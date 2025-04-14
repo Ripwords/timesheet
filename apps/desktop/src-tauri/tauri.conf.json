@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "timesheet",
   "version": "0.1.0",
-  "identifier": "com.timesheet.s20",
+  "identifier": "com.timesheet.app",
   "build": {
     "beforeDevCommand": "bun run ui:dev",
     "devUrl": "http://localhost:3000",

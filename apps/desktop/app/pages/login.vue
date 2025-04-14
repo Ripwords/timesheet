@@ -77,7 +77,7 @@ async function forgotPassword() {
           <UInput
             v-model="state.email"
             type="email"
-            placeholder="s20@studio20.my"
+            placeholder="example@email.com"
           />
         </UFormField>
 

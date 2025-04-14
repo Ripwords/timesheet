@@ -13,7 +13,7 @@ export const sendEmail = async (
   console.log(auth)
 
   const transporter = createTransport({
-    name: "S20",
+    name: process.env.SMTP_USER,
     host: process.env.SMTP_HOST,
     port: 465,
     secure: true,

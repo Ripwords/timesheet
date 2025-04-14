@@ -28,8 +28,8 @@ export const auth = baseApp("auth").group("/auth", (app) =>
       async ({ db, body, error }) => {
         const { email, password } = body
 
-        // Email needs to have @studio20.my domain
-        if (!email.endsWith("@studio20.my")) {
+        const allowedDomains = process.env.SIGNUP_DOMAINS?.split(",")
+        if (!allowedDomains?.includes(email.split("@")[1])) {
           return error(400, "Invalid email domain.")
         }
 
