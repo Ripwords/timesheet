@@ -10,8 +10,10 @@ const state = reactive({
 
 const eden = useEden()
 const toast = useToast()
+const disabled = ref(false)
 
 async function submit() {
+  disabled.value = true
   if (state.password !== state.confirmPassword) {
     toast.add({
       title: "Error",
@@ -34,10 +36,11 @@ async function submit() {
   if (data) {
     toast.add({
       title: "Success",
-      description: "Registered successfully",
+      description: "Registered successfully, please verify your email",
     })
     navigateTo("/login")
   }
+  disabled.value = false
 }
 </script>
 
@@ -101,6 +104,7 @@ async function submit() {
           type="submit"
           block
           label="Register"
+          :disabled
         />
       </UForm>
 

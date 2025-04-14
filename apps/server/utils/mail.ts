@@ -10,8 +10,6 @@ export const sendEmail = async (
     pass: process.env.SMTP_PASSWORD,
   }
 
-  console.log(auth)
-
   const transporter = createTransport({
     name: process.env.SMTP_USER,
     host: process.env.SMTP_HOST,

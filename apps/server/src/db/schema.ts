@@ -6,6 +6,7 @@ import {
   pgEnum,
   integer,
   type AnyPgColumn,
+  boolean,
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
@@ -15,6 +16,8 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(), // Store hashed passwords, never plain text!
   role: userRoleEnum("role").default("user").notNull(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  verificationToken: text("verification_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -4,7 +4,7 @@ import * as schema from "../db/schema"
 import { t } from "elysia"
 import { sendEmail } from "../../utils/mail"
 import crypto from "crypto"
-import { eq } from "drizzle-orm"
+import { eq, and, isNotNull } from "drizzle-orm"
 
 export const auth = baseApp("auth").group("/auth", (app) =>
   app
@@ -25,7 +25,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     })
     .post(
       "/signup",
-      async ({ db, body, error }) => {
+      async ({ db, body, error, set }) => {
         const { email, password } = body
 
         const allowedDomains = process.env.SIGNUP_DOMAINS?.split(",")
@@ -34,24 +34,50 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         }
 
         const existingUser = await db.query.users.findFirst({
-          where: (users, { eq }) => eq(users.email, email),
+          where: (users, { eq, and, isNotNull }) =>
+            and(eq(users.email, email), isNotNull(users.emailVerified)),
         })
 
-        if (existingUser) {
-          return error(409, "User with this email already exists.")
+        if (existingUser && existingUser.emailVerified) {
+          return error(409, "User with this email already verified.")
         }
 
         const passwordHash = await bcrypt.hash(password, 10)
+        const verificationToken = crypto.randomBytes(32).toString("hex")
+        const verificationTokenHash = await bcrypt.hash(verificationToken, 10)
 
-        const newUser = await db
-          .insert(schema.users)
-          .values({
-            email: email,
-            passwordHash: passwordHash,
-          })
-          .returning({ id: schema.users.id, email: schema.users.email })
+        try {
+          const newUser = await db
+            .insert(schema.users)
+            .values({
+              email: email,
+              passwordHash: passwordHash,
+              verificationToken: verificationTokenHash,
+            })
+            .returning({ id: schema.users.id, email: schema.users.email })
 
-        return { message: "User created successfully", user: newUser[0] }
+          const verificationUrl = `${process.env.DASHBOARD_URL}/verify-email/${verificationToken}`
+          const message = `Welcome! Please verify your email by clicking this link: ${verificationUrl}`
+          console.log(message)
+          await sendEmail(email, "Verify Your Email", message)
+
+          set.status = 201
+          return {
+            message:
+              "User created. Please check your email to verify your account.",
+            user: newUser[0],
+          }
+        } catch (e: any) {
+          if (
+            e.message?.includes(
+              'duplicate key value violates unique constraint "users_email_key"'
+            )
+          ) {
+            return error(409, "User with this email already exists.")
+          }
+          console.error("Signup Error:", e)
+          return error(500, "Failed to create user.")
+        }
       },
       {
         body: t.Object({
@@ -71,6 +97,10 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         if (!user) {
           return error(401, "Invalid email or password.")
+        }
+
+        if (!user.emailVerified) {
+          return error(403, "Please verify your email before signing in.")
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -206,6 +236,53 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         body: t.Object({
           token: t.String(),
           password: t.String({ minLength: 8 }),
+        }),
+      }
+    )
+    .get(
+      "/verify-email/:token",
+      async ({ db, params, error, set }) => {
+        const { token } = params
+
+        const usersToCheck = await db.query.users.findMany({
+          where: (users) =>
+            and(
+              eq(users.emailVerified, false),
+              isNotNull(users.verificationToken)
+            ),
+          columns: { id: true, verificationToken: true },
+        })
+
+        let foundUser = null
+        for (const user of usersToCheck) {
+          if (
+            user.verificationToken &&
+            (await bcrypt.compare(token, user.verificationToken))
+          ) {
+            foundUser = user
+            break
+          }
+        }
+
+        if (!foundUser || !foundUser.verificationToken) {
+          return error(400, "Verification token is invalid or has expired.")
+        }
+
+        await db
+          .update(schema.users)
+          .set({
+            emailVerified: true,
+            verificationToken: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, foundUser.id))
+
+        set.status = 200
+        return { message: "Email verified successfully." }
+      },
+      {
+        params: t.Object({
+          token: t.String(),
         }),
       }
     )
