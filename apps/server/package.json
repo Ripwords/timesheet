@@ -1,0 +1,26 @@
+{
+  "name": "@timesheet/server",
+  "version": "1.0.50",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.2.0",
+    "@elysiajs/jwt": "^1.2.0",
+    "@elysiajs/swagger": "^1.2.2",
+    "elysia": "latest",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.14.1"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.11.12",
+    "bun-types": "latest"
+  },
+  "module": "src/index.ts",
+  "main": "src/index.ts"
+}

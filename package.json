@@ -1,0 +1,23 @@
+{
+  "name": "timesheet",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/bun": "latest",
+    "bcryptjs": "^3.0.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "dependencies": {
+    "@elysiajs/cookie": "^0.8.0",
+    "@elysiajs/jwt": "^1.2.0",
+    "drizzle-kit": "^0.30.6",
+    "drizzle-orm": "^0.41.0",
+    "postgres": "^3.4.5"
+  }
+}

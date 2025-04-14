@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1744624250945,
+      "tag": "0000_massive_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1744627581910,
+      "tag": "0001_slim_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1744628804015,
+      "tag": "0002_swift_sentinels",
+      "breakpoints": true
+    }
+  ]
+}
