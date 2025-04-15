@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, h } from "vue"
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-// Import UBadge for programmatic use
 import { UBadge, UButton } from "#components"
 
 definePageMeta({
@@ -15,9 +13,14 @@ type UsersResponse = Awaited<
 type User = NonNullable<UsersResponse>[number] // Get the item type from the array
 
 const eden = useEden() // Uncomment eden
-const users = ref<User[]>([]) // Use inferred User type
-const loading = ref(true) // Set loading to true initially
-const error = ref<string | null>(null)
+const {
+  data: users,
+  status,
+  error,
+} = await useLazyAsyncData("users", async () => {
+  const { data } = await eden.api.admin.users.index.get()
+  return data ?? []
+})
 
 // Helper function for date formatting
 const formatDate = (date: string | Date | null) => {
@@ -94,32 +97,6 @@ const columns: ColumnDef<User, unknown>[] = [
   },
 ]
 
-// Uncomment fetchUsers again
-async function fetchUsers() {
-  loading.value = true
-  error.value = null
-  try {
-    const response = await eden.api.admin.users.index.get() // Use the correct endpoint
-    if (response.error) {
-      const errorMessage =
-        response.error.value &&
-        typeof response.error.value === "object" &&
-        "message" in response.error.value
-          ? String(response.error.value.message)
-          : "Failed to fetch users (Unknown API error)"
-      throw new Error(errorMessage)
-    }
-    // Type should be inferred correctly now
-    users.value = Array.isArray(response.data) ? response.data : []
-  } catch (err: unknown) {
-    console.error("Error fetching users:", err)
-    error.value =
-      err instanceof Error ? err.message : "An unknown error occurred"
-  } finally {
-    loading.value = false
-  }
-}
-
 function viewUserDetails(userId: number | string) {
   useRouter().push(`/admin/users/${userId}`)
 }
@@ -135,9 +112,6 @@ function deleteUser(user: User) {
     alert(`Deleting user ID: ${user.id} (Not implemented)`)
   }
 }
-
-// Uncomment onMounted call
-onMounted(fetchUsers)
 </script>
 
 <template>
@@ -147,7 +121,7 @@ onMounted(fetchUsers)
     </div>
 
     <div
-      v-if="loading"
+      v-if="status === 'pending'"
       class="text-center py-4"
     >
       Loading users...
@@ -159,10 +133,10 @@ onMounted(fetchUsers)
       Error loading users: {{ error }}
     </div>
 
-    <UCard v-if="!loading && !error">
+    <UCard v-if="status === 'success'">
       <UTable
-        :rows="users"
-        :columns="columns"
+        :data="users"
+        :columns
         :empty-state="{
           icon: 'i-heroicons-user-group',
           label: 'No users found.', // Restore default label
