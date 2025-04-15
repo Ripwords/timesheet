@@ -3,7 +3,8 @@ import { treaty } from "@elysiajs/eden"
 import type { App } from "@timesheet/server"
 
 export const useEden = () => {
-  const eden = treaty<App>("http://localhost:3100", {
+  const appConfig = useAppConfig()
+  const eden = treaty<App>(appConfig.serverUrl, {
     // @ts-ignore
     fetcher(url, options) {
       return tauriFetch(url, options as any)

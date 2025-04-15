@@ -28,34 +28,6 @@ async function submit() {
     navigateTo("/")
   }
 }
-
-async function forgotPassword() {
-  if (!state.email) {
-    toast.add({
-      title: "Error",
-      description: "Please enter an email",
-    })
-    return
-  }
-  console.log(state.email)
-  const { data, error } = await eden.auth["forgot-password"].post({
-    email: state.email,
-  })
-
-  if (error) {
-    toast.add({
-      title: "Error",
-      description: "Failed to send reset password email",
-    })
-  }
-
-  if (data) {
-    toast.add({
-      title: "Success",
-      description: "Reset password email sent",
-    })
-  }
-}
 </script>
 
 <template>
@@ -98,24 +70,6 @@ async function forgotPassword() {
           label="Login"
         />
       </UForm>
-
-      <template #footer>
-        <p class="text-sm text-center">
-          Don't have an account?
-          <NuxtLink
-            to="/register"
-            class="text-primary"
-            >Register</NuxtLink
-          >
-        </p>
-        <p class="text-sm text-center cursor-pointer">
-          <NuxtLink
-            @click="forgotPassword"
-            class="text-primary"
-            >Forgot password?</NuxtLink
-          >
-        </p>
-      </template>
     </UCard>
   </UContainer>
 </template>

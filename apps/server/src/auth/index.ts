@@ -1,10 +1,12 @@
-import { baseApp } from "../../utils/baseApp"
 import bcrypt from "bcryptjs"
-import * as schema from "../db/schema"
-import { t } from "elysia"
-import { sendEmail } from "../../utils/mail"
 import crypto from "crypto"
-import { eq, and, isNotNull } from "drizzle-orm"
+
+import { and, eq, isNotNull } from "drizzle-orm"
+import { t } from "elysia"
+
+import { baseApp } from "../../utils/baseApp"
+import { sendEmail } from "../../utils/mail"
+import * as schema from "../db/schema"
 
 export const auth = baseApp("auth").group("/auth", (app) =>
   app
@@ -19,7 +21,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           if (!profile) {
             return null
           }
-          return profile as { userId: number; email: string }
+          return profile as { userId: number; email: string; role: string }
         },
       }
     })
@@ -56,9 +58,9 @@ export const auth = baseApp("auth").group("/auth", (app) =>
             })
             .returning({ id: schema.users.id, email: schema.users.email })
 
-          const verificationUrl = `${process.env.DASHBOARD_URL}/verify-email/${verificationToken}`
-          const message = `Welcome! Please verify your email by clicking this link: ${verificationUrl}`
-          console.log(message)
+          const verificationUrl = `http://localhost:${process.env.SERVER_PORT}/auth/verify-email/${verificationToken}`
+          const message = `Welcome! Please verify your email by clicking this link: <a href="${verificationUrl}">Verify Email</a>`
+
           await sendEmail(email, "Verify Your Email", message)
 
           set.status = 201
@@ -145,7 +147,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         return error(401, "Unauthorized")
       }
 
-      return `Hello ${userProfile.email}! Your user ID is ${userProfile.userId}.`
+      return userProfile
     })
     .post(
       "/forgot-password",
@@ -177,7 +179,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         const resetUrl = `${process.env.DASHBOARD_URL}/reset-password/${resetToken}`
 
-        const message = `You requested a password reset. Click the link to reset your password: ${resetUrl}\nIf you didn't request this, please ignore this email.`
+        const message = `You requested a password reset. Click the link to reset your password: <a href="${resetUrl}">Reset Password</a>\nIf you didn't request this, please ignore this email.`
 
         try {
           await sendEmail(user.email, "Password Reset Request", message)
@@ -200,37 +202,71 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     .post(
       "/reset-password",
       async ({ db, body, error }) => {
-        const { token, password } = body
+        const { token: rawToken, password } = body
 
-        const resetTokenHash = await bcrypt.hash(token, 10)
-
-        const user = await db.query.resetPasswordTokens.findFirst({
-          where: (tokens, { eq, and, gt }) =>
-            and(
-              eq(tokens.token, resetTokenHash),
-              gt(tokens.expiresAt, new Date())
-            ),
+        const candidateTokens = await db.query.resetPasswordTokens.findMany({
+          where: (tokens, { gt }) => gt(tokens.expiresAt, new Date()),
+          columns: {
+            token: true,
+            userId: true,
+            id: true,
+          },
         })
 
-        if (!user) {
-          return error(400, "Password reset token is invalid or has expired.")
+        let validTokenRecord = null
+
+        for (const candidate of candidateTokens) {
+          if (candidate.token) {
+            const isMatch = await bcrypt.compare(rawToken, candidate.token)
+            if (isMatch) {
+              validTokenRecord = candidate
+              break
+            }
+          }
         }
 
+        // 3. Check if a valid token was found
+        if (!validTokenRecord) {
+          console.log("No valid reset token found or token expired/mismatched.")
+          return error(400, "Invalid or expired reset token.")
+        }
+
+        // Ensure userId is present on the valid token record
+        if (!validTokenRecord.userId) {
+          console.error(
+            "User ID missing from valid reset token record:",
+            validTokenRecord.id
+          )
+          return error(500, "Internal server error during password reset.")
+        }
+
+        console.log("Valid token found for user:", validTokenRecord.userId)
+
+        // 4. Hash the new password
         const newPasswordHash = await bcrypt.hash(password, 10)
 
+        // 5. Update the user's password
         await db
           .update(schema.users)
           .set({
             passwordHash: newPasswordHash,
-            updatedAt: new Date(), // Manually update updatedAt
+            updatedAt: new Date(),
           })
-          .where(eq(schema.users.id, user.id))
+          .where(eq(schema.users.id, validTokenRecord.userId))
 
+        // 6. Delete the used reset token
         await db
           .delete(schema.resetPasswordTokens)
-          .where(eq(schema.resetPasswordTokens.id, user.id))
+          .where(eq(schema.resetPasswordTokens.id, validTokenRecord.id))
 
-        return { message: "Password has been reset successfully." }
+        console.log(
+          "Password updated successfully for user:",
+          validTokenRecord.userId
+        )
+
+        return {
+          message: "Password reset successfully.",
+        }
       },
       {
         body: t.Object({
@@ -277,8 +313,11 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           })
           .where(eq(schema.users.id, foundUser.id))
 
-        set.status = 200
-        return { message: "Email verified successfully." }
+        set.status = 302
+        set.headers = {
+          Location: `${process.env.DASHBOARD_URL}/login`,
+        }
+        return { message: "Redirecting to dashboard." }
       },
       {
         params: t.Object({

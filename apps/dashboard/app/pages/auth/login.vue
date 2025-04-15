@@ -1,46 +1,37 @@
 <script setup lang="ts">
-import { reactive } from "vue"
-
 const state = reactive({
-  name: "",
   email: "",
   password: "",
-  confirmPassword: "",
 })
 
 const eden = useEden()
 const toast = useToast()
-const disabled = ref(false)
 
 async function submit() {
-  disabled.value = true
-  if (state.password !== state.confirmPassword) {
-    toast.add({
-      title: "Error",
-      description: "Passwords do not match",
-    })
-    return
-  }
-  const { data, error } = await eden.auth.signup.post({
+  const { data, error } = await eden.auth.signin.post({
     email: state.email,
     password: state.password,
   })
 
+  console.log(data)
+
+  const { data: profile } = await eden.auth.profile.get()
+  console.log(profile)
+
   if (error) {
     toast.add({
       title: "Error",
-      description: "Failed to register",
+      description: "Invalid email or password",
     })
   }
 
   if (data) {
     toast.add({
       title: "Success",
-      description: "Registered successfully, please verify your email",
+      description: "Logged in successfully",
     })
-    navigateTo("/login")
+    navigateTo("/")
   }
-  disabled.value = false
 }
 </script>
 
@@ -48,24 +39,13 @@ async function submit() {
   <UContainer class="flex items-center justify-center min-h-screen">
     <UCard class="w-full max-w-sm">
       <template #header>
-        <h1 class="text-xl font-bold text-center">Register</h1>
+        <h1 class="text-xl font-bold text-center">Login</h1>
       </template>
 
       <UForm
-        :state="state"
+        :state
         @submit="submit"
       >
-        <UFormField
-          label="Name"
-          name="name"
-          class="mb-4"
-        >
-          <UInput
-            v-model="state.name"
-            placeholder="Your Name"
-          />
-        </UFormField>
-
         <UFormField
           label="Email"
           name="email"
@@ -81,7 +61,7 @@ async function submit() {
         <UFormField
           label="Password"
           name="password"
-          class="mb-4"
+          class="mb-6"
         >
           <UInput
             v-model="state.password"
@@ -89,32 +69,27 @@ async function submit() {
           />
         </UFormField>
 
-        <UFormField
-          label="Confirm Password"
-          name="confirmPassword"
-          class="mb-6"
-        >
-          <UInput
-            v-model="state.confirmPassword"
-            type="password"
-          />
-        </UFormField>
-
         <UButton
           type="submit"
           block
-          label="Register"
-          :disabled
+          label="Login"
         />
       </UForm>
 
       <template #footer>
         <p class="text-sm text-center">
-          Already have an account?
+          Don't have an account?
           <NuxtLink
-            to="/login"
+            to="/register"
             class="text-primary"
-            >Login</NuxtLink
+            >Register</NuxtLink
+          >
+        </p>
+        <p class="text-sm text-center cursor-pointer">
+          <NuxtLink
+            to="/forgot-password"
+            class="text-primary"
+            >Forgot password?</NuxtLink
           >
         </p>
       </template>

@@ -13,9 +13,13 @@ export const sendEmail = async (
   const transporter = createTransport({
     name: process.env.SMTP_USER,
     host: process.env.SMTP_HOST,
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
     auth,
+    tls: {
+      // do not fail on invalid certs
+      rejectUnauthorized: false,
+    },
   })
 
   await transporter.sendMail({
@@ -23,5 +27,6 @@ export const sendEmail = async (
     to: email,
     subject,
     text: message,
+    html: `<p>${message}</p>`,
   })
 }

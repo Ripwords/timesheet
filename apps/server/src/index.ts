@@ -7,7 +7,7 @@ const app = baseApp("main")
   .use(projects)
   .use(timeEntries)
   .get("/", () => "Hello Elysia")
-  .listen(3100)
+  .listen(process.env.SERVER_PORT || 3100)
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`

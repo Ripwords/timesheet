@@ -5,5 +5,4 @@ export default defineAppConfig({
       neutral: "zinc",
     },
   },
-  serverUrl: "http://localhost:3100",
 })

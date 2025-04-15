@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "timesheet",
+        "title": "Timesheet",
         "width": 600,
         "height": 450
       }
