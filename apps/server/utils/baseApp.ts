@@ -1,10 +1,14 @@
 import { Elysia, t } from "elysia"
+
 import { swagger } from "@elysiajs/swagger"
+import { serverTiming } from "@elysiajs/server-timing"
 import { cors } from "@elysiajs/cors"
 import { jwt } from "@elysiajs/jwt"
 import { cookie } from "@elysiajs/cookie"
+
 import postgres from "postgres"
 import { drizzle } from "drizzle-orm/postgres-js"
+
 import * as schema from "../src/db/schema"
 import * as dotenv from "dotenv"
 
@@ -27,6 +31,7 @@ export const baseApp = (name: string) =>
   new Elysia({
     name,
   })
+    .use(serverTiming())
     .decorate("db", db)
     .use(
       cors({
