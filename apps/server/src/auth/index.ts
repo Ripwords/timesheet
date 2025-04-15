@@ -7,7 +7,9 @@ import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { sendEmail } from "../../utils/mail"
 import * as schema from "../db/schema"
+import { seedAdmin } from "../db/seedUser"
 
+seedAdmin()
 export const auth = baseApp("auth").group("/auth", (app) =>
   app
     .derive(({ jwt, cookie }) => {
