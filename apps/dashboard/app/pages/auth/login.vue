@@ -1,4 +1,7 @@
 <script setup lang="ts">
+definePageMeta({
+  layout: "auth",
+})
 const state = reactive({
   email: "",
   password: "",

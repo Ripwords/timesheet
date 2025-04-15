@@ -1,4 +1,7 @@
 <script setup lang="ts">
+definePageMeta({
+  layout: "auth",
+})
 const { params } = useRoute("reset-password-token")
 const token = params.token as string
 
@@ -99,7 +102,7 @@ async function submitPasswordReset() {
         <UButton
           type="submit"
           block
-        label="Reset Password"
+          label="Reset Password"
         />
       </UForm>
 

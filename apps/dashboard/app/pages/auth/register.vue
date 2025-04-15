@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { departmentEnum } from "@timesheet/server/src/db/schema"
+definePageMeta({
+  layout: "auth",
+})
 const departments = departmentEnum.enumValues
 
 const state = reactive({

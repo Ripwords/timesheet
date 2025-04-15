@@ -47,7 +47,7 @@ export const seedAdmin = async () => {
       // Update existing user to admin role
       await db
         .update(schema.users)
-        .set({ role: "admin" })
+        .set({ role: "admin", emailVerified: true })
         .where(eq(schema.users.email, adminEmail))
 
       console.log(`Admin user ${adminEmail} updated to admin role.`)
@@ -63,6 +63,7 @@ export const seedAdmin = async () => {
       passwordHash: hashedPassword, // Use passwordHash as suggested by previous error
       role: "admin",
       department: "backend",
+      emailVerified: true,
     })
 
     console.log(`Admin user ${adminEmail} seeded successfully.`)
