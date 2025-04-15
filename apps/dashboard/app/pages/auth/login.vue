@@ -80,7 +80,7 @@ async function submit() {
         <p class="text-sm text-center">
           Don't have an account?
           <NuxtLink
-            to="/register"
+            to="/auth/register"
             class="text-primary"
             >Register</NuxtLink
           >

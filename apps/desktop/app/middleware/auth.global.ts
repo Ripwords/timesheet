@@ -13,7 +13,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const requiresAuth = protectedRoutes.includes(to.path)
 
   // Define authentication routes (e.g., login, register pages)
-  const authRoutes = ["/login", "/register"] // Add your auth routes like '/register'
+  const authRoutes = ["/login"] // Add your auth routes like '/register'
   const isAuthRoute = authRoutes.includes(to.path)
 
   // --- Redirection Logic ---

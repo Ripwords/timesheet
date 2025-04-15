@@ -11,6 +11,7 @@ import { drizzle } from "drizzle-orm/postgres-js"
 
 import * as schema from "../src/db/schema"
 import * as dotenv from "dotenv"
+import { logger } from "@rasla/logify"
 
 dotenv.config({ path: "../../.env" })
 
@@ -31,6 +32,7 @@ export const baseApp = (name: string) =>
   new Elysia({
     name,
   })
+    .use(logger())
     .use(serverTiming())
     .decorate("db", db)
     .use(

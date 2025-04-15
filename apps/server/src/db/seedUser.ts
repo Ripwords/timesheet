@@ -62,6 +62,7 @@ export const seedAdmin = async () => {
       email: adminEmail,
       passwordHash: hashedPassword, // Use passwordHash as suggested by previous error
       role: "admin",
+      department: "backend",
     })
 
     console.log(`Admin user ${adminEmail} seeded successfully.`)

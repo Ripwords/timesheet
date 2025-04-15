@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { departmentEnum } from "@timesheet/server/src/db/schema"
+const departments = departmentEnum.enumValues
+
 const state = reactive({
   name: "",
   email: "",
   password: "",
   confirmPassword: "",
+  department: departments[0],
 })
 
 const eden = useEden()
@@ -22,6 +26,7 @@ async function submit() {
   const { data, error } = await eden.auth.signup.post({
     email: state.email,
     password: state.password,
+    department: state.department,
   })
 
   if (error) {
@@ -36,7 +41,7 @@ async function submit() {
       title: "Success",
       description: "Registered successfully, please verify your email",
     })
-    navigateTo("/login")
+    navigateTo("/auth/login")
   }
   disabled.value = false
 }
@@ -61,6 +66,17 @@ async function submit() {
           <UInput
             v-model="state.name"
             placeholder="Your Name"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Department"
+          name="department"
+          class="mb-4"
+        >
+          <USelectMenu
+            v-model="state.department"
+            :items="departments"
           />
         </UFormField>
 
@@ -110,7 +126,7 @@ async function submit() {
         <p class="text-sm text-center">
           Already have an account?
           <NuxtLink
-            to="/login"
+            to="/auth/login"
             class="text-primary"
             >Login</NuxtLink
           >

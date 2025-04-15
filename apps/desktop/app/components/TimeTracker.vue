@@ -3,6 +3,11 @@ import type { TableColumn } from "#ui/types"
 
 const dayjs = useDayjs()
 const toast = useToast()
+const eden = useEden()
+const logout = async () => {
+  await eden.auth.signout.post()
+  navigateTo("/login")
+}
 
 // --- State ---
 const timerInterval = ref<NodeJS.Timeout | null>(null)
@@ -208,12 +213,6 @@ const saveSession = async () => {
 const cancelSession = () => {
   showProjectModal.value = false
   resetState()
-}
-
-const eden = useEden()
-const logout = async () => {
-  await eden.auth.signout.post()
-  navigateTo("/login")
 }
 </script>
 

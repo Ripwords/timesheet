@@ -81,7 +81,7 @@ async function submitForgotPassword() {
         <p class="text-sm text-center">
           Remembered your password?
           <NuxtLink
-            to="/login"
+            to="/auth/login"
             class="text-primary"
             >Login</NuxtLink
           >

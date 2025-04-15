@@ -16,7 +16,7 @@ async function submitPasswordReset() {
       title: "Error",
       description: "Invalid or missing reset token.",
     })
-    await navigateTo("/login") // Redirect if no token
+    await navigateTo("/auth/login") // Redirect if no token
     return
   }
 
@@ -56,7 +56,7 @@ async function submitPasswordReset() {
       title: "Success",
       description: "Password has been reset successfully.",
     })
-    await navigateTo("/login")
+    await navigateTo("/auth/login")
   }
 }
 </script>
@@ -99,7 +99,7 @@ async function submitPasswordReset() {
         <UButton
           type="submit"
           block
-          label="Reset Password"
+        label="Reset Password"
         />
       </UForm>
 
@@ -107,7 +107,7 @@ async function submitPasswordReset() {
         <p class="text-sm text-center">
           Remembered your password?
           <NuxtLink
-            to="/login"
+            to="/auth/login"
             class="text-primary"
             >Login</NuxtLink
           >

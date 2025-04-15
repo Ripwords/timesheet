@@ -13,8 +13,8 @@
     "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/server-timing": "^1.2.1",
     "@elysiajs/swagger": "^1.2.2",
+    "@rasla/logify": "^5.0.0",
     "elysia": "latest",
-    "logestic": "^1.2.4",
     "nodemailer": "^6.10.1",
     "pg": "^8.14.1"
   },
