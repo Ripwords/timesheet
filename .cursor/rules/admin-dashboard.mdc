@@ -1,0 +1,84 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+Description: Outlines the page structure and core functionalities for the Nuxt Admin Dashboard, focusing on user, project, and time entry analytics.
+
+**Admin Dashboard Pages & Functionality:**
+
+1.  **`/admin/overview` (or `/admin`)**
+    *   **Purpose:** Provide a high-level summary and entry point for admins.
+    *   **Key Features:**
+        *   Display key metrics (widgets):
+            *   Total registered users.
+            *   Total active projects.
+            *   Total hours tracked (e.g., last 7 days, last 30 days).
+            *   Number of recently completed time entries.
+        *   Quick navigation links to other admin sections (Users, Projects, Reports).
+        *   Potentially display recent admin activity logs (optional).
+
+2.  **`/admin/users`**
+    *   **Purpose:** Manage registered users.
+    *   **Key Features:**
+        *   Display a paginated, searchable, and sortable table of all users (`users` table data).
+        *   Columns: `ID`, `Email`, `Role`, `Email Verified`, `Created At`.
+        *   Actions per user:
+            *   Navigate to User Detail page (`/admin/users/[id]`).
+            *   Edit User Role (`admin`/`user`).
+            *   Manually verify/unverify email (optional, depending on policy).
+            *   Potentially disable/delete user (consider implications).
+
+3.  **`/admin/users/[id]`**
+    *   **Purpose:** View detailed information and activity for a specific user.
+    *   **Key Features:**
+        *   Display user profile details (`id`, `email`, `role`, `createdAt`, etc.).
+        *   Display a paginated, searchable, and sortable table of time entries filtered by this `userId` (`timeEntries` table data).
+        *   Time Entry Columns: `Entry ID`, `Project Name`, `Start Time`, `End Time`, `Duration`.
+        *   Filtering options for time entries:
+            *   Date Range (Start/End).
+            *   Project.
+        *   Display summary statistics for the user (based on filtered entries):
+            *   Total hours tracked.
+            *   Number of projects contributed to.
+
+4.  **`/admin/projects`**
+    *   **Purpose:** Manage projects.
+    *   **Key Features:**
+        *   Display a paginated, searchable, and sortable table of all projects (`projects` table data).
+        *   Columns: `ID`, `Name`, `Created At`, `Total Hours Tracked (optional aggregate)`.
+        *   Actions:
+            *   Create New Project (Modal or separate page `/admin/projects/new`).
+            *   Navigate to Project Detail page (`/admin/projects/[id]`).
+            *   Edit Project Name.
+            *   Delete Project (Consider soft delete or preventing deletion if `timeEntries` reference it).
+
+5.  **`/admin/projects/[id]`**
+    *   **Purpose:** View detailed information and activity for a specific project.
+    *   **Key Features:**
+        *   Display project details (`id`, `name`, `createdAt`).
+        *   Display a paginated, searchable, and sortable table of time entries filtered by this `projectId` (`timeEntries` table data).
+        *   Time Entry Columns: `Entry ID`, `User Email`, `Start Time`, `End Time`, `Duration`.
+        *   Filtering options for time entries:
+            *   Date Range (Start/End).
+            *   User.
+        *   Display summary statistics for the project (based on filtered entries):
+            *   Total hours tracked.
+            *   Number of contributors.
+        *   Display a breakdown of contributions by user:
+            *   Table/List: `User Email`, `Total Hours on this Project`.
+
+6.  **`/admin/reports` (or `/admin/analytics`)**
+    *   **Purpose:** Provide flexible, combined data analysis and reporting.
+    *   **Key Features:**
+        *   Combined Filtering Interface: Allow filtering `timeEntries` by multiple criteria simultaneously:
+            *   Date Range.
+            *   Specific User(s).
+            *   Specific Project(s).
+        *   Display filtered results in a comprehensive table.
+        *   Data Visualization:
+            *   Charts showing total hours per project over time.
+            *   Charts showing total hours per user over time.
+            *   Charts comparing project contributions.
+        *   Data Export: Ability to export the filtered data table (e.g., to CSV).

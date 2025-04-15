@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+**Core Preferences & Instructions:**
+
+1.  **Package Management:** Always use `antfu/ni` commands for Node.js package management (`ni`, `nr`, `nlx`, `nu`, `nun`, `nci`, `na`) instead of raw `npm`, `yarn`, `pnpm`, or `bun` commands.
+2.  **CSS Framework:** Default to using Tailwind CSS for styling. In this project, this was achieved primarily through `@nuxt/ui`.
+
+**Technology Stack & Configuration:**
+
+*   **Framework:** Nuxt 3 (using `defineNuxtConfig`, `nuxi` commands).
+*   **UI Library:** `@nuxt/ui` v3. Components used: `<UApp>`, `<UCard>`, `<UButton>`, `<UTable>`, `<UModal>`, `<USelectMenu>`, `<UFormGroup>`.
+*   **Date/Time Library:** `dayjs-nuxt`.
+    *   Requires adding `"dayjs-nuxt"` to `modules` in `nuxt.config.ts`.
+    *   Requires configuring necessary plugins (e.g., `duration`, `relativeTime`, `localizedFormat`, `utc`) via the `dayjs` key in `nuxt.config.ts`.
+    *   Use the `useDayjs()` composable within components.
+*   **Desktop Framework:** Tauri (Setup observed in `app/App.vue` using `@tauri-apps/plugin-positioner`, `@tauri-apps/api/tray`, `@tauri-apps/api/menu`, `@tauri-apps/api/window` for tray icon, window management, always-on-top, etc.).
+*   **Language:** TypeScript.
+*   **Vue Version:** Vue 3 (using Composition API: `ref`, `computed`, `watch`, `onMounted`, `<script setup>`).
+
+**Coding Patterns & Conventions:**
+
+*   **Component Structure:** Encapsulate features within dedicated Vue components (e.g., `app/components/TimeTracker.vue`).
+*   **State Management:** Use Vue Composition API `ref`s for local component state. Refactor state logic for clarity when debugging (e.g., introduced `modalStartTime`).
+*   **Persistence:** Use browser `localStorage` for simple data persistence, including `JSON.stringify`/`parse` and error handling during parsing. Use `watch` with `{ deep: true }` to automatically save state changes.
+*   **Nuxt UI Usage:**
+    *   `<UTable>`: Define columns with both `key` and `id` properties. Use `:rows`, `:columns`, `:empty-state`. Handle potential type issues with column definitions (used `as any` as a temporary workaround).
+    *   `<UButton>`: Utilize standard props like `icon`, `size`, `variant`, `:disabled`, `@click`. Use valid Nuxt UI `color` props (e.g., `warning`, `error`, `neutral`, *not* arbitrary Tailwind colors like `red` or `yellow` directly in the `color` prop).
+    *   `<UModal>`: Control with `v-model`.
+    *   `<USelectMenu>`: Use `v-model`, `:options`, `placeholder`, `searchable`.
+    *   `<UCard>`: Leverage header/footer slots. Avoid non-standard props like `:ui`.
+*   **Imports:** Use specific imports (e.g., `import { useNuxtApp } from '#app'` for composables when needed, direct component imports aren't usually necessary with Nuxt auto-imports).
+
+**Debugging Workflow:**
+
+*   **Type Errors:** Run `npx nuxi prepare` after installing modules or changing `nuxt.config.ts` to regenerate types and resolve issues with module augmentation (like `$dayjs` or config types).
+*   **Module Compatibility:** Verify Nuxt module compatibility (e.g., `@nuxtjs/dayjs` is for Nuxt 2, `dayjs-nuxt` is for Nuxt 3).
+*   **Configuration:** Double-check `nuxt.config.ts` for correct module inclusion *and* necessary configuration blocks after edits or tool applications.
+*   **Linter Errors:** Address linter errors promptly, paying attention to type mismatches (especially with UI component props) and configuration issues.
+*   **Logic Errors:** Refactor state management or control flow when features don't behave as expected (e.g., modal trigger logic).
+*   **Tool Errors:** Correct failed terminal commands (e.g., using `npx nuxi prepare` instead of `nr prepare`). Verify file paths if tools report missing files.
