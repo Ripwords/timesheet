@@ -39,7 +39,7 @@ async function submitPasswordReset() {
     return
   }
 
-  const { data, error } = await eden.auth["reset-password"].post({
+  const { data, error } = await eden.api.auth["reset-password"].post({
     token,
     password: state.password,
   })

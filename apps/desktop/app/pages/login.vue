@@ -8,7 +8,7 @@ const eden = useEden()
 const toast = useToast()
 
 async function submit() {
-  const { data, error } = await eden.auth.signin.post({
+  const { data, error } = await eden.api.auth.signin.post({
     email: state.email,
     password: state.password,
   })

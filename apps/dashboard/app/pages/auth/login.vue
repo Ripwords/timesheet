@@ -11,14 +11,14 @@ const eden = useEden()
 const toast = useToast()
 
 async function submit() {
-  const { data, error } = await eden.auth.signin.post({
+  const { data, error } = await eden.api.auth.signin.post({
     email: state.email,
     password: state.password,
   })
 
   console.log(data)
 
-  const { data: profile } = await eden.auth.profile.get()
+  const { data: profile } = await eden.api.auth.profile.get()
   console.log(profile)
 
   if (error) {
@@ -90,7 +90,7 @@ async function submit() {
         </p>
         <p class="text-sm text-center cursor-pointer">
           <NuxtLink
-            to="/forgot-password"
+            to="/auth/forgot-password"
             class="text-primary"
             >Forgot password?</NuxtLink
           >

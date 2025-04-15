@@ -26,7 +26,7 @@ async function submit() {
     })
     return
   }
-  const { data, error } = await eden.auth.signup.post({
+  const { data, error } = await eden.api.auth.signup.post({
     email: state.email,
     password: state.password,
     department: state.department,

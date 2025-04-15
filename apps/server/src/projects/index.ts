@@ -59,6 +59,8 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           orderBy: (projects, { desc }) => [desc(projects.createdAt)],
         })
 
+        console.log(allProjects)
+
         return allProjects
       },
       {

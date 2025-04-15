@@ -20,7 +20,7 @@ async function submitForgotPassword() {
     return
   }
 
-  const { data, error } = await eden.auth["forgot-password"].post({
+  const { data, error } = await eden.api.auth["forgot-password"].post({
     email: state.email,
   })
 
