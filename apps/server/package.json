@@ -4,6 +4,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts",
+    "build": "bun --compile --minify-whitespace --minify-syntax --target bun --outfile server ./src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
@@ -15,6 +16,7 @@
     "@elysiajs/server-timing": "^1.2.1",
     "@elysiajs/swagger": "^1.2.2",
     "@rasla/logify": "^5.0.0",
+    "bcryptjs": "^3.0.2",
     "elysia": "latest",
     "nodemailer": "^6.10.1",
     "pg": "^8.14.1"

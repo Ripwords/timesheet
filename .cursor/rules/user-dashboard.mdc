@@ -1,0 +1,123 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+Okay, here is a markdown document outlining the structure and functionality for a non-admin user dashboard, incorporating elements from the `TimeTracker.vue` and the backend `time-entries` API for managing time entries.
+
+```markdown
+# User Dashboard Documentation
+
+This document outlines the structure and core functionalities for the standard user dashboard within the Nuxt web application. It allows users to view their tracked time, manage their projects, and manually add or edit time entries.
+
+**Core Technologies:**
+
+*   **Framework:** Nuxt 3
+*   **UI Library:** `@nuxt/ui`
+*   **Date/Time:** `dayjs-nuxt`
+*   **API Client:** `elysia-eden` connecting to the ElysiaJS backend.
+
+**Authentication:** All pages within the user dashboard require the user to be authenticated. Access control should redirect unauthenticated users to the login page.
+
+---
+
+## Dashboard Pages & Functionality
+
+### 1. `/dashboard` (Overview)
+
+*   **Purpose:** Provide a quick summary of the user's recent activity and key metrics.
+*   **Key Features:**
+    *   **Welcome Message:** Greet the logged-in user.
+    *   **Summary Widgets:**
+        *   Total hours tracked (e.g., today, last 7 days).
+        *   Number of projects worked on (last 7 days).
+        *   Link/Button to quickly start the Tauri Time Tracker app (if feasible via custom protocol handlers).
+    *   **Recent Time Entries:** Display a small list (e.g., last 5) of the user's most recent time entries (similar to the history table in `TimeTracker.vue`).
+        *   Columns: Project Name, Date, Duration.
+        *   Link to the full time entries page (`/dashboard/time-entries`).
+    *   **Quick Navigation:** Links to other dashboard sections (Projects, Time Entries, Profile).
+
+### 2. `/dashboard/projects`
+
+*   **Purpose:** Allow users to view projects they have logged time against.
+*   **Key Features:**
+    *   Display a list or table of projects associated with the user's time entries.
+        *   Data Source: Fetch unique projects linked to the user's `timeEntries` from the backend (`GET /api/projects?userId=current_user_id` or similar logic).
+    *   **Project Details (per project):**
+        *   Project Name.
+        *   Total time logged by the user for this project (calculated aggregate).
+        *   Date of the last entry logged for this project.
+    *   **Filtering/Sorting:** Allow sorting projects by name or total time tracked.
+    *   *(Optional: If project creation/assignment is allowed for regular users)* Button to create a new project (if applicable based on permissions).
+
+### 3. `/dashboard/time-entries`
+
+*   **Purpose:** Provide a detailed log of the user's time entries with editing capabilities.
+*   **Key Features:**
+    *   **Time Entry Table:** Display a paginated, searchable, and sortable table of the user's time entries (`timeEntries` table data filtered by `userId`).
+        *   Data Source: `GET /api/time-entries?userId=current_user_id&page=...&sortBy=...`
+        *   Columns: Project Name, Start Time (formatted), End Time (formatted), Duration (formatted, e.g., `HH:mm:ss` or humanized), Actions.
+    *   **Filtering:**
+        *   Date Range (Start Date / End Date).
+        *   Project (`USelectMenu` populated with user's projects).
+    *   **Actions per Entry:**
+        *   **Edit:** Open the "Edit Time Entry" modal (see below).
+        *   **Delete:** Confirmation prompt before deleting (`DELETE /api/time-entries/:id`).
+    *   **"Add Entry" Button:** Opens the "Create Time Entry" modal (see below).
+    *   **Summary Statistics:** Display total hours tracked based on the current filter settings.
+
+### 4. `/dashboard/profile`
+
+*   **Purpose:** Allow users to manage their profile settings.
+*   **Key Features:**
+    *   Display user email.
+    *   Change Password functionality.
+    *   *(Optional)* Manage other profile details if added to the schema (e.g., name, timezone preference).
+    *   Logout Button.
+
+---
+
+## Time Entry Modal (Create/Edit)
+
+This modal is used for both creating new manual time entries and editing existing ones. It reuses concepts and UI elements from the `TimeTracker.vue` project selection and interacts with the `time-entries` backend API.
+
+*   **Trigger:**
+    *   **Create:** Clicking the "Add Entry" button on `/dashboard/time-entries`.
+    *   **Edit:** Clicking the "Edit" button next to an entry in the time entries table. The modal should be pre-filled with the selected entry's data.
+*   **UI Components:** `@nuxt/ui` (`UModal`, `UForm`, `UFormGroup`, `USelectMenu`, `UButton`, Date/Time Pickers).
+*   **Fields:**
+    *   **Project:** (`USelectMenu`)
+        *   `v-model`: Binds to a `selectedProjectId` ref.
+        *   `:options`: Populated by fetching the user's relevant projects (`GET /api/projects` or derived from user's history). Should match the structure used in `TimeTracker.vue` (`{ id: number, name: string }`).
+        *   `placeholder`: "Select project"
+        *   `searchable`: true
+        *   Required validation.
+    *   **Start Time:** (Date/Time Picker Input)
+        *   `v-model`: Binds to a `startTime` ref (Date object or ISO string).
+        *   Required validation.
+    *   **End Time:** (Date/Time Picker Input)
+        *   `v-model`: Binds to an `endTime` ref (Date object or ISO string).
+        *   Required validation.
+        *   Validation: Must be after Start Time.
+    *   **Duration:** (Display Only or Manual Input - TBD)
+        *   Option 1 (Calculated): Displayed dynamically based on Start/End Time using `dayjs`. Not directly editable.
+        *   Option 2 (Manual): Allow direct input (e.g., HH:MM:SS). If used, Start/End time might become optional or calculated based on duration + one time point. *Option 1 is generally preferred for accuracy.*
+    *   *(Optional) Notes:* (Text Area)
+        *   `v-model`: Binds to a `notes` ref (if a `notes` field is added to the `timeEntries` schema).
+*   **Actions:**
+    *   **Save Button:**
+        *   On **Create:** Performs validation. Calculates `durationSeconds` from `startTime` and `endTime` using `dayjs`. Sends a `POST` request to `/api/time-entries` with `{ projectId, startTime, endTime, durationSeconds }`. Closes modal on success, shows toast notification.
+        *   On **Edit:** Performs validation. Calculates `durationSeconds`. Sends a `PUT` request to `/api/time-entries/:id` with the updated fields. Closes modal on success, shows toast notification.
+    *   **Cancel Button:** Closes the modal without saving changes.
+    *   **Delete Button (Edit Mode Only):** Triggers the delete confirmation flow.
+
+**Data Handling:**
+
+*   Use `useEden()` composable for API calls.
+*   Use `useDayjs()` for all date/time parsing, manipulation, formatting, and duration calculations.
+*   Use `ref` for managing modal state (open/closed) and form input values.
+*   Use `@nuxt/ui`'s `useToast()` for user feedback.
+*   Refresh the time entries table data (`refresh()` from `useAsyncData`) after successful create, update, or delete operations.
+
+```

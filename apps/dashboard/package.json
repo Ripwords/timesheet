@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "@timesheet/dashboard",
   "private": true,
   "type": "module",
   "scripts": {
