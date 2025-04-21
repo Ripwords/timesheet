@@ -4,16 +4,18 @@ import { TrayIcon } from "@tauri-apps/api/tray"
 import { Menu } from "@tauri-apps/api/menu"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
+const resetWindow = () => {
+  moveWindow(Position.TopRight)
+  appWindow.setFocus()
+  appWindow.show()
+}
+
 const menu = await Menu.new({
   items: [
     {
       id: "show",
       text: "Show",
-      action: async () => {
-        moveWindow(Position.TopRight)
-        appWindow.setFocus()
-        appWindow.show()
-      },
+      action: resetWindow,
     },
     {
       id: "hide",
@@ -34,8 +36,19 @@ const menu = await Menu.new({
 
 await TrayIcon.new({
   icon: "icons/icon.png",
+  showMenuOnLeftClick: false,
   menu,
-  menuOnLeftClick: true,
+  action: (event) => {
+    switch (event.type) {
+      case "Click":
+        ;(() => {
+          if (event.button === "Left") {
+            resetWindow()
+          }
+        })()
+        break
+    }
+  },
 })
 
 moveWindow(Position.TopRight)
@@ -43,7 +56,7 @@ const appWindow = getCurrentWindow()
 await appWindow.setAlwaysOnTop(true)
 await appWindow.setSkipTaskbar(true)
 await appWindow.listen("tauri://close-requested", () => {
-  appWindow.minimize()
+  appWindow.hide()
 })
 </script>
 
