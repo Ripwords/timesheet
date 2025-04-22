@@ -8,28 +8,22 @@ import { authGuard } from "../middleware/authGuard"
 export const adminReportsRoutes = baseApp("reports").group(
   "/admin/reports",
   (app) =>
-    app.use(authGuard("admin")).get(
+    app.use(authGuard()).get(
       "/aggregate",
-      async ({ query, db: contextDb }) => {
-        // Ensure db is available on context
-        if (!contextDb) {
-          console.error(
-            "Database connection not found on context in adminReportsRoutes"
-          )
-          throw error(
-            500,
-            "Server configuration error: Database connection missing."
-          )
-        }
-
+      async ({ query, db, getUser }) => {
         const {
           startDate,
           endDate,
           groupBy,
           timeUnit = "day",
-          userIds,
           projectIds,
         } = query
+        let { userIds } = query
+
+        const user = await getUser()
+        if (user && user.role !== "admin") {
+          userIds = [user.userId]
+        }
 
         // Ensure filters array always has at least one element to prevent `and()` error
         // A default condition like `sql`true` ` or similar can be used if needed,
@@ -60,7 +54,7 @@ export const adminReportsRoutes = baseApp("reports").group(
         const includeTimeGrouping = timeUnit && timeUnit !== "none"
 
         if (groupBy === "project") {
-          queryBuilder = contextDb
+          queryBuilder = db
             .select({
               id: projects.id,
               name: projects.name,
@@ -77,7 +71,7 @@ export const adminReportsRoutes = baseApp("reports").group(
             ) // Conditionally group by time
             .orderBy(desc(totalDurationSeconds))
         } else if (groupBy === "user") {
-          queryBuilder = contextDb
+          queryBuilder = db
             .select({
               id: users.id,
               email: users.email,
@@ -95,7 +89,7 @@ export const adminReportsRoutes = baseApp("reports").group(
             .orderBy(desc(totalDurationSeconds))
         } else {
           // Default case: Aggregate total duration without grouping by project/user
-          queryBuilder = contextDb
+          queryBuilder = db
             .select({
               totalDuration: totalDurationSeconds,
               ...(includeTimeGrouping && { timePeriod: dateTrunc }), // Still allow time grouping for overall total

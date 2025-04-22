@@ -191,7 +191,6 @@ const weeklyLineChartData = computed(() => {
 
 // --- Computed Summary Metrics ---
 const totalHoursToday = computed(() => {
-  console.log("todayData", todayData.value)
   const totalSeconds = todayData.value.reduce(
     (sum, item) => sum + (item.totalDuration || 0),
     0

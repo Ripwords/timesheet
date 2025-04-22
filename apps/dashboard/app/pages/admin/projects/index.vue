@@ -19,7 +19,6 @@ const { data: projects, status } = await useLazyAsyncData(
   "projects-admin",
   async () => {
     const { data } = await eden.api.projects.index.get()
-    console.log("projects", data)
     return data ?? []
   }
 )
