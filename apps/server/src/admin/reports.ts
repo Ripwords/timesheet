@@ -5,6 +5,13 @@ import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 
+interface AggregateDataPoint {
+  id?: number // Project ID
+  name?: string // Project Name
+  totalDuration: number // Duration in seconds
+  timePeriod?: string | Date // Time period (e.g., '2023-10-26', '2023-W43')
+}
+
 export const adminReportsRoutes = baseApp("reports").group(
   "/admin/reports",
   (app) =>
@@ -108,12 +115,9 @@ export const adminReportsRoutes = baseApp("reports").group(
 
         try {
           const results = await queryBuilder
-          // Example: Format duration post-query if needed
-          // const formattedResults = results.map(r => ({ ...r, formattedDuration: formatDuration(r.totalDuration) }));
-          return results
+          return results as AggregateDataPoint[]
         } catch (e) {
           console.error("Error fetching aggregated report:", e)
-          // Type check or assertion if necessary, then use Elysia's error
           const message =
             e instanceof Error ? e.message : "Unknown error occurred"
           throw error(500, `Failed to fetch aggregated report data: ${message}`)

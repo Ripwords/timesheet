@@ -1,144 +1,104 @@
 <script lang="ts" setup>
-// Define types similar to the admin dashboard, adjusted for user context
-interface AggregateDataPoint {
-  id?: number // Project ID
-  name?: string // Project Name
-  totalDuration: number // Duration in seconds
-  timePeriod?: string | Date // Time period (e.g., '2023-10-26', '2023-W43')
-}
-
-interface AggregateQueryParams {
-  startDate?: string // ISO date string
-  endDate?: string // ISO date string
-  groupBy?: "project" | "user" // 'user' might not be needed here unless showing team stats?
-  timeUnit?: "day" | "week" | "month" | "year" | "none"
-  userIds?: number[] // We'll filter by the current user's ID
-  projectIds?: number[]
-}
-
 const eden = useEden()
 const dayjs = useDayjs()
 
-// Mock user ID - replace with actual logged-in user ID when auth is ready
+// Fetch data for summary widgets
+const todayStr = dayjs().format("YYYY-MM-DD")
+const sevenDaysAgoStr = dayjs().subtract(6, "day").format("YYYY-MM-DD") // Include today
+
 const { data: user } = await eden.api.auth.profile.get()
 const currentUserId = user?.userId
+if (!currentUserId) {
+  useRouter().push("/login")
+}
 
 // State for chart data
-const projectTotalsData = ref<AggregateDataPoint[]>([])
-const dailyTotalsData = ref<AggregateDataPoint[]>([])
-const weeklyTotalsData = ref<AggregateDataPoint[]>([])
-// State for summary data
-const last7DaysData = ref<AggregateDataPoint[]>([])
-const todayData = ref<AggregateDataPoint[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// Fetch function, adapted for user context
-async function fetchUserAggregateData(
-  params: AggregateQueryParams
-): Promise<AggregateDataPoint[]> {
-  loading.value = true
-  error.value = null
-  try {
-    if (!currentUserId) {
-      throw new Error("User ID not found")
-    }
-    // Ensure we always filter by the current user
-    const queryParams = {
-      ...params,
-      userIds: [currentUserId], // Filter by the current user
-      groupBy: params.groupBy === "user" ? "project" : params.groupBy, // Group by project if user is selected
-    }
-
-    // Using the admin aggregate endpoint, filtered by user ID
-    const response = await eden.api.admin.reports.aggregate.get({
-      query: queryParams,
+const { data: projectTotalsData } = await useLazyAsyncData(
+  "project-user-totals",
+  async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "none",
+      },
     })
-
-    if (response.error) {
-      throw new Error(
-        response.error.value?.message || "Unknown API error fetching user data"
-      )
-    }
-    return Array.isArray(response.data)
-      ? (response.data as AggregateDataPoint[])
-      : []
-  } catch (err: unknown) {
-    console.error("Error fetching user aggregate data:", err)
-    if (err instanceof Error) {
-      error.value = err.message
-    } else {
-      error.value = "An unknown error occurred while fetching user data"
-    }
-    return []
-  } finally {
-    loading.value = false
+    return data ?? []
   }
-}
+)
 
-// Fetch data on component mount
-onMounted(async () => {
-  if (!currentUserId) {
-    error.value = "User not logged in or session expired."
-    loading.value = false
-    return // Stop fetching if no user ID
+const { data: dailyTotalsData } = await useLazyAsyncData(
+  "daily-totals",
+  async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "day",
+      },
+    })
+    return data ?? []
   }
+)
 
-  // Fetch total hours per project for this user
-  projectTotalsData.value = await fetchUserAggregateData({
-    groupBy: "project",
-    timeUnit: "none",
+const { data: weeklyTotalsData } = await useLazyAsyncData(
+  "weekly-totals",
+  async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "week",
+      },
+    })
+    return data ?? []
+  }
+)
+
+const { data: last7DaysData } = await useLazyAsyncData(
+  "last-7-days",
+  async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "none",
+        startDate: sevenDaysAgoStr,
+        endDate: todayStr,
+      },
+    })
+    return data ?? []
+  }
+)
+
+const { data: todayData } = await useLazyAsyncData("today", async () => {
+  const { data } = await eden.api.admin.reports.aggregate.get({
+    query: {
+      groupBy: "project",
+      timeUnit: "none",
+      startDate: todayStr,
+      endDate: todayStr,
+    },
   })
-
-  // Fetch total hours per day for this user
-  dailyTotalsData.value = await fetchUserAggregateData({
-    groupBy: "project", // Still group by project to see daily breakdown per project
-    timeUnit: "day",
-  })
-
-  // Fetch total hours per week for this user
-  weeklyTotalsData.value = await fetchUserAggregateData({
-    groupBy: "project", // Still group by project to see weekly breakdown per project
-    timeUnit: "week",
-  })
-
-  // Fetch data for summary widgets
-  const todayStr = dayjs().format("YYYY-MM-DD")
-  const sevenDaysAgoStr = dayjs().subtract(6, "day").format("YYYY-MM-DD") // Include today
-
-  // Fetch aggregated data for the last 7 days (grouped by project, no time unit)
-  last7DaysData.value = await fetchUserAggregateData({
-    groupBy: "project",
-    timeUnit: "none",
-    startDate: sevenDaysAgoStr,
-    endDate: todayStr,
-  })
-
-  // Fetch aggregated data for today (grouped by project, no time unit)
-  todayData.value = await fetchUserAggregateData({
-    groupBy: "project",
-    timeUnit: "none",
-    startDate: todayStr,
-    endDate: todayStr,
-  })
+  return data ?? []
 })
 
-// --- Chart Data Formatting (Example - might need adjustments based on chart components) ---
-
+// --- Chart Data Formatting ---
 // Format data for the Bar Chart (Project Totals)
 const projectBarChartData = computed(() => {
-  return projectTotalsData.value.map((item) => ({
-    id: item.id,
-    label: item.name || `Project ${item.id}`, // Use name, fallback to ID
-    value: Math.round((item.totalDuration || 0) / 60), // Convert seconds to minutes
-  }))
+  return (
+    projectTotalsData.value?.map((item) => ({
+      id: item.id,
+      label: item.name || `Project ${item.id}`, // Use name, fallback to ID
+      value: Math.round((item.totalDuration || 0) / 60), // Convert seconds to minutes
+    })) ?? []
+  )
 })
 
 // Format data for the Line Chart (Daily)
 const dailyLineChartData = computed(() => {
   // Aggregate data by date if multiple projects exist for the same day
   const aggregated: Record<string, number> = {}
-  dailyTotalsData.value.forEach((item) => {
+  dailyTotalsData.value?.forEach((item) => {
     const dateStr = dayjs(item.timePeriod).format("YYYY-MM-DD") // Ensure consistent format
     if (!aggregated[dateStr]) {
       aggregated[dateStr] = 0
@@ -158,7 +118,7 @@ const dailyLineChartData = computed(() => {
 const weeklyLineChartData = computed(() => {
   // Aggregate data by week if multiple projects exist for the same week
   const aggregated: Record<string, number> = {}
-  weeklyTotalsData.value.forEach((item) => {
+  weeklyTotalsData.value?.forEach((item) => {
     const weekStr = item.timePeriod as string // Assuming DB returns like '2023-W43'
     if (!weekStr) return // Skip if timePeriod is missing
     if (!aggregated[weekStr]) {
@@ -191,25 +151,29 @@ const weeklyLineChartData = computed(() => {
 
 // --- Computed Summary Metrics ---
 const totalHoursToday = computed(() => {
-  const totalSeconds = todayData.value.reduce(
-    (sum, item) => sum + (item.totalDuration || 0),
-    0
-  )
+  const totalSeconds =
+    todayData.value?.reduce(
+      (sum, item) => sum + (item.totalDuration || 0),
+      0
+    ) ?? 0
   return (totalSeconds / 3600).toFixed(2) // Convert seconds to hours
 })
 
 const totalHoursLast7Days = computed(() => {
-  const totalSeconds = last7DaysData.value.reduce(
-    (sum, item) => sum + (item.totalDuration || 0),
-    0
-  )
+  const totalSeconds =
+    last7DaysData.value?.reduce(
+      (sum, item) => sum + (item.totalDuration || 0),
+      0
+    ) ?? 0
   return (totalSeconds / 3600).toFixed(2) // Convert seconds to hours
 })
 
 const uniqueProjectsLast7Days = computed(() => {
   // Count unique project IDs from the last 7 days data
   const projectIds = new Set(
-    last7DaysData.value.map((item) => item.id).filter((id) => id !== undefined)
+    last7DaysData.value
+      ?.map((item) => item.id)
+      .filter((id) => id !== undefined) ?? []
   )
   return projectIds.size
 })
@@ -291,8 +255,19 @@ const uniqueProjectsLast7Days = computed(() => {
               uniqueProjectsLast7Days
             }}</span>
           </div>
-          <!-- Optional: Link to start timer -->
-          <!-- <UButton label="Start Timer" icon="i-heroicons-play" block class="mt-4" /> -->
+          <UButton
+            label="Start Timer"
+            icon="i-heroicons-play"
+            block
+            class="mt-4"
+          />
+          <UButton
+            label="Stop Timer"
+            icon="i-heroicons-stop"
+            block
+            color="error"
+            class="mt-4"
+          />
         </div>
       </UCard>
 
