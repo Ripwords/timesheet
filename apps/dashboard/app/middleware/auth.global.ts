@@ -1,6 +1,4 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (import.meta.server) return
-
   const checkAuthStatus = async () => {
     const eden = useEden()
     try {

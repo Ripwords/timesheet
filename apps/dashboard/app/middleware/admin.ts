@@ -1,5 +1,4 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (import.meta.server) return
   // Fetch user profile to check role
   const checkAuthStatus = async () => {
     const eden = useEden()
