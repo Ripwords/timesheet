@@ -27,7 +27,8 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.9",
+    "@iconify-json/lucide": "^1.2.38",
+    "@types/bun": "^1.2.10",
     "elysia": "^1.2.25"
   }
 }

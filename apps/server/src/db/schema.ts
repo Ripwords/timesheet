@@ -32,6 +32,7 @@ export const users = pgTable("users", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+export type User = typeof users.$inferSelect
 
 export const resetPasswordTokens = pgTable("reset_password_tokens", {
   id: serial("id").primaryKey(),
@@ -42,6 +43,7 @@ export const resetPasswordTokens = pgTable("reset_password_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 })
+export type ResetPasswordToken = typeof resetPasswordTokens.$inferSelect
 
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -52,6 +54,7 @@ export const projects = pgTable("projects", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+export type Project = typeof projects.$inferSelect
 
 export const timeEntries = pgTable("time_entries", {
   id: serial("id").primaryKey(),
@@ -63,6 +66,12 @@ export const timeEntries = pgTable("time_entries", {
     .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+  description: text("description"),
   durationSeconds: integer("duration_seconds").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
+export type TimeEntry = typeof timeEntries.$inferSelect

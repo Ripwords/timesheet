@@ -23,9 +23,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // If the route requires admin privileges and the user is not an admin
   if (requiresAdmin && !isAdmin) {
-    console.log(
-      `Admin middleware: Non-admin user attempting to access ${to.path}. Redirecting.`
-    )
     // Redirect non-admins away. Redirect to login if not authenticated,
     // or to the base route if authenticated but not admin.
     if (!user) {
@@ -34,7 +31,4 @@ export default defineNuxtRouteMiddleware(async (to) => {
       return navigateTo("/")
     }
   }
-
-  console.log(`Admin middleware: Allowing navigation to ${to.path}`)
-  // Allow navigation if the user is an admin or the route doesn't require admin
 })

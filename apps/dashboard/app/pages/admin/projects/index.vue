@@ -15,20 +15,20 @@ type Project = NonNullable<ProjectsResponse>[number] // Get the item type from t
 const eden = useEden()
 const dayjs = useDayjs()
 
-const {
-  data: projects,
-  status,
-  error,
-} = await useLazyAsyncData("projects", async () => {
-  const { data } = await eden.api.projects.index.get()
-  return data ?? []
-})
+const { data: projects, status } = await useLazyAsyncData(
+  "projects-admin",
+  async () => {
+    const { data } = await eden.api.projects.index.get()
+    console.log("projects", data)
+    return data ?? []
+  }
+)
 
 // Define columns using accessorKey/label for data, key/label for actions
 const columns: ColumnDef<Project, unknown>[] = [
-  { accessorKey: "id", header: "ID", enableSorting: true },
-  { accessorKey: "name", header: "Name", enableSorting: true },
-  { accessorKey: "updatedAt", header: "Updated At", enableSorting: true },
+  { accessorKey: "id", header: "ID" },
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "updatedAt", header: "Updated At" },
   {
     id: "actions",
     header: "Actions",
@@ -37,24 +37,24 @@ const columns: ColumnDef<Project, unknown>[] = [
       return h("div", { class: "space-x-2" }, [
         h(UButton, {
           icon: "i-heroicons-eye",
-          size: "xs",
-          variant: "ghost",
+          size: "xl",
+          variant: "outline",
           color: "primary",
           ariaLabel: "View Details",
           onClick: () => viewProjectDetails(Number(project.id)),
         }),
         h(UButton, {
           icon: "i-heroicons-pencil-square",
-          size: "xs",
-          variant: "ghost",
+          size: "xl",
+          variant: "outline",
           color: "warning",
           ariaLabel: "Edit",
           onClick: () => editProject(project),
         }),
         h(UButton, {
           icon: "i-heroicons-trash",
-          size: "xs",
-          variant: "ghost",
+          size: "xl",
+          variant: "outline",
           color: "error",
           ariaLabel: "Delete",
           onClick: () => deleteProject(project),
@@ -92,20 +92,7 @@ function deleteProject(project: Project) {
       />
     </div>
 
-    <div
-      v-if="status === 'pending'"
-      class="text-center py-4"
-    >
-      Loading projects...
-    </div>
-    <div
-      v-if="status === 'error'"
-      class="text-red-500 bg-red-100 p-3 rounded mb-4"
-    >
-      Error loading projects: {{ error }}
-    </div>
-
-    <UCard v-if="projects">
+    <UCard>
       <UTable
         :data="projects"
         :columns="columns"
@@ -113,9 +100,10 @@ function deleteProject(project: Project) {
           icon: 'i-heroicons-circle-stack',
           label: 'No projects found.',
         }"
+        :loading="status === 'pending'"
       >
         <template #updatedAt-cell="{ row }">
-          {{ dayjs(row.original.updatedAt).format("YYYY-MM-DD HH:mm:ss") }}
+          {{ dayjs(row.original.updatedAt).format("MMM D, hh:mm A") }}
         </template>
       </UTable>
     </UCard>

@@ -3,93 +3,69 @@ definePageMeta({
   middleware: "admin",
 })
 
-// Type for API response items
-interface AggregateDataPoint {
-  id?: number // User or Project ID
-  name?: string // Project Name
-  email?: string // User Email
-  totalDuration: number // Duration in seconds
-  timePeriod?: string | Date // Optional time period (string from DB, might need parsing)
-}
-
-// Type for the query parameters for the aggregate endpoint
-interface AggregateQueryParams {
-  startDate?: string // ISO date string
-  endDate?: string // ISO date string
-  groupBy?: "project" | "user"
-  timeUnit?: "day" | "week" | "month" | "year" | "none"
-  userIds?: number[]
-  projectIds?: number[]
-}
-
-const eden = useEden() // Assuming useEden is configured globally
+const eden = useEden()
 
 // State for chart data
-const projectTotalsData = ref<AggregateDataPoint[]>([])
-const userTotalsData = ref<AggregateDataPoint[]>([])
-const projectTimeSeriesData = ref<AggregateDataPoint[]>([])
-const userTimeSeriesData = ref<AggregateDataPoint[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-// Use the specific type for params
-async function fetchAggregateData(
-  params: AggregateQueryParams
-): Promise<AggregateDataPoint[]> {
-  loading.value = true
-  error.value = null
-  try {
-    // Pass the typed params object directly
-    const response = await eden.api.admin.reports.aggregate.get({
-      query: params,
+const { data: projectTotalsData, status: projectTotalsStatus } =
+  await useLazyAsyncData("projects-total", async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "none",
+      },
     })
-    if (response.error) {
-      throw new Error(response.error.value?.message || "Unknown API error")
-    }
-    // Ensure data is an array, default to empty array if not
-    // Cast to the expected type after checking if it's an array
-    return Array.isArray(response.data)
-      ? (response.data as AggregateDataPoint[])
-      : []
-  } catch (err: unknown) {
-    console.error("Error fetching aggregate data:", err)
-    // Check if it's an error object before accessing message
-    if (err instanceof Error) {
-      error.value = err.message
-    } else {
-      error.value = "An unknown error occurred while fetching data"
-    }
-    return [] // Return empty array on error
-  } finally {
-    loading.value = false
-  }
-}
-
-// Fetch data on component mount
-onMounted(async () => {
-  // Fetch total hours per project (no time unit)
-  projectTotalsData.value = await fetchAggregateData({
-    groupBy: "project",
-    timeUnit: "none",
+    return data ?? []
   })
 
-  // Fetch total hours per user (no time unit)
-  userTotalsData.value = await fetchAggregateData({
-    groupBy: "user",
-    timeUnit: "none",
+const { data: userTotalsData, status: userTotalsStatus } =
+  await useLazyAsyncData("users-total", async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "user",
+        timeUnit: "none",
+      },
+    })
+    return data ?? []
   })
 
-  // Fetch project hours over time (e.g., by day)
-  projectTimeSeriesData.value = await fetchAggregateData({
-    groupBy: "project",
-    timeUnit: "day",
+const { data: projectTimeSeriesData, status: projectTimeSeriesStatus } =
+  await useLazyAsyncData("projects-time-series", async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "day",
+      },
+    })
+    return data ?? []
   })
 
-  // Fetch user hours over time (e.g., by day)
-  userTimeSeriesData.value = await fetchAggregateData({
-    groupBy: "user",
-    timeUnit: "day",
+const { data: userTimeSeriesData, status: userTimeSeriesStatus } =
+  await useLazyAsyncData("users-time-series", async () => {
+    const { data } = await eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "user",
+        timeUnit: "day",
+      },
+    })
+    return data ?? []
   })
+
+const loading = computed(() => {
+  return (
+    projectTotalsStatus.value === "pending" ||
+    userTotalsStatus.value === "pending" ||
+    projectTimeSeriesStatus.value === "pending" ||
+    userTimeSeriesStatus.value === "pending"
+  )
+})
+
+const error = computed(() => {
+  return (
+    projectTotalsStatus.value === "error" ||
+    userTotalsStatus.value === "error" ||
+    projectTimeSeriesStatus.value === "error" ||
+    userTimeSeriesStatus.value === "error"
+  )
 })
 </script>
 
@@ -121,7 +97,7 @@ onMounted(async () => {
           <h2 class="text-lg font-medium">Total Hours per Project</h2>
         </template>
         <div
-          v-if="projectTotalsData.length > 0"
+          v-if="projectTotalsData && projectTotalsData.length > 0"
           class="h-64 md:h-80"
         >
           <AdminChartsBarChart
@@ -150,7 +126,7 @@ onMounted(async () => {
           <h2 class="text-lg font-medium">Total Hours per User</h2>
         </template>
         <div
-          v-if="userTotalsData.length > 0"
+          v-if="userTotalsData && userTotalsData.length > 0"
           class="h-64 md:h-80"
         >
           <AdminChartsBarChart
@@ -179,7 +155,7 @@ onMounted(async () => {
           <h2 class="text-lg font-medium">Project Hours Over Time (Daily)</h2>
         </template>
         <div
-          v-if="projectTimeSeriesData.length > 0"
+          v-if="projectTimeSeriesData && projectTimeSeriesData.length > 0"
           class="h-80 md:h-96"
         >
           <AdminChartsLineChart
@@ -209,7 +185,7 @@ onMounted(async () => {
           <h2 class="text-lg font-medium">User Hours Over Time (Daily)</h2>
         </template>
         <div
-          v-if="userTimeSeriesData.length > 0"
+          v-if="userTimeSeriesData && userTimeSeriesData.length > 0"
           class="h-80 md:h-96"
         >
           <AdminChartsLineChart

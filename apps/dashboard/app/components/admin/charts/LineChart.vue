@@ -22,6 +22,7 @@ import {
 } from "chart.js"
 import "chartjs-adapter-dayjs-4" // Use dayjs adapter
 import { Line } from "vue-chartjs"
+import { useDayjs } from "#dayjs" // Import dayjs
 
 // Register necessary Chart.js components
 ChartJS.register(
@@ -56,29 +57,59 @@ const props = withDefaults(defineProps<Props>(), {
   timeUnit: "day",
 })
 
+const dayjs = useDayjs() // Get dayjs instance
+
 const chartData = computed((): ChartData<"line"> => {
-  const processedData: Point[] = props.data.map((item) => {
+  if (!props.data || props.data.length === 0) {
+    return { datasets: [] }
+  }
+
+  // 1. Map existing data and find min/max dates
+  const existingDataMap = new Map<number, number>()
+  let minDate = Infinity
+  let maxDate = -Infinity
+
+  props.data.forEach((item) => {
     const xValueRaw = item[props.labelField]
     const yValueRaw = item[props.valueField]
 
-    // Ensure x is a timestamp (number)
-    const xDate =
-      xValueRaw instanceof Date
-        ? xValueRaw
-        : new Date(String(xValueRaw ?? Date.now()))
-    const xValue = xDate.getTime() // Convert Date to timestamp
+    const xDate = dayjs(
+      xValueRaw instanceof Date ? xValueRaw : String(xValueRaw ?? Date.now())
+    )
+    if (!xDate.isValid()) return // Skip invalid dates
 
-    // Ensure y is a number
+    const xTimestamp = xDate.startOf(props.timeUnit).valueOf() // Align timestamp to the start of the unit
     const yValueNumber = Number(yValueRaw)
     const yValueInSeconds = isNaN(yValueNumber) ? 0 : yValueNumber
-    const yValue = yValueInSeconds / 60 // Convert seconds to minutes
+    const yValueInMinutes = yValueInSeconds / 60
 
-    // Explicitly return as Point type {x: number, y: number}
-    return { x: xValue, y: yValue }
+    existingDataMap.set(xTimestamp, yValueInMinutes)
+    minDate = Math.min(minDate, xTimestamp)
+    maxDate = Math.max(maxDate, xTimestamp)
   })
 
-  // Sort the data by the x value (timestamp)
-  processedData.sort((a, b) => a.x - b.x)
+  if (minDate === Infinity) {
+    // Handle case where no valid dates were found
+    return { datasets: [] }
+  }
+
+  // 2. Generate all dates in the range and fill gaps
+  const filledData: Point[] = []
+  let currentDate = dayjs(minDate)
+  const endDate = dayjs(maxDate)
+
+  while (
+    currentDate.isBefore(endDate) ||
+    currentDate.isSame(endDate, props.timeUnit)
+  ) {
+    const currentTimestamp = currentDate.startOf(props.timeUnit).valueOf()
+    const yValue = existingDataMap.get(currentTimestamp) ?? 0 // Use 0 if data point is missing
+    filledData.push({ x: currentTimestamp, y: yValue })
+    currentDate = currentDate.add(1, props.timeUnit) // Increment by the specified unit
+  }
+
+  // Sorting might still be needed if the original data wasn't perfectly ordered by the timeUnit start
+  filledData.sort((a, b) => a.x - b.x)
 
   return {
     datasets: [
@@ -86,8 +117,9 @@ const chartData = computed((): ChartData<"line"> => {
         label: props.chartTitle,
         backgroundColor: "#3b82f6", // Example blue color
         borderColor: "#3b82f6",
-        tension: 0.1, // Increased tension for a smoother curve
-        data: processedData, // Use the sorted, pre-processed data
+        tension: 0.2,
+        data: filledData, // Use the filled and sorted data
+        spanGaps: false, // Explicitly disable spanning gaps in Chart.js
       },
     ],
   }

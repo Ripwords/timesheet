@@ -8,7 +8,7 @@ export const timeEntries = baseApp("time-entries").group(
   "/time-entries",
   (app) =>
     app
-      .use(authGuard)
+      .use(authGuard())
       // CREATE Time Entry
       .post(
         "/",
@@ -28,6 +28,7 @@ export const timeEntries = baseApp("time-entries").group(
               .values({
                 userId: user.userId,
                 projectId: body.projectId,
+                description: body.description,
                 startTime: body.startTime, // Drizzle expects Date objects
                 endTime: body.endTime, // Drizzle expects Date objects
                 durationSeconds: body.durationSeconds,
@@ -57,6 +58,7 @@ export const timeEntries = baseApp("time-entries").group(
             startTime: t.Date(), // Use t.Date(), assumes input can be parsed to Date
             endTime: t.Date(),
             durationSeconds: t.Integer(),
+            description: t.Optional(t.String()),
           }),
           detail: {
             summary: "Create a new time entry",
@@ -229,7 +231,10 @@ export const timeEntries = baseApp("time-entries").group(
                 ...(body.durationSeconds !== undefined && {
                   durationSeconds: body.durationSeconds,
                 }),
-                // NOTE: `updatedAt` is not in the schema, so not updated here.
+                ...(body.description !== undefined && {
+                  description: body.description,
+                }),
+                updatedAt: new Date(),
               })
               .where(eq(schema.timeEntries.id, entryId)) // Use numeric ID
               .returning() // Return the updated entry
@@ -262,6 +267,7 @@ export const timeEntries = baseApp("time-entries").group(
             startTime: t.Optional(t.Date()),
             endTime: t.Optional(t.Date()),
             durationSeconds: t.Optional(t.Integer()),
+            description: t.Optional(t.String()),
           }),
           detail: {
             summary: "Update a time entry by ID",

@@ -18,7 +18,7 @@ const db = drizzle(client, { schema })
 
 const SEED_USERS_COUNT = 15
 const SEED_PROJECTS_COUNT = 8
-const SEED_TIME_ENTRIES_COUNT = 50
+const SEED_TIME_ENTRIES_COUNT = 250
 
 const seedTestData = async () => {
   console.log("🌱 Starting test data seeding...")
@@ -90,7 +90,7 @@ const seedTestData = async () => {
   const timeEntriesToInsert: (typeof schema.timeEntries.$inferInsert)[] = []
   for (let i = 0; i < SEED_TIME_ENTRIES_COUNT; i++) {
     const durationSeconds = faker.number.int({ min: 300, max: 28800 }) // 5 mins to 8 hours
-    const endTime = faker.date.recent({ days: 30 }) // End time within the last 30 days
+    const endTime = faker.date.recent({ days: 90 }) // End time within the last 90 days (increased from 30)
     const startTime = new Date(endTime.getTime() - durationSeconds * 1000)
 
     timeEntriesToInsert.push({

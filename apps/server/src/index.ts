@@ -22,3 +22,4 @@ console.log(
 )
 
 export type App = typeof app
+export * from "./db/schema"

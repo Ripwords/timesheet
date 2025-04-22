@@ -6,6 +6,8 @@ definePageMeta({
   middleware: "admin",
 })
 
+const dayjs = useDayjs()
+
 // Uncomment and use correct type inference
 type UsersResponse = Awaited<
   ReturnType<typeof eden.api.admin.users.index.get> // Use the newly created endpoint
@@ -13,25 +15,25 @@ type UsersResponse = Awaited<
 type User = NonNullable<UsersResponse>[number] // Get the item type from the array
 
 const eden = useEden() // Uncomment eden
-const {
-  data: users,
-  status,
-  error,
-} = await useLazyAsyncData("users", async () => {
-  const { data } = await eden.api.admin.users.index.get()
-  return data ?? []
-})
+const { data: users, status } = await useLazyAsyncData(
+  "users-admin",
+  async () => {
+    const { data } = await eden.api.admin.users.index.get()
+    console.log("users", data)
+    return data ?? []
+  }
+)
 
 // Helper function for date formatting
 const formatDate = (date: string | Date | null) => {
-  return date ? new Date(date).toLocaleDateString() : "N/A"
+  return date ? dayjs(date).format("MMM D, YYYY") : "N/A"
 }
 
 // Define columns using TanStack types and cell functions with INFERRED User type
 const columns: ColumnDef<User, unknown>[] = [
-  { accessorKey: "id", header: "ID", enableSorting: true },
-  { accessorKey: "email", header: "Email", enableSorting: true },
-  { accessorKey: "role", header: "Role", enableSorting: true },
+  { accessorKey: "id", header: "ID" },
+  { accessorKey: "email", header: "Email" },
+  { accessorKey: "department", header: "Department" },
   {
     accessorKey: "emailVerified",
     header: "Email Verified",
@@ -119,21 +121,7 @@ function deleteUser(user: User) {
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-semibold">Manage Users</h1>
     </div>
-
-    <div
-      v-if="status === 'pending'"
-      class="text-center py-4"
-    >
-      Loading users...
-    </div>
-    <div
-      v-if="error"
-      class="text-red-500 bg-red-100 p-3 rounded mb-4"
-    >
-      Error loading users: {{ error }}
-    </div>
-
-    <UCard v-if="status === 'success'">
+    <UCard>
       <UTable
         :data="users"
         :columns
@@ -141,9 +129,8 @@ function deleteUser(user: User) {
           icon: 'i-heroicons-user-group',
           label: 'No users found.', // Restore default label
         }"
-      >
-        <!-- Rendering handled by cell functions, no slots needed -->
-      </UTable>
+        :loading="status === 'pending'"
+      />
     </UCard>
   </div>
 </template>

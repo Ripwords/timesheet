@@ -8,6 +8,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "db:reset": "bun run src/db/reset.ts",
     "db:seed": "bun run src/db/seedTestData.ts"
   },
   "dependencies": {
@@ -25,7 +26,8 @@
     "@faker-js/faker": "^9.7.0",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.12",
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "drizzle-seed": "^0.3.1"
   },
   "module": "src/index.ts",
   "main": "src/index.ts"

@@ -2,25 +2,9 @@
 import type { NavigationMenuItem } from "@nuxt/ui"
 
 const eden = useEden() // Make eden available for logout
+const user = await eden.api.auth.profile.get()
 
 const navItems = ref<NavigationMenuItem[][]>([
-  [
-    {
-      label: "Overview",
-      icon: "i-lucide-layout-dashboard", // Example icon
-      to: "/admin",
-    },
-    {
-      label: "Users",
-      icon: "i-lucide-users", // Example icon
-      to: "/admin/users",
-    },
-    {
-      label: "Projects",
-      icon: "i-lucide-briefcase", // Example icon
-      to: "/admin/projects",
-    },
-  ],
   [
     {
       label: "Logout",
@@ -33,6 +17,36 @@ const navItems = ref<NavigationMenuItem[][]>([
     },
   ],
 ])
+
+onMounted(async () => {
+  navItems.value.unshift(
+    user.data?.role === "admin"
+      ? [
+          {
+            label: "Overview",
+            icon: "i-lucide-layout-dashboard", // Example icon
+            to: "/admin",
+          },
+          {
+            label: "Users",
+            icon: "i-lucide-users", // Example icon
+            to: "/admin/users",
+          },
+          {
+            label: "Projects",
+            icon: "i-lucide-briefcase", // Example icon
+            to: "/admin/projects",
+          },
+        ]
+      : [
+          {
+            label: "Time Entries",
+            icon: "i-lucide-clock",
+            to: "/time-entries",
+          },
+        ]
+  )
+})
 </script>
 
 <template>

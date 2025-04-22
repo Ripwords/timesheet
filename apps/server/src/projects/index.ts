@@ -5,8 +5,7 @@ import { eq } from "drizzle-orm"
 import { authGuard } from "../middleware/authGuard"
 export const projects = baseApp("projects").group("/projects", (app) =>
   app
-    .use(authGuard)
-    // CREATE Project
+    .use(authGuard())
     .post(
       "/",
       async ({ db, body, error, getUser }) => {
@@ -58,8 +57,6 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         const allProjects = await db.query.projects.findMany({
           orderBy: (projects, { desc }) => [desc(projects.createdAt)],
         })
-
-        console.log(allProjects)
 
         return allProjects
       },

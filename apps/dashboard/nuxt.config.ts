@@ -8,7 +8,6 @@ export default defineNuxtConfig({
   devServer: {
     port: 5173,
   },
-  ssr: false,
   runtimeConfig: {
     public: {
       serverUrl: "http://localhost:3100",

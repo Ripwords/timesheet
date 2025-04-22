@@ -28,7 +28,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // 1. If navigating to a protected route and not authenticated, redirect to login
   if (requiresAuth && !isAuthenticated) {
     if (to.path !== "/auth/login") {
-      console.log(`Redirecting to login from protected route: ${to.path}`)
       return navigateTo("/auth/login") // Redirect to your login page
     }
   }
@@ -41,23 +40,16 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
     // Avoid redirecting to the same page
     if (to.path !== targetRedirectRoute) {
-      console.log(
-        `User authenticated (${
-          isAdmin ? "admin" : "user"
-        }), redirecting from auth route ${to.path} to ${targetRedirectRoute}`
-      )
       return navigateTo(targetRedirectRoute)
     }
   }
 
   // 3. Redirect admin from / to /admin
   if (isAuthenticated && isAdmin && to.path === "/") {
-    console.log(`Admin user detected at root, redirecting to /admin`)
     return navigateTo("/admin")
   }
 
   // 4. Allow navigation if none of the above conditions trigger a redirect
   // Admin route access control will be handled by a separate middleware
-  console.log(`Auth middleware: Allowing navigation to: ${to.path}`)
   // No return statement means navigation proceeds
 })

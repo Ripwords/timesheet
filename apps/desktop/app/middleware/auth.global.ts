@@ -26,7 +26,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (requiresAuth && !isAuthenticated) {
     // Avoid redirect loop if login page is somehow protected
     if (to.path !== "/login") {
-      console.log(`Redirecting to login from protected route: ${to.path}`)
       return navigateTo("/login") // Redirect to your login page
     }
   }
@@ -36,14 +35,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     const defaultAuthenticatedRoute = "/" // Your main authenticated page (e.g., dashboard)
     // Avoid redirecting to the same page if default route is somehow the auth route
     if (to.path !== defaultAuthenticatedRoute) {
-      console.log(
-        `User authenticated, redirecting from auth route ${to.path} to ${defaultAuthenticatedRoute}`
-      )
       return navigateTo(defaultAuthenticatedRoute)
     }
   }
 
   // 3. Allow navigation if none of the above conditions trigger a redirect
-  console.log(`Allowing navigation to: ${to.path}`)
   // No return statement means navigation proceeds
 })

@@ -14,19 +14,18 @@ const timerInterval = ref<NodeJS.Timeout | null>(null)
 const timerStatus = ref<"stopped" | "running" | "paused">("stopped")
 const startTime = ref<number | null>(null) // Timestamp of the *very first* start after stopped
 const intervalStartTime = ref<number | null>(null) // Timestamp of the start of the current running interval (start or resume)
-const totalAccumulatedDuration = ref<number>(0) // Seconds accumulated before the current running interval
-const currentIntervalElapsedTime = ref<number>(0) // Seconds elapsed in the current running interval
+const totalAccumulatedDuration = ref(0) // Seconds accumulated before the current running interval
+const currentIntervalElapsedTime = ref(0) // Seconds elapsed in the current running interval
 const showProjectModal = ref(false)
 const finalSessionDuration = ref(0) // Store final duration when stopping
+const selectedProjectId = ref<number>()
+const timeEntryDescription = ref("")
 
 // --- Projects ---
-const selectedProjectId = ref<number>()
 const { data: projects } = await useLazyAsyncData("projects", async () => {
   const { data: projectData } = await eden.api.projects.index.get()
   return projectData?.map((project) => ({ id: project.id, name: project.name }))
 })
-
-console.log(projects.value)
 
 // --- History ---
 const { data: history, refresh: refreshHistory } = await useLazyAsyncData(
@@ -82,6 +81,7 @@ const resetState = () => {
   totalAccumulatedDuration.value = 0
   currentIntervalElapsedTime.value = 0
   selectedProjectId.value = undefined
+  timeEntryDescription.value = ""
   refreshHistory()
 }
 
@@ -289,7 +289,10 @@ const cancelSession = () => {
         />
       </div>
     </UCard>
-    <UModal v-model:open="showProjectModal">
+    <UModal
+      v-model:open="showProjectModal"
+      @update:open="resetState"
+    >
       <template #header>
         <h3 class="text-lg font-semibold">Save Session</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -299,15 +302,21 @@ const cancelSession = () => {
       </template>
 
       <template #body>
-        <USelectMenu
-          v-model="selectedProjectId"
-          :items="projects"
-          label-key="name"
-          value-key="id"
-          placeholder="Select project"
-          searchable
-          searchable-placeholder="Search projects..."
-        />
+        <div class="flex flex-col gap-2">
+          <USelectMenu
+            v-model="selectedProjectId"
+            :items="projects"
+            label-key="name"
+            value-key="id"
+            placeholder="Select project"
+            searchable
+            searchable-placeholder="Search projects..."
+          />
+          <UInput
+            v-model="timeEntryDescription"
+            placeholder="Description"
+          />
+        </div>
       </template>
 
       <template #footer>

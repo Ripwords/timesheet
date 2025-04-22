@@ -36,6 +36,20 @@
       "when": 1744695677922,
       "tag": "0004_cloudy_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745226431379,
+      "tag": "0005_brave_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1745231383526,
+      "tag": "0006_romantic_argent",
+      "breakpoints": true
     }
   ]
 }
