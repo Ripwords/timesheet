@@ -7,5 +7,16 @@ export const useEden = () => {
     fetch: {
       credentials: "include",
     },
+    // @ts-expect-error bun fetch type error
+    fetcher: (url, options) => {
+      const headers = useRequestHeaders(["cookie"])
+      return fetch(url, {
+        ...options,
+        headers: new Headers({
+          ...options?.headers,
+          ...headers,
+        }),
+      })
+    },
   })
 }
