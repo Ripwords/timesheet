@@ -129,7 +129,11 @@ function deleteUser(user: User) {
           label: 'No users found.', // Restore default label
         }"
         :loading="status === 'pending'"
-      />
+      >
+        <template #department-cell="{ row }">
+          <Department :department="row.original.department" />
+        </template>
+      </UTable>
     </UCard>
   </div>
 </template>

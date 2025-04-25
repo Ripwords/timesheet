@@ -295,7 +295,13 @@ const handleSelect = (row: TableRow<WeeklyBreakdownRow>) => {
         :ui="{
           th: index !== 0 ? 'text-transparent' : '',
         }"
-        @select="handleSelect"
+        @select="
+          (row) => {
+            if (index === 0) {
+              handleSelect(row)
+            }
+          }
+        "
       >
         <template #projectName-cell="{ row }">
           <span
