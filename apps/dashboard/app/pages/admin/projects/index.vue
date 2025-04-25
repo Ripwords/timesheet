@@ -10,17 +10,46 @@ definePageMeta({
 type ProjectsResponse = Awaited<
   ReturnType<typeof eden.api.projects.index.get>
 >["data"]
-type Project = NonNullable<ProjectsResponse>[number] // Get the item type from the array
+type Project = NonNullable<ProjectsResponse>["projects"][number] // Get the item type from the array
 
 const eden = useEden()
 const dayjs = useDayjs()
+const page = ref(1)
+const search = ref("")
+const sort = ref<"createdAt" | "name">("createdAt")
+const order = ref<"asc" | "desc">("desc")
 
-const { data: projects, status } = await useLazyAsyncData(
+const {
+  data: projects,
+  status,
+  refresh,
+} = await useLazyAsyncData(
   "projects-admin",
   async () => {
-    const { data } = await eden.api.projects.index.get()
-    return data ?? []
+    const { data } = await eden.api.projects.index.get({
+      query: {
+        page: page.value,
+        search: search.value,
+        sort: sort.value,
+        order: order.value,
+      },
+    })
+    return {
+      projects: data?.projects ?? [],
+      total: data?.total ?? 0,
+    }
+  },
+  {
+    watch: [page, sort, order],
   }
+)
+
+watchDebounced(
+  search,
+  async () => {
+    await refresh()
+  },
+  { debounce: 150 }
 )
 
 // Define columns using accessorKey/label for data, key/label for actions
@@ -92,8 +121,17 @@ function deleteProject(project: Project) {
     </div>
 
     <UCard>
+      <template #header>
+        <div class="flex gap-3">
+          <UInput
+            v-model="search"
+            class="w-[30vw]"
+            placeholder="Search..."
+          />
+        </div>
+      </template>
       <UTable
-        :data="projects"
+        :data="projects?.projects ?? []"
         :columns="columns"
         :empty-state="{
           icon: 'i-heroicons-circle-stack',
@@ -105,6 +143,13 @@ function deleteProject(project: Project) {
           {{ dayjs(row.original.updatedAt).format("MMM D, hh:mm A") }}
         </template>
       </UTable>
+      <div class="flex justify-center border-t border-default pt-4">
+        <UPagination
+          :items-per-page="10"
+          :total="projects?.total ?? 0"
+          @update:page="(p) => (page = p)"
+        />
+      </div>
     </UCard>
   </div>
 </template>

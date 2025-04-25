@@ -1,3 +1,4 @@
+import { departmentEnumDef } from "@timesheet/constants"
 import {
   pgTable,
   serial,
@@ -10,13 +11,8 @@ import {
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
-export const departmentEnum = pgEnum("department", [
-  "frontend_design",
-  "frontend_js",
-  "backend",
-  "uiux",
-  "digital_marketing",
-])
+
+export const departmentEnum = pgEnum("department", departmentEnumDef)
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),

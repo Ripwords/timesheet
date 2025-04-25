@@ -1,8 +1,29 @@
+import { and, count, desc, eq, ilike } from "drizzle-orm"
 import { error, t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { count, desc, eq } from "drizzle-orm"
+import { departmentEnumDef } from "@timesheet/constants"
+
+const querySchema = t.Object({
+  search: t.Optional(t.Nullable(t.String())),
+  page: t.Optional(
+    t.Number({
+      default: 1,
+    })
+  ),
+  limit: t.Optional(
+    t.Number({
+      default: 10,
+    })
+  ),
+  department: t.Optional(
+    t.UnionEnum(departmentEnumDef, {
+      default: undefined,
+    })
+  ),
+})
+
 export const adminUsersRoutes = baseApp("adminUsers").group(
   "/admin/users",
   (app) =>
@@ -12,8 +33,27 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
         "/",
         async ({ db, query }) => {
           try {
-            const { page = 1, limit = 10 } = query
+            const { page = 1, limit = 10, search, department } = query
             const offset = (page - 1) * limit
+
+            const whereList = []
+            if (search && search !== "") {
+              whereList.push(ilike(users.email, `%${search}%`))
+            }
+            if (department) {
+              if (
+                departmentEnumDef.includes(
+                  department as (typeof departmentEnumDef)[number]
+                )
+              ) {
+                whereList.push(
+                  eq(
+                    users.department,
+                    department as (typeof departmentEnumDef)[number]
+                  )
+                )
+              }
+            }
 
             const userList = await db
               .select({
@@ -28,8 +68,21 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               .orderBy(desc(users.createdAt))
               .limit(limit)
               .offset(offset)
+              .where(and(...whereList))
 
-            return userList
+            const total = await db
+              .select({ count: count() })
+              .from(users)
+              .where(
+                search && search !== ""
+                  ? ilike(users.email, `%${search}%`)
+                  : undefined
+              )
+
+            return {
+              users: userList,
+              total: total[0]?.count ?? 0,
+            }
           } catch (e) {
             console.error("Error fetching user list for admin:", e)
             const message =
@@ -44,16 +97,9 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               "Fetches a complete list of registered users. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
-          query: t.Object({
-            page: t.Optional(t.Number()),
-            limit: t.Optional(t.Number()),
-          }),
+          query: querySchema,
         }
       )
-      .get("/total", async ({ db }) => {
-        const total = await db.select({ count: count() }).from(users)
-        return total[0]?.count ?? 0
-      })
       .get(
         "/user/:id",
         async ({ db, params }) => {

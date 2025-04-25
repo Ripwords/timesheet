@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { departmentEnum } from "@timesheet/server/src/db/schema"
+import { departmentEnumDef } from "@timesheet/constants"
 definePageMeta({
   layout: "auth",
 })
-const departments = departmentEnum.enumValues
-
 const state = reactive({
   name: "",
   email: "",
   password: "",
   confirmPassword: "",
-  department: departments[0],
+  department: departmentEnumDef[0],
 })
 
 const eden = useEden()
@@ -79,7 +77,7 @@ async function submit() {
         >
           <USelectMenu
             v-model="state.department"
-            :items="departments"
+            :items="[...departmentEnumDef]"
           />
         </UFormField>
 

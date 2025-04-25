@@ -1,8 +1,17 @@
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { t } from "elysia"
-import { eq } from "drizzle-orm"
+import { and, count, eq, ilike } from "drizzle-orm"
 import { authGuard } from "../middleware/authGuard"
+
+const querySchema = t.Object({
+  page: t.Optional(t.Number({ default: 1 })),
+  limit: t.Optional(t.Number({ default: 10 })),
+  search: t.Optional(t.String()),
+  sort: t.Optional(t.UnionEnum(["createdAt", "name", "id"])),
+  order: t.Optional(t.UnionEnum(["asc", "desc"])),
+})
+
 export const projects = baseApp("projects").group("/projects", (app) =>
   app
     .use(authGuard())
@@ -53,18 +62,46 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     // READ All Projects
     .get(
       "/",
-      async ({ db }) => {
+      async ({ db, query }) => {
+        const { page = 1, limit = 10, search, sort, order } = query
+
+        const whereList = []
+        if (search) {
+          whereList.push(ilike(schema.projects.name, `%${search}%`))
+        }
+
         const allProjects = await db.query.projects.findMany({
-          orderBy: (projects, { desc }) => [desc(projects.createdAt)],
+          orderBy: (projects, { desc, asc }) => {
+            const sortField =
+              sort === "createdAt"
+                ? projects.createdAt
+                : sort === "name"
+                ? projects.name
+                : projects.id
+
+            return [order === "asc" ? asc(sortField) : desc(sortField)]
+          },
+          where: and(...whereList),
+          limit,
+          offset: (page - 1) * limit,
         })
 
-        return allProjects
+        const total = await db
+          .select({ count: count() })
+          .from(schema.projects)
+          .where(and(...whereList))
+
+        return {
+          projects: allProjects,
+          total: total[0]?.count ?? 0,
+        }
       },
       {
         detail: {
           summary: "Get all projects",
           tags: ["Projects"],
         },
+        query: querySchema,
       }
     )
     // READ Single Project

@@ -16,9 +16,9 @@ if (!connectionString) {
 const client = postgres(connectionString)
 const db = drizzle(client, { schema })
 
-const SEED_USERS_COUNT = 15
-const SEED_PROJECTS_COUNT = 8
-const SEED_TIME_ENTRIES_COUNT = 250
+const SEED_USERS_COUNT = 30
+const SEED_PROJECTS_COUNT = 20
+const SEED_TIME_ENTRIES_COUNT = 500
 
 const seedTestData = async () => {
   console.log("🌱 Starting test data seeding...")

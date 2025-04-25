@@ -101,12 +101,7 @@ const error = computed(() => {
           class="h-64 md:h-80"
         >
           <AdminChartsBarChart
-            :data="
-              projectTotalsData.map((item) => ({
-                label: item.name,
-                value: item.totalDuration,
-              }))
-            "
+            :data="projectTotalsData"
             label-field="name"
             value-field="totalDuration"
             chart-title="Total Hours per Project (All Time)"
@@ -135,12 +130,7 @@ const error = computed(() => {
           class="h-64 md:h-80"
         >
           <AdminChartsBarChart
-            :data="
-              userTotalsData.map((item) => ({
-                label: item.name,
-                value: item.totalDuration,
-              }))
-            "
+            :data="userTotalsData"
             label-field="email"
             value-field="totalDuration"
             chart-title="Total Hours per User (All Time)"
@@ -169,12 +159,7 @@ const error = computed(() => {
           class="h-80 md:h-96"
         >
           <AdminChartsLineChart
-            :data="
-              projectTimeSeriesData.map((item) => ({
-                label: item.timePeriod,
-                value: item.totalDuration,
-              }))
-            "
+            :data="projectTimeSeriesData"
             label-field="timePeriod"
             value-field="totalDuration"
             chart-title="Project Hours per Day"
@@ -204,12 +189,7 @@ const error = computed(() => {
           class="h-80 md:h-96"
         >
           <AdminChartsLineChart
-            :data="
-              userTimeSeriesData.map((item) => ({
-                label: item.timePeriod,
-                value: item.totalDuration,
-              }))
-            "
+            :data="userTimeSeriesData"
             label-field="timePeriod"
             value-field="totalDuration"
             chart-title="User Hours per Day"

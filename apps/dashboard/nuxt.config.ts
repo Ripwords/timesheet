@@ -24,5 +24,6 @@ export default defineNuxtConfig({
     "@nuxt/image",
     "@nuxt/ui",
     "dayjs-nuxt",
+    "@vueuse/nuxt",
   ],
 })

@@ -1,15 +1,11 @@
 import { error, t } from "elysia"
-// import { db } from "../db" // Removed direct import - assume db is on context
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 
 interface AggregateDataPoint {
-  id?: number // Project ID
-  name?: string // Project Name
-  totalDuration: number // Duration in seconds
-  timePeriod?: string | Date // Time period (e.g., '2023-10-26', '2023-W43')
+  [key: string]: string | number | Date | undefined // More specific index signature
 }
 
 export const adminReportsRoutes = baseApp("reports").group(

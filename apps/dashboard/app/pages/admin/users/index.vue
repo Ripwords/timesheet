@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
 import { UBadge, UButton } from "#components"
+import { departmentEnumDef } from "@timesheet/constants"
 
 definePageMeta({
   middleware: "admin",
@@ -9,33 +10,47 @@ definePageMeta({
 type UsersResponse = Awaited<
   ReturnType<typeof eden.api.admin.users.index.get> // Use the newly created endpoint
 >["data"]
-type User = NonNullable<UsersResponse>[number] // Get the item type from the array
+type User = NonNullable<UsersResponse>["users"][number] // Get the item type from the array
 
 const dayjs = useDayjs()
 const eden = useEden()
 const page = ref(1)
-const limit = ref(10)
+const search = ref("")
+const department = ref<(typeof departmentEnumDef)[number] | undefined>(
+  undefined
+)
 
-const { data: users, status } = await useLazyAsyncData(
+const {
+  data: users,
+  status,
+  refresh,
+} = await useLazyAsyncData(
   "users-admin",
   async () => {
     const { data } = await eden.api.admin.users.index.get({
       query: {
         page: page.value,
-        limit: limit.value,
+        ...(search.value && { search: search.value }),
+        ...(department.value && { department: department.value }),
       },
     })
-    return data ?? []
+    return {
+      users: data?.users ?? [],
+      total: data?.total ?? 0,
+    }
   },
   {
-    watch: [page, limit],
+    watch: [page, department],
   }
 )
 
-const { data: totalUsers } = await useLazyAsyncData("total-users", async () => {
-  const { data } = await eden.api.admin.users.total.get()
-  return data
-})
+watchDebounced(
+  search,
+  async () => {
+    await refresh()
+  },
+  { debounce: 150 }
+)
 
 // Helper function for date formatting
 const formatDate = (date: string | Date | null) => {
@@ -135,13 +150,53 @@ function deleteUser(user: User) {
       <h1 class="text-2xl font-semibold">Manage Users</h1>
     </div>
     <UCard>
+      <template #header>
+        <div class="flex gap-3">
+          <UInput
+            v-model="search"
+            class="w-[30vw]"
+            placeholder="Search..."
+          />
+          <USelectMenu
+            v-model="department"
+            class="w-50"
+            placeholder="Select Department"
+            :items="[...departmentEnumDef]"
+            :search-input="{
+              placeholder: 'Search items...',
+            }"
+          >
+            <template #item="{ item }">
+              <Department :department="item" />
+            </template>
+            <template #default="{ modelValue }">
+              <Department
+                v-if="modelValue"
+                :department="modelValue"
+              />
+            </template>
+            <template #trailing>
+              <button
+                v-if="department"
+                :class="['ml-2 px-1  hover:text-red-600 !pointer-events-auto']"
+                @click.stop="
+                  () => {
+                    department = undefined
+                  }
+                "
+              >
+                ✕
+              </button>
+            </template>
+          </USelectMenu>
+        </div>
+      </template>
       <UTable
-        ref="table"
         :pagination="{
           pageIndex: page,
-          pageSize: limit,
+          pageSize: 10,
         }"
-        :data="users"
+        :data="users?.users ?? []"
         :columns
         :empty-state="{
           icon: 'i-heroicons-user-group',
@@ -155,8 +210,8 @@ function deleteUser(user: User) {
       </UTable>
       <div class="flex justify-center border-t border-default pt-4">
         <UPagination
-          :items-per-page="limit"
-          :total="totalUsers ?? 0"
+          :items-per-page="10"
+          :total="users?.total ?? 0"
           @update:page="(p) => (page = p)"
         />
       </div>

@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import type { departmentEnum } from "@timesheet/server"
+import type { departmentEnumDef } from "@timesheet/constants"
 import type { BadgeProps } from "#ui/types"
 
 const props = defineProps<{
-  department: (typeof departmentEnum.enumValues)[number]
+  department: (typeof departmentEnumDef)[number]
 }>()
 
 const departmentLabel = computed(() => {

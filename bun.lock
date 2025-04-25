@@ -29,6 +29,8 @@
         "@nuxt/icon": "1.12.0",
         "@nuxt/image": "1.10.0",
         "@nuxt/ui": "3.0.2",
+        "@timesheet/constants": "workspace:*",
+        "@vueuse/nuxt": "13.1.0",
         "chart.js": "^4.4.8",
         "chartjs-adapter-dayjs-4": "^1.0.4",
         "dayjs-nuxt": "2.1.11",
@@ -80,6 +82,7 @@
         "@elysiajs/server-timing": "^1.2.1",
         "@elysiajs/swagger": "^1.2.2",
         "@rasla/logify": "^5.0.0",
+        "@timesheet/constants": "workspace:*",
         "bcryptjs": "^3.0.2",
         "elysia": "latest",
         "nodemailer": "^6.10.1",
@@ -91,6 +94,15 @@
         "@types/pg": "^8.11.12",
         "bun-types": "latest",
         "drizzle-seed": "^0.3.1",
+      },
+    },
+    "packages/sharedConstants": {
+      "name": "@timesheet/constants",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
       },
     },
   },
@@ -588,6 +600,8 @@
     "@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.2.6", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, "sha512-bSdkuP71ZQRepPOn8BOEdBKYJQvl6+jb160QtJX/i2H9BF6ZySY/kYljh76N2Ne5fJMQRge7rlKoStYQY5Jq1w=="],
 
     "@tauri-apps/plugin-positioner": ["@tauri-apps/plugin-positioner@2.2.0", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, "sha512-3JIWqV4U1US4nmM4PGmAHODq0ltkJ91MyANR033elKSSpX3AqKnVQnLz76xThBFHjChJrZwsXASpc2Inpu+cTg=="],
+
+    "@timesheet/constants": ["@timesheet/constants@workspace:packages/sharedConstants"],
 
     "@timesheet/dashboard": ["@timesheet/dashboard@workspace:apps/dashboard"],
 
