@@ -6,22 +6,36 @@ definePageMeta({
   middleware: "admin",
 })
 
-const dayjs = useDayjs()
-
-// Uncomment and use correct type inference
 type UsersResponse = Awaited<
   ReturnType<typeof eden.api.admin.users.index.get> // Use the newly created endpoint
 >["data"]
 type User = NonNullable<UsersResponse>[number] // Get the item type from the array
 
-const eden = useEden() // Uncomment eden
+const dayjs = useDayjs()
+const eden = useEden()
+const page = ref(1)
+const limit = ref(10)
+
 const { data: users, status } = await useLazyAsyncData(
   "users-admin",
   async () => {
-    const { data } = await eden.api.admin.users.index.get()
+    const { data } = await eden.api.admin.users.index.get({
+      query: {
+        page: page.value,
+        limit: limit.value,
+      },
+    })
     return data ?? []
+  },
+  {
+    watch: [page, limit],
   }
 )
+
+const { data: totalUsers } = await useLazyAsyncData("total-users", async () => {
+  const { data } = await eden.api.admin.users.total.get()
+  return data
+})
 
 // Helper function for date formatting
 const formatDate = (date: string | Date | null) => {
@@ -122,11 +136,16 @@ function deleteUser(user: User) {
     </div>
     <UCard>
       <UTable
+        ref="table"
+        :pagination="{
+          pageIndex: page,
+          pageSize: limit,
+        }"
         :data="users"
         :columns
         :empty-state="{
           icon: 'i-heroicons-user-group',
-          label: 'No users found.', // Restore default label
+          label: 'No users found.',
         }"
         :loading="status === 'pending'"
       >
@@ -134,6 +153,13 @@ function deleteUser(user: User) {
           <Department :department="row.original.department" />
         </template>
       </UTable>
+      <div class="flex justify-center border-t border-default pt-4">
+        <UPagination
+          :items-per-page="limit"
+          :total="totalUsers ?? 0"
+          @update:page="(p) => (page = p)"
+        />
+      </div>
     </UCard>
   </div>
 </template>

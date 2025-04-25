@@ -17,17 +17,17 @@ const eden = useEden()
 const dayjs = useDayjs()
 const { monthOptions, selectedMonth } = useDropdownMonths()
 
-dayjs.extend(duration) // Ensure duration plugin is extended
-dayjs.extend(isSameOrAfter) // Extend with isSameOrAfter
-dayjs.extend(isSameOrBefore) // Extend with isSameOrBefore
+dayjs.extend(duration)
+dayjs.extend(isSameOrAfter)
+dayjs.extend(isSameOrBefore)
 
 const { data: user } = await useLazyAsyncData(`user-${userId}`, async () => {
-  const { data } = await eden.api.admin.users.index.get({
-    query: {
+  const { data } = await eden.api.admin.users
+    .user({
       id: userId,
-    },
-  })
-  return data?.[0]
+    })
+    .get()
+  return data
 })
 
 const { data: userTimeEntries } = await useLazyAsyncData(

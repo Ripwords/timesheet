@@ -2,17 +2,19 @@ import { error, t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { eq } from "drizzle-orm"
+import { count, desc, eq } from "drizzle-orm"
 export const adminUsersRoutes = baseApp("adminUsers").group(
   "/admin/users",
   (app) =>
     app
       .use(authGuard("admin"))
       .get(
-        "/", // Corresponds to eden.api.admin.users.index.get()
-        async ({ db }) => {
+        "/",
+        async ({ db, query }) => {
           try {
-            // Fetch all users, selecting only necessary fields
+            const { page = 1, limit = 10 } = query
+            const offset = (page - 1) * limit
+
             const userList = await db
               .select({
                 id: users.id,
@@ -23,6 +25,9 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
                 createdAt: users.createdAt,
               })
               .from(users)
+              .orderBy(desc(users.createdAt))
+              .limit(limit)
+              .offset(offset)
 
             return userList
           } catch (e) {
@@ -39,8 +44,16 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               "Fetches a complete list of registered users. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
+          query: t.Object({
+            page: t.Optional(t.Number()),
+            limit: t.Optional(t.Number()),
+          }),
         }
       )
+      .get("/total", async ({ db }) => {
+        const total = await db.select({ count: count() }).from(users)
+        return total[0]?.count ?? 0
+      })
       .get(
         "/user/:id",
         async ({ db, params }) => {
