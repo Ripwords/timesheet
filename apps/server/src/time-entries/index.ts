@@ -1,4 +1,4 @@
-import { desc, eq, and, gte, lte } from "drizzle-orm"
+import { desc, eq, and, gte, lte, SQL } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
@@ -76,8 +76,13 @@ export const timeEntries = baseApp("time-entries").group(
             return error(401, "Unauthorized")
           }
 
-          // Base condition: entries must belong to the user
-          const conditions = [eq(schema.timeEntries.userId, user.userId)]
+          // Base condition: entries must belong to the user if user is not admin
+          let conditions: SQL[] = []
+          if (user.role !== "admin") {
+            conditions.push(eq(schema.timeEntries.userId, user.userId))
+          } else if (query.userId) {
+            conditions.push(eq(schema.timeEntries.userId, Number(query.userId)))
+          }
 
           // Add start date condition if provided
           if (startDate) {
@@ -142,25 +147,68 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
+            userId: t.Optional(t.Number()),
           }),
         }
       )
-      // READ Single Time Entry
       .get(
-        "/id/:id",
-        async ({ db, params, error, getUser }) => {
+        "/project/:id",
+        async ({ db, params, query, error, getUser }) => {
+          const { startDate, endDate } = query
           const user = await getUser()
           if (!user) {
             return error(401, "Unauthorized")
           }
 
-          const entryId = Number(params.id) // Parse ID to number
-          if (isNaN(entryId)) {
+          // Base condition: entries must belong to the user if user is not admin
+          let conditions: SQL[] = []
+          if (user.role !== "admin") {
+            conditions.push(eq(schema.timeEntries.userId, user.userId))
+          } else if (query.userId) {
+            conditions.push(eq(schema.timeEntries.userId, Number(query.userId)))
+          }
+
+          // Add start date condition if provided
+          if (startDate) {
+            try {
+              const start = new Date(startDate)
+              // Check if date is valid before pushing condition
+              if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
+              conditions.push(gte(schema.timeEntries.startTime, start))
+            } catch (e) {
+              console.error("Invalid startDate format:", startDate, e)
+              return error(400, "Invalid startDate format. Use ISO 8601.")
+            }
+          }
+
+          // Add end date condition if provided
+          if (endDate) {
+            try {
+              const end = new Date(endDate)
+              // Check if date is valid before pushing condition
+              if (isNaN(end.getTime())) throw new Error("Invalid Date Object")
+              // Make the end date inclusive by setting time to the end of the day
+              // or adding one day and using less than (depends on preference)
+              // Here, we add 1 day and use less than the *start* of the next day (UTC)
+              end.setUTCHours(0, 0, 0, 0)
+              end.setUTCDate(end.getUTCDate() + 1)
+              conditions.push(lte(schema.timeEntries.startTime, end))
+            } catch (e) {
+              console.error("Invalid endDate format:", endDate, e)
+              return error(400, "Invalid endDate format. Use ISO 8601.")
+            }
+          }
+
+          const projectId = Number(params.id) // Parse ID to number
+          if (isNaN(projectId)) {
             return error(400, "Invalid time entry ID format")
           }
 
-          const timeEntry = await db.query.timeEntries.findFirst({
-            where: eq(schema.timeEntries.id, entryId), // Use numeric ID
+          const timeEntry = await db.query.timeEntries.findMany({
+            where: and(
+              eq(schema.timeEntries.projectId, projectId),
+              ...conditions
+            ),
           })
 
           if (!timeEntry) {
@@ -168,7 +216,10 @@ export const timeEntries = baseApp("time-entries").group(
           }
 
           // Authorization check: User must own the entry OR be an admin
-          if (timeEntry.userId !== user.userId && user.role !== "admin") {
+          if (
+            timeEntry.some((entry) => entry.userId !== user.userId) &&
+            user.role !== "admin"
+          ) {
             return error(403, "Forbidden: You do not own this time entry")
           }
 
@@ -177,6 +228,21 @@ export const timeEntries = baseApp("time-entries").group(
         {
           params: t.Object({
             id: t.Numeric(),
+          }),
+          query: t.Object({
+            startDate: t.Optional(
+              t.String({
+                format: "date-time",
+                description: "ISO 8601 format e.g., 2024-01-01T00:00:00Z",
+              })
+            ),
+            endDate: t.Optional(
+              t.String({
+                format: "date-time",
+                description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
+              })
+            ),
+            userId: t.Optional(t.Number()),
           }),
           detail: {
             summary: "Get a single time entry by ID",

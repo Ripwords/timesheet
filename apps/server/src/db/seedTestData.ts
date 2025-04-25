@@ -96,6 +96,7 @@ const seedTestData = async () => {
     timeEntriesToInsert.push({
       userId: faker.helpers.arrayElement(allUserIds),
       projectId: faker.helpers.arrayElement(allProjectIds),
+      description: faker.lorem.sentence(),
       startTime: startTime,
       endTime: endTime,
       durationSeconds: durationSeconds,

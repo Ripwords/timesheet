@@ -19,6 +19,6 @@ async function main() {
   const db = drizzle(client, { schema })
   await reset(db, schema)
   console.log("🌱 Database reset complete.")
-  return
+  return db.$client.end()
 }
 main()
