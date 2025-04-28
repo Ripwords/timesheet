@@ -7,6 +7,7 @@ import {
   integer,
   type AnyPgColumn,
   boolean,
+  numeric,
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
@@ -99,3 +100,17 @@ export const departmentDefaultDescription = pgTable(
 )
 export type DepartmentDefaultDescription =
   typeof departmentDefaultDescription.$inferSelect
+
+export const projectBudgetInjections = pgTable("project_budget_injections", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id")
+    .notNull()
+    .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
+  budget: numeric("budget").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})
+export type ProjectBudgetInjection = typeof projectBudgetInjections.$inferSelect
