@@ -89,7 +89,7 @@ const projectBarChartData = computed(() => {
     projectTotalsData.value?.map((item) => ({
       id: item.id,
       label: item.name || `Project ${item.id}`, // Use name, fallback to ID
-      value: Math.round((item.totalDuration || 0) / 60), // Convert seconds to minutes
+      value: Math.round(Number(item.totalDuration) / 60), // Convert seconds to minutes
     })) ?? []
   )
 })
@@ -103,7 +103,7 @@ const dailyLineChartData = computed(() => {
     if (!aggregated[dateStr]) {
       aggregated[dateStr] = 0
     }
-    aggregated[dateStr] += item.totalDuration || 0
+    aggregated[dateStr] += Number(item.totalDuration) || 0
   })
 
   return Object.entries(aggregated)
@@ -124,7 +124,7 @@ const weeklyLineChartData = computed(() => {
     if (!aggregated[weekStr]) {
       aggregated[weekStr] = 0
     }
-    aggregated[weekStr] += item.totalDuration || 0
+    aggregated[weekStr] += Number(item.totalDuration) || 0
   })
 
   return (
@@ -153,7 +153,7 @@ const weeklyLineChartData = computed(() => {
 const totalHoursToday = computed(() => {
   const totalSeconds =
     todayData.value?.reduce(
-      (sum, item) => sum + (item.totalDuration || 0),
+      (sum, item) => sum + Number(item.totalDuration),
       0
     ) ?? 0
   return (totalSeconds / 3600).toFixed(2) // Convert seconds to hours
@@ -162,7 +162,7 @@ const totalHoursToday = computed(() => {
 const totalHoursLast7Days = computed(() => {
   const totalSeconds =
     last7DaysData.value?.reduce(
-      (sum, item) => sum + (item.totalDuration || 0),
+      (sum, item) => sum + Number(item.totalDuration),
       0
     ) ?? 0
   return (totalSeconds / 3600).toFixed(2) // Convert seconds to hours

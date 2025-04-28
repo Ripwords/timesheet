@@ -11,11 +11,18 @@ import {
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
+export const accountStatusEnum = pgEnum("account_status", [
+  "active",
+  "inactive",
+])
 
 export const departmentEnum = pgEnum("department", departmentEnumDef)
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  accountStatus: accountStatusEnum("account_status")
+    .default("active")
+    .notNull(),
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(), // Store hashed passwords, never plain text!
   role: userRoleEnum("role").default("user").notNull(),

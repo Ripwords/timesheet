@@ -32,13 +32,17 @@ export const baseApp = (name: string) =>
   new Elysia({
     name,
   })
-    .use(logger())
+    .use(
+      logger({
+        level: "debug",
+      })
+    )
     .use(serverTiming())
     .decorate("db", db)
     .use(
       cors({
         origin: "http://localhost:5173",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"],
       })

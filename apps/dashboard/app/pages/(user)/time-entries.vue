@@ -34,11 +34,6 @@ const modalState = reactive({
   description: "", // Assuming description might be added later
 })
 
-// Filtering state (optional for now, can add later)
-// const filterStartDate = ref('');
-// const filterEndDate = ref('');
-// const filterProjectId = ref(undefined);
-
 // --- Data Fetching ---
 const {
   data: timeEntries,
@@ -61,7 +56,6 @@ const {
       })
       return []
     }
-
     return (
       (data?.map((entry) => {
         const project = projects.value?.find(
@@ -101,7 +95,9 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   "projects",
   async () => {
     try {
-      const { data, error } = await eden.api.projects.index.get()
+      const { data, error } = await eden.api.projects.index.get({
+        query: {},
+      })
       if (error) {
         toast.add({
           title: "Error fetching projects",
@@ -110,7 +106,8 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
         })
         return []
       }
-      return data?.map((p) => ({ id: p.id, name: p.name })) || []
+
+      return data?.projects.map((p) => ({ id: p.id, name: p.name })) || []
     } catch {
       toast.add({
         title: "Error",

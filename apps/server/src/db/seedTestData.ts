@@ -41,6 +41,7 @@ const seedTestData = async () => {
       email: email,
       passwordHash: passwordHash,
       role: "user",
+      accountStatus: "active",
       department:
         faker.helpers.arrayElement(schema.departmentEnum.enumValues) ||
         "frontend_js",

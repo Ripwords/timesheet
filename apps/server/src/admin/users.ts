@@ -24,6 +24,22 @@ const querySchema = t.Object({
   ),
 })
 
+const updateUserBodySchema = t.Object({
+  email: t.Optional(t.String({ format: "email" })),
+  department: t.Optional(t.UnionEnum(departmentEnumDef)),
+  emailVerified: t.Optional(
+    t.Boolean({
+      error: {
+        message: "Email verified must be a boolean",
+      },
+    })
+  ),
+})
+
+const userIdParamsSchema = t.Object({
+  id: t.Numeric(),
+})
+
 export const adminUsersRoutes = baseApp("adminUsers").group(
   "/admin/users",
   (app) =>
@@ -119,6 +135,96 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
           params: t.Object({
             id: t.String(),
           }),
+        }
+      )
+      .patch(
+        "/:id",
+        async ({ db, params, body }) => {
+          const userId = params.id
+          const { email, department, emailVerified } = body
+
+          if (!email && !department && !emailVerified) {
+            throw error(
+              400,
+              "No update data provided. Provide email or department."
+            )
+          }
+
+          const updateData: Partial<{
+            email: string
+            department: (typeof departmentEnumDef)[number]
+            emailVerified: boolean
+            updatedAt: Date
+          }> = {
+            updatedAt: new Date(), // Always update the timestamp
+          }
+          if (email) {
+            // Optional: Check if email already exists for another user
+            const existingUser = await db.query.users.findFirst({
+              where: eq(users.email, email),
+            })
+            if (existingUser && existingUser.id !== userId) {
+              throw error(
+                409,
+                `Email "${email}" is already in use by another user.`
+              )
+            }
+            updateData.email = email
+          }
+          if (department) {
+            // Basic validation already done by schema, but double check just in case
+            if (!departmentEnumDef.includes(department)) {
+              throw error(400, `Invalid department value: ${department}`)
+            }
+            updateData.department = department
+          }
+
+          if (emailVerified) {
+            updateData.emailVerified = emailVerified
+          }
+
+          try {
+            const updatedUser = await db
+              .update(users)
+              .set(updateData)
+              .where(eq(users.id, userId))
+              .returning({
+                id: users.id,
+                email: users.email,
+                department: users.department,
+                emailVerified: users.emailVerified,
+                updatedAt: users.updatedAt,
+              })
+
+            if (!updatedUser || updatedUser.length === 0) {
+              throw error(404, `User with ID ${userId} not found.`)
+            }
+
+            return updatedUser[0] // Return the first (and only) updated user record
+          } catch (e) {
+            console.error(`Error updating user ${userId}:`, e)
+            if (
+              e instanceof Error &&
+              "status" in e &&
+              typeof e.status === "number"
+            ) {
+              // Re-throw specific errors
+              throw e
+            }
+            const message =
+              e instanceof Error ? e.message : "Unknown error occurred"
+            throw error(500, `Failed to update user: ${message}`)
+          }
+        },
+        {
+          detail: {
+            summary: "Update User Details (Admin)",
+            description:
+              "Updates a user's email and/or department. Requires admin privileges.",
+            tags: ["Admin", "Users"],
+          },
+          params: userIdParamsSchema,
+          body: updateUserBodySchema,
         }
       )
 )
