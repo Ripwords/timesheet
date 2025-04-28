@@ -111,6 +111,48 @@ const seedTestData = async () => {
   ).map((p) => p.id)
   console.log(`Total projects in DB after seeding: ${allProjectIds.length}`)
 
+  // --- 3b. Seed Project Budget Injections ---
+  console.log(`💸 Seeding budget injections for projects...`)
+  const budgetInjectionsToInsert = []
+  for (const projectId of allProjectIds) {
+    // 1-3 injections per project
+    const numInjections = faker.number.int({ min: 1, max: 3 })
+    // Total budget for this project: random between 30,000 and 100,000
+    const totalBudget = faker.number.int({ min: 30000, max: 100000 })
+    // Generate random splits for the injections
+    let splits = []
+    if (numInjections === 1) {
+      splits = [totalBudget]
+    } else {
+      // Generate (numInjections-1) random cut points, sort, and compute differences
+      const cuts = Array.from({ length: numInjections - 1 }, () =>
+        faker.number.int({ min: 1, max: totalBudget - 1 })
+      )
+      cuts.sort((a, b) => a - b)
+      splits = [
+        cuts[0],
+        ...cuts.slice(1).map((c, i) => c - cuts[i]),
+        totalBudget - cuts[cuts.length - 1],
+      ]
+    }
+    // Shuffle splits for realism
+    faker.helpers.shuffle(splits)
+    for (const budget of splits) {
+      budgetInjectionsToInsert.push({
+        projectId,
+        budget: budget.toString(), // numeric expects string
+      })
+    }
+  }
+  if (budgetInjectionsToInsert.length > 0) {
+    await db
+      .insert(schema.projectBudgetInjections)
+      .values(budgetInjectionsToInsert)
+    console.log(
+      `Seeded ${budgetInjectionsToInsert.length} project budget injections.`
+    )
+  }
+
   if (allUserIds.length === 0 || allProjectIds.length === 0) {
     console.error("Cannot seed time entries without users and projects.")
     return
