@@ -211,7 +211,7 @@ const uniqueProjectsLast7Days = computed(() => {
           class="h-64 md:h-80"
         >
           <!-- Assuming AdminChartsBarChart can be reused or adapted -->
-          <AdminChartsBarChart
+          <AdminChartsBar
             :data="projectBarChartData"
             label-field="label"
             value-field="value"
@@ -281,7 +281,7 @@ const uniqueProjectsLast7Days = computed(() => {
           class="h-80 md:h-96"
         >
           <!-- Assuming AdminChartsLineChart can be reused or adapted -->
-          <AdminChartsLineChart
+          <AdminChartsLine
             :data="dailyLineChartData"
             label-field="label"
             value-field="value"
@@ -312,7 +312,7 @@ const uniqueProjectsLast7Days = computed(() => {
           class="h-80 md:h-96"
         >
           <!-- Assuming AdminChartsLineChart can be reused or adapted -->
-          <AdminChartsLineChart
+          <AdminChartsLine
             :data="weeklyLineChartData"
             label-field="label"
             value-field="value"

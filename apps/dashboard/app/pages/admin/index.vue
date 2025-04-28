@@ -100,7 +100,7 @@ const error = computed(() => {
           v-if="projectTotalsData && projectTotalsData.length > 0"
           class="h-64 md:h-80"
         >
-          <AdminChartsBarChart
+          <AdminChartsBar
             :data="projectTotalsData"
             label-field="name"
             value-field="totalDuration"
@@ -129,7 +129,7 @@ const error = computed(() => {
           v-if="userTotalsData && userTotalsData.length > 0"
           class="h-64 md:h-80"
         >
-          <AdminChartsBarChart
+          <AdminChartsBar
             :data="userTotalsData"
             label-field="email"
             value-field="totalDuration"
@@ -158,7 +158,7 @@ const error = computed(() => {
           v-if="projectTimeSeriesData && projectTimeSeriesData.length > 0"
           class="h-80 md:h-96"
         >
-          <AdminChartsLineChart
+          <AdminChartsLine
             :data="projectTimeSeriesData"
             label-field="timePeriod"
             value-field="totalDuration"
@@ -188,7 +188,7 @@ const error = computed(() => {
           v-if="userTimeSeriesData && userTimeSeriesData.length > 0"
           class="h-80 md:h-96"
         >
-          <AdminChartsLineChart
+          <AdminChartsLine
             :data="userTimeSeriesData"
             label-field="timePeriod"
             value-field="totalDuration"

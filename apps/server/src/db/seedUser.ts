@@ -41,11 +41,17 @@ export const seedAdminUser = async () => {
     console.log(`Creating admin user ${adminEmail}...`)
     const hashedPassword = await bcrypt.hash(adminPassword, 10)
 
+    const adminDepartment = await db
+      .select({ id: schema.departments.id })
+      .from(schema.departments)
+      .where(eq(schema.departments.name, "Administration"))
+      .limit(1)
+
     await db.insert(schema.users).values({
       email: adminEmail,
       passwordHash: hashedPassword,
       role: "admin",
-      departmentId: 3,
+      departmentId: adminDepartment[0].id,
       emailVerified: true,
     })
     console.log(`Admin user ${adminEmail} seeded successfully.`)
