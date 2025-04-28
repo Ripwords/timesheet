@@ -13,21 +13,21 @@
     "db:seed": "bun run src/db/seedTestData.ts"
   },
   "dependencies": {
-    "@timesheet/constants": "workspace:*",
     "@elysiajs/cors": "^1.2.0",
     "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/server-timing": "^1.2.1",
     "@elysiajs/swagger": "^1.2.2",
     "@rasla/logify": "^5.0.0",
+    "@timesheet/constants": "workspace:*",
     "bcryptjs": "^3.0.2",
     "elysia": "latest",
     "nodemailer": "^6.10.1",
-    "pg": "^8.14.1"
+    "pg": "^8.15.6"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.7.0",
     "@types/nodemailer": "^6.4.17",
-    "@types/pg": "^8.11.12",
+    "@types/pg": "^8.11.14",
     "bun-types": "latest",
     "drizzle-seed": "^0.3.1"
   },
