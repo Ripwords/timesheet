@@ -69,7 +69,10 @@ const { data: defaultDescriptions } = await useLazyAsyncData(
         description: "Could not load default descriptions.",
         color: "error",
       })
-      return [] // Return empty array on error
+      return {
+        defaultDescriptions: [],
+        departmentThreshold: undefined,
+      } // Return empty array on error
     }
     return descriptionsData || []
   }
@@ -84,6 +87,36 @@ const formattedElapsedTime = computed(() => {
     duration.minutes()
   ).padStart(2, "0")}:${String(duration.seconds()).padStart(2, "0")}`
 })
+
+const exceedsDepartmentThreshold = computed(() => {
+  const threshold = defaultDescriptions?.value?.departmentThreshold
+  return typeof threshold === "number" && finalSessionDuration.value > threshold
+})
+
+// --- Custom description logic ---
+const customDescription = ref("")
+const dropdownDescription = ref("")
+
+watch(
+  [exceedsDepartmentThreshold, customDescription, dropdownDescription],
+  ([exceeds, custom, dropdown]) => {
+    if (exceeds) {
+      timeEntryDescription.value = custom
+    } else {
+      timeEntryDescription.value = custom || dropdown
+    }
+  }
+)
+
+watch(
+  () => showProjectModal.value,
+  (open) => {
+    if (open) {
+      customDescription.value = ""
+      dropdownDescription.value = ""
+    }
+  }
+)
 
 // Define columns using accessorKey and header, explicitly typed
 const historyColumns: TableColumn<{
@@ -339,16 +372,46 @@ const cancelSession = () => {
             searchable
             searchable-placeholder="Search projects..."
           />
-          <USelectMenu
-            v-model="timeEntryDescription"
-            :items="defaultDescriptions"
-            label-key="description"
-            value-key="description"
-            placeholder="Select or type description..."
-            creatable
-            searchable
-            searchable-placeholder="Search or add description..."
-          />
+          <div>
+            <label class="block text-sm font-medium mb-1">Description</label>
+            <template v-if="exceedsDepartmentThreshold">
+              <UInput
+                v-model="customDescription"
+                placeholder="Enter description..."
+                color="primary"
+                variant="outline"
+                class="w-full"
+                required
+              />
+              <p class="text-xs text-warning mt-1">
+                A custom description is required for long sessions.
+              </p>
+            </template>
+            <template v-else>
+              <USelectMenu
+                v-model="dropdownDescription"
+                :items="defaultDescriptions?.defaultDescriptions"
+                label-key="description"
+                value-key="description"
+                placeholder="Select or type description..."
+                creatable
+                searchable
+                searchable-placeholder="Search or add description..."
+                class="mb-2"
+              />
+              <UInput
+                v-model="customDescription"
+                placeholder="Or enter a custom description..."
+                color="primary"
+                variant="outline"
+                class="w-full"
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                You can select a description or enter your own. If you type a
+                custom description, it will be used.
+              </p>
+            </template>
+          </div>
         </div>
       </template>
 
@@ -361,7 +424,10 @@ const cancelSession = () => {
             >Cancel</UButton
           >
           <UButton
-            :disabled="!selectedProjectId"
+            :disabled="
+              !selectedProjectId ||
+              (exceedsDepartmentThreshold && !customDescription)
+            "
             @click="saveSession"
             >Save Session</UButton
           >

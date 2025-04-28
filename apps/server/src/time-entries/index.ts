@@ -342,7 +342,14 @@ export const timeEntries = baseApp("time-entries").group(
                 user.departmentId
               )
             )
-          console.log(userDefaultDescriptions)
+
+          const departmentThreshold = await db.query.departments.findFirst({
+            where: eq(schema.departments.id, user.departmentId),
+            columns: {
+              maxSessionMinutes: true,
+            },
+          })
+
           // Ensure the user record and department exist
           if (!userDefaultDescriptions) {
             console.warn(
@@ -351,7 +358,10 @@ export const timeEntries = baseApp("time-entries").group(
             return error(400, "User department not set or user not found")
           }
 
-          return userDefaultDescriptions
+          return {
+            defaultDescriptions: userDefaultDescriptions,
+            departmentThreshold: departmentThreshold?.maxSessionMinutes,
+          }
         },
         {
           detail: {
