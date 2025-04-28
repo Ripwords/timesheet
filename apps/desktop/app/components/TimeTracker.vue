@@ -8,6 +8,7 @@ const logout = async () => {
   await eden.api.auth.signout.post()
   navigateTo("/login")
 }
+const auth = useCookie("auth")
 
 // --- State ---
 const timerInterval = ref<NodeJS.Timeout | null>(null)
@@ -23,8 +24,13 @@ const timeEntryDescription = ref("")
 
 // --- Projects ---
 const { data: projects } = await useLazyAsyncData("projects", async () => {
-  const { data: projectData } = await eden.api.projects.index.get()
-  return projectData?.map((project) => ({ id: project.id, name: project.name }))
+  const { data: projectData } = await eden.api.projects.index.get({
+    query: {},
+  })
+  return projectData?.projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+  }))
 })
 
 // --- History ---
@@ -46,6 +52,26 @@ const { data: history, refresh: refreshHistory } = await useLazyAsyncData(
           .duration(entry.time_entries.durationSeconds, "seconds")
           .humanize() || "0 seconds",
     }))
+  }
+)
+
+// --- Default Descriptions ---
+const { data: defaultDescriptions } = await useLazyAsyncData(
+  `default-descriptions-${auth.value}`,
+  async () => {
+    const { data: descriptionsData, error } = await eden.api[
+      "time-entries"
+    ].defaults.get()
+    if (error) {
+      console.error("Error fetching default descriptions:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Could not load default descriptions.",
+        color: "error",
+      })
+      return [] // Return empty array on error
+    }
+    return descriptionsData || []
   }
 )
 
@@ -187,6 +213,7 @@ const saveSession = async () => {
     startTime: startTimeForApi,
     endTime: endTimeForApi,
     durationSeconds: finalSessionDuration.value,
+    description: timeEntryDescription.value || undefined,
   }
 
   try {
@@ -312,9 +339,15 @@ const cancelSession = () => {
             searchable
             searchable-placeholder="Search projects..."
           />
-          <UInput
+          <USelectMenu
             v-model="timeEntryDescription"
-            placeholder="Description"
+            :items="defaultDescriptions"
+            label-key="description"
+            value-key="description"
+            placeholder="Select or type description..."
+            creatable
+            searchable
+            searchable-placeholder="Search or add description..."
           />
         </div>
       </template>

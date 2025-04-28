@@ -250,6 +250,118 @@ export const timeEntries = baseApp("time-entries").group(
           },
         }
       )
+      .get(
+        "/department-list",
+        async ({ db, getUser, error }) => {
+          const userPayload = await getUser()
+          if (!userPayload) {
+            return error(401, "Unauthorized")
+          }
+
+          // Fetch the user's department from the database using the userId from the payload
+          const userRecord = await db
+            .select({
+              departmentId: schema.departments.id,
+              departmentName: schema.departments.name,
+            })
+            .from(schema.users)
+            .innerJoin(
+              schema.departments,
+              eq(schema.users.departmentId, schema.departments.id)
+            )
+            .where(eq(schema.users.id, userPayload.userId))
+            .limit(1)
+            .then((res) => res[0])
+
+          // Ensure the user record and department exist
+          if (!userRecord || !userRecord.departmentId) {
+            console.warn(
+              `User ${userPayload.userId} not found or has no department assigned.`
+            )
+            return error(400, "User department not set or user not found")
+          }
+
+          const userDepartment = userRecord.departmentId
+
+          try {
+            const defaultDescriptions = await db
+              .select({
+                id: schema.departmentDefaultDescription.id,
+              })
+              .from(schema.departmentDefaultDescription)
+              .where(
+                eq(
+                  schema.departmentDefaultDescription.departmentId,
+                  userDepartment
+                )
+              )
+
+            return defaultDescriptions
+          } catch (e) {
+            console.error(
+              `Failed to fetch default descriptions for department ${userDepartment}:`,
+              e
+            )
+            return error(500, "Internal Server Error")
+          }
+        },
+        {
+          detail: {
+            summary: "Get the list of departments",
+            description: "Fetches a list of departments.",
+            tags: ["TimeEntries", "Defaults"],
+          },
+        }
+      )
+      .get(
+        "/defaults",
+        async ({ db, getUser, error }) => {
+          const userPayload = await getUser()
+          if (!userPayload) {
+            return error(401, "Unauthorized")
+          }
+
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.id, userPayload.userId),
+          })
+
+          if (!user) {
+            return error(400, "User not found")
+          }
+
+          // Fetch the user's department from the database using the userId from the payload
+          const userDefaultDescriptions = await db
+            .select({
+              id: schema.departmentDefaultDescription.id,
+              description: schema.departmentDefaultDescription.description,
+            })
+            .from(schema.departmentDefaultDescription)
+            .where(
+              eq(
+                schema.departmentDefaultDescription.departmentId,
+                user.departmentId
+              )
+            )
+          console.log(userDefaultDescriptions)
+          // Ensure the user record and department exist
+          if (!userDefaultDescriptions) {
+            console.warn(
+              `User ${userPayload.userId} not found or has no department assigned.`
+            )
+            return error(400, "User department not set or user not found")
+          }
+
+          return userDefaultDescriptions
+        },
+        {
+          detail: {
+            summary: "Get default time entry descriptions",
+            description:
+              "Fetches a list of predefined time entry descriptions based on the logged-in user's assigned department.",
+            tags: ["TimeEntries", "Defaults"],
+          },
+        }
+      )
       // UPDATE Time Entry
       .put(
         "/id/:id",

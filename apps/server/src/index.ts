@@ -4,7 +4,7 @@ import { projects } from "./projects"
 import { timeEntries } from "./time-entries"
 import { adminReportsRoutes } from "./admin/reports"
 import { adminUsersRoutes } from "./admin/users"
-
+import { adminDepartmentsRoutes } from "./admin/departments"
 const app = baseApp("main")
   .group("/api", (app) =>
     app
@@ -13,6 +13,7 @@ const app = baseApp("main")
       .use(timeEntries)
       .use(adminReportsRoutes)
       .use(adminUsersRoutes)
+      .use(adminDepartmentsRoutes)
   )
   .get("/", () => "Hello Elysia - Timesheet Backend")
   .listen(process.env.SERVER_PORT || 3100)

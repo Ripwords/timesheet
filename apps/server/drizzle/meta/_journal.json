@@ -50,6 +50,13 @@
       "when": 1745231383526,
       "tag": "0006_romantic_argent",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1745826016299,
+      "tag": "0007_steep_blue_blade",
+      "breakpoints": true
     }
   ]
 }

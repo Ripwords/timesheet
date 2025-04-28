@@ -57,8 +57,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
               email: email,
               passwordHash: passwordHash,
               verificationToken: verificationTokenHash,
-              department:
-                body.department as (typeof schema.departmentEnum.enumValues)[number],
+              departmentId: body.departmentId,
             })
             .returning({ id: schema.users.id, email: schema.users.email })
 
@@ -89,7 +88,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         body: t.Object({
           email: t.String({ format: "email" }),
           password: t.String({ minLength: 8 }),
-          department: t.String({ enum: schema.departmentEnum.enumValues }),
+          departmentId: t.Number(),
         }),
       }
     )

@@ -221,7 +221,7 @@ watch(selectedMonth, () => {
       </div>
       <div v-if="user || project">
         <div v-if="user">
-          <Department :department="user.department" />
+          <Department :department-id="user.departmentId" />
         </div>
         <div
           v-if="project"

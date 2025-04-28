@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-import { departmentEnumDef } from "@timesheet/constants"
 
 import {
   UButton,
@@ -29,28 +28,35 @@ type User = Omit<
   emailVerified: boolean | null
 }
 
-const dayjs = useDayjs()
 const eden = useEden()
 const toast = useToast()
 const page = ref(1)
 const search = ref("")
-const department = ref<(typeof departmentEnumDef)[number] | undefined>(
-  undefined
-)
+const departmentId = ref(0)
 const isEditModalOpen = ref(false)
 const editingUser = ref<User | null>(null) // Store the user being edited
 const editedData = reactive<{
   email: string
-  department: (typeof departmentEnumDef)[number] | undefined
+  departmentId: number | undefined
   emailVerified: boolean | null
 }>({
   email: "",
-  department: undefined,
+  departmentId: undefined,
   emailVerified: null,
 })
 const isSaving = ref(false)
 const isVerifying = ref(false)
 
+const { data: departments } = await useLazyAsyncData(
+  "departments",
+  async () => {
+    const { data } = await eden.api.admin.departments.index.get({
+      query: {},
+    })
+
+    return data ?? []
+  }
+)
 const {
   data: users,
   status,
@@ -62,7 +68,7 @@ const {
       query: {
         page: page.value,
         ...(search.value && { search: search.value }),
-        ...(department.value && { department: department.value }),
+        ...(departmentId.value && { departmentId: departmentId.value }),
       },
     })
     return {
@@ -71,7 +77,7 @@ const {
     }
   },
   {
-    watch: [page, department],
+    watch: [page, departmentId],
   }
 )
 
@@ -82,28 +88,6 @@ watchDebounced(
   },
   { debounce: 150 }
 )
-
-// Simplify formatDate based on boolean status
-const formatDate = (dateInput: string | Date | boolean | null): string => {
-  // Handle actual dates/timestamps if they exist
-  if (
-    dateInput instanceof Date ||
-    (typeof dateInput === "string" && dayjs(dateInput).isValid())
-  ) {
-    try {
-      const dateObj =
-        typeof dateInput === "string" ? dayjs(dateInput) : dayjs(dateInput)
-      return dateObj.isValid() ? dateObj.format("MMM D, YYYY") : "Invalid Date"
-    } catch (e) {
-      console.error("Error formatting date:", dateInput, e)
-      return "Error"
-    }
-  }
-  // Handle boolean or null status
-  if (dateInput === true) return "Verified"
-  if (dateInput === false) return "Not Verified"
-  return "N/A" // For null or other unexpected cases
-}
 
 // Define columns using TanStack types and cell functions with INFERRED User type
 const columns: ColumnDef<User, unknown>[] = [
@@ -139,11 +123,13 @@ const columns: ColumnDef<User, unknown>[] = [
     },
   },
   {
-    accessorKey: "createdAt",
-    header: "Created At",
+    header: "Hours (week)",
     enableSorting: true,
     cell: (context: CellContext<User, unknown>) => {
-      return formatDate(context.row.original.createdAt)
+      const totalHours = context.row.original.totalHoursThisWeek
+      return h("div", { class: "text-right" }, [
+        h("span", { class: "text-sm" }, `${totalHours.toFixed(2)}`),
+      ])
     },
   },
   {
@@ -189,7 +175,7 @@ function editUser(user: User) {
   editingUser.value = JSON.parse(JSON.stringify(user))
   if (editingUser.value) {
     editedData.email = editingUser.value.email ?? ""
-    editedData.department = editingUser.value.department ?? undefined
+    editedData.departmentId = editingUser.value.departmentId ?? undefined
     isEditModalOpen.value = true
   }
 }
@@ -208,14 +194,14 @@ async function saveUserChanges() {
   const userId = editingUser.value.id
   const payload: {
     email?: string
-    department?: (typeof departmentEnumDef)[number]
+    departmentId?: number
   } = {}
 
   if (editedData.email !== editingUser.value.email) {
     payload.email = editedData.email
   }
-  if (editedData.department !== editingUser.value.department) {
-    payload.department = editedData.department
+  if (editedData.departmentId !== editingUser.value.departmentId) {
+    payload.departmentId = editedData.departmentId
   }
 
   if (Object.keys(payload).length === 0) {
@@ -303,30 +289,32 @@ function cancelEdit() {
             placeholder="Search..."
           />
           <USelectMenu
-            v-model="department"
+            v-model="departmentId"
             class="w-50"
             placeholder="Select Department"
-            :items="[...departmentEnumDef]"
+            :items="[...departments]"
+            value-key="id"
+            label-key="departmentName"
             :search-input="{
               placeholder: 'Search items...',
             }"
           >
             <template #item="{ item }">
-              <Department :department="item" />
+              <Department :department-id="item.id" />
             </template>
             <template #default="{ modelValue }">
               <Department
                 v-if="modelValue"
-                :department="modelValue"
+                :department-id="modelValue"
               />
             </template>
             <template #trailing>
               <button
-                v-if="department"
+                v-if="departmentId"
                 :class="['ml-2 px-1  hover:text-red-600 !pointer-events-auto']"
                 @click.stop="
                   () => {
-                    department = undefined
+                    departmentId = 0
                   }
                 "
               >
@@ -350,7 +338,7 @@ function cancelEdit() {
         :loading="status === 'pending'"
       >
         <template #department-cell="{ row }">
-          <Department :department="row.original.department" />
+          <Department :department-id="row.original.departmentId" />
         </template>
       </UTable>
       <div class="flex justify-center border-t border-default pt-4">
@@ -398,6 +386,7 @@ function cancelEdit() {
             >
               <UInput
                 v-model="editedData.email"
+                class="w-50"
                 :disabled="isSaving || isVerifying"
               />
             </UFormField>
@@ -408,21 +397,22 @@ function cancelEdit() {
               class="mb-4"
             >
               <USelectMenu
-                v-model="editedData.department"
+                v-model="editedData.departmentId"
+                class="w-50"
                 placeholder="Select Department"
-                :items="[...departmentEnumDef]"
-                value-attribute="value"
-                option-attribute="label"
+                :items="[...departments]"
+                value-key="id"
+                label-key="departmentName"
                 :search-input="{ placeholder: 'Search departments...' }"
                 :disabled="isSaving || isVerifying"
               >
                 <template #item="{ item }">
-                  <Department :department="item" />
+                  <Department :department-id="item.id" />
                 </template>
                 <template #default="{ modelValue }">
                   <Department
                     v-if="modelValue"
-                    :department="modelValue"
+                    :department-id="modelValue"
                   />
                   <span
                     v-else

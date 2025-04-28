@@ -1,4 +1,3 @@
-import { departmentEnumDef } from "@timesheet/constants"
 import {
   pgTable,
   serial,
@@ -16,7 +15,14 @@ export const accountStatusEnum = pgEnum("account_status", [
   "inactive",
 ])
 
-export const departmentEnum = pgEnum("department", departmentEnumDef)
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  maxSessionMinutes: integer("max_session_minutes").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+export type Department = typeof departments.$inferSelect
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -26,7 +32,9 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(), // Store hashed passwords, never plain text!
   role: userRoleEnum("role").default("user").notNull(),
-  department: departmentEnum("department").notNull(),
+  departmentId: integer("department_id")
+    .notNull()
+    .references((): AnyPgColumn => departments.id, { onDelete: "restrict" }),
   emailVerified: boolean("email_verified").default(false).notNull(),
   verificationToken: text("verification_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -78,3 +86,16 @@ export const timeEntries = pgTable("time_entries", {
     .$onUpdate(() => new Date()),
 })
 export type TimeEntry = typeof timeEntries.$inferSelect
+
+export const departmentDefaultDescription = pgTable(
+  "department_default_description",
+  {
+    id: serial("id").primaryKey(),
+    departmentId: integer("department_id")
+      .notNull()
+      .references((): AnyPgColumn => departments.id, { onDelete: "restrict" }),
+    description: text("description").notNull(),
+  }
+)
+export type DepartmentDefaultDescription =
+  typeof departmentDefaultDescription.$inferSelect

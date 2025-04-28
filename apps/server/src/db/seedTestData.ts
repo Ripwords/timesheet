@@ -19,15 +19,47 @@ const db = drizzle(client, { schema })
 const SEED_USERS_COUNT = 30
 const SEED_PROJECTS_COUNT = 20
 const SEED_TIME_ENTRIES_COUNT = 500
+const DEPARTMENTS_TO_SEED = [
+  { name: "Frontend Design", maxSessionMinutes: 480 },
+  { name: "Frontend JS", maxSessionMinutes: 480 },
+  { name: "Backend", maxSessionMinutes: 480 },
+  { name: "UI/UX", maxSessionMinutes: 480 },
+  { name: "Digital Marketing", maxSessionMinutes: 420 },
+  { name: "Administration", maxSessionMinutes: 540 },
+]
 
 const seedTestData = async () => {
   console.log("🌱 Starting test data seeding...")
 
-  // --- 1. Seed Regular Users ---
+  // --- 1. Seed Departments ---
+  console.log(`🏢 Seeding ${DEPARTMENTS_TO_SEED.length} departments...`)
+  await db
+    .insert(schema.departments)
+    .values(DEPARTMENTS_TO_SEED)
+    .onConflictDoNothing() // Ignore if names already exist
+
+  // Fetch seeded departments to get their IDs and map names to IDs
+  const seededDepartments = await db
+    .select({ id: schema.departments.id, name: schema.departments.name })
+    .from(schema.departments)
+
+  if (seededDepartments.length === 0) {
+    console.error("❌ Failed to seed or fetch departments. Aborting.")
+    process.exit(1)
+  }
+
+  const departmentNameToIdMap = new Map(
+    seededDepartments.map((d) => [d.name, d.id])
+  )
+  const departmentIds = seededDepartments.map((d) => d.id)
+  console.log(
+    `Total departments in DB after seeding: ${seededDepartments.length}`
+  )
+
+  // --- 2. Seed Regular Users ---
   console.log(`👥 Seeding ${SEED_USERS_COUNT} regular users...`)
   const userEmails = new Set<string>()
   while (userEmails.size < SEED_USERS_COUNT) {
-    // Ensure generated emails are not the admin email
     const potentialEmail = faker.internet.email()
     if (potentialEmail !== (process.env.ADMIN_EMAIL ?? "admin@example.com")) {
       userEmails.add(potentialEmail)
@@ -37,15 +69,15 @@ const seedTestData = async () => {
   const usersToInsert: (typeof schema.users.$inferInsert)[] = []
   for (const email of userEmails) {
     const passwordHash = await bcrypt.hash("password", 10) // Default password
+    const randomDepartmentId = faker.helpers.arrayElement(departmentIds) // Pick a random *ID*
+
     usersToInsert.push({
       email: email,
       passwordHash: passwordHash,
       role: "user",
       accountStatus: "active",
-      department:
-        faker.helpers.arrayElement(schema.departmentEnum.enumValues) ||
-        "frontend_js",
-      emailVerified: faker.datatype.boolean(0.8), // 80% chance of being verified
+      departmentId: randomDepartmentId, // Assign departmentId FK
+      emailVerified: faker.datatype.boolean(0.8),
     })
   }
 
@@ -58,7 +90,7 @@ const seedTestData = async () => {
   ).map((u) => u.id)
   console.log(`Total users in DB after seeding: ${allUserIds.length}`)
 
-  // --- 2. Seed Projects ---
+  // --- 3. Seed Projects ---
   console.log(`🏗️ Seeding ${SEED_PROJECTS_COUNT} projects...`)
   const projectNames = new Set<string>()
   while (projectNames.size < SEED_PROJECTS_COUNT) {
@@ -69,13 +101,11 @@ const seedTestData = async () => {
     projectNames
   ).map((name) => ({ name }))
 
-  // Batch insert projects, ignoring conflicts on name (if unique constraint added later)
   await db
     .insert(schema.projects)
     .values(projectsToInsert)
     .onConflictDoNothing()
 
-  // Fetch all project IDs
   const allProjectIds = (
     await db.select({ id: schema.projects.id }).from(schema.projects)
   ).map((p) => p.id)
@@ -83,15 +113,15 @@ const seedTestData = async () => {
 
   if (allUserIds.length === 0 || allProjectIds.length === 0) {
     console.error("Cannot seed time entries without users and projects.")
-    return // Exit if no users or projects
+    return
   }
 
-  // --- 3. Seed Time Entries ---
+  // --- 4. Seed Time Entries ---
   console.log(`⏱️ Seeding ${SEED_TIME_ENTRIES_COUNT} time entries...`)
   const timeEntriesToInsert: (typeof schema.timeEntries.$inferInsert)[] = []
   for (let i = 0; i < SEED_TIME_ENTRIES_COUNT; i++) {
-    const durationSeconds = faker.number.int({ min: 300, max: 28800 }) // 5 mins to 8 hours
-    const endTime = faker.date.recent({ days: 90 }) // End time within the last 90 days (increased from 30)
+    const durationSeconds = faker.number.int({ min: 300, max: 28800 })
+    const endTime = faker.date.recent({ days: 90 })
     const startTime = new Date(endTime.getTime() - durationSeconds * 1000)
 
     timeEntriesToInsert.push({
@@ -106,6 +136,77 @@ const seedTestData = async () => {
 
   if (timeEntriesToInsert.length > 0) {
     await db.insert(schema.timeEntries).values(timeEntriesToInsert)
+  }
+
+  // --- 5. Seed Department Default Descriptions ---
+  console.log("🏷️ Seeding default descriptions for departments...")
+  const defaultDescriptionsToInsert: (typeof schema.departmentDefaultDescription.$inferInsert)[] =
+    []
+
+  // Descriptions keyed by the *names* defined in DEPARTMENTS_TO_SEED
+  const descriptionsByDepartmentName: Record<string, string[]> = {
+    "Frontend Design": [
+      "Implement UI components from Figma",
+      "Style application elements",
+      "Ensure responsive design",
+      "Design system integration",
+    ],
+    "Frontend JS": [
+      "Develop interactive features",
+      "Manage application state (Pinia/Vuex)",
+      "Integrate backend APIs",
+      "Write unit/integration tests",
+      "Optimize frontend performance",
+    ],
+    Backend: [
+      "Design and implement API endpoints",
+      "Database schema management (Drizzle)",
+      "Implement authentication/authorization",
+      "Server deployment and maintenance",
+      "Write backend tests",
+    ],
+    "UI/UX": [
+      "User research and analysis",
+      "Create wireframes and mockups",
+      "Develop user flow diagrams",
+      "Conduct usability testing",
+      "Prototype interactions",
+    ],
+    "Digital Marketing": [
+      "Plan and execute marketing campaigns",
+      "Manage social media presence",
+      "Create marketing content (blog, ads)",
+      "Analyze campaign performance",
+      "SEO optimization",
+    ],
+    Administration: [
+      // Descriptions for the added admin department
+      "Manage user accounts",
+      "System configuration",
+      "Generate reports",
+      "General administrative tasks",
+    ],
+  }
+
+  // Iterate through the map of seeded departments (name -> id)
+  for (const [deptName, deptId] of departmentNameToIdMap.entries()) {
+    const descriptions = descriptionsByDepartmentName[deptName] || []
+    for (const description of descriptions) {
+      defaultDescriptionsToInsert.push({
+        departmentId: deptId, // Use the department ID
+        description: description,
+      })
+    }
+  }
+
+  if (defaultDescriptionsToInsert.length > 0) {
+    await db
+      .insert(schema.departmentDefaultDescription)
+      .values(defaultDescriptionsToInsert)
+      .onConflictDoNothing()
+    console.log(
+      `Seeded ${defaultDescriptionsToInsert.length} default descriptions.`
+    )
   }
 
   console.log(`✅ Test data seeding complete!`)

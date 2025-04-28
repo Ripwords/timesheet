@@ -266,7 +266,7 @@ const handleSelect = (row: TableRow<WeeklyBreakdownRow>) => {
         v-if="user"
         class="text-sm text-gray-500 dark:text-gray-400 mt-1"
       >
-        <Department :department="user.department" />
+        <Department :department-id="user.departmentId" />
       </div>
     </template>
     <div

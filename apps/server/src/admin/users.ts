@@ -1,9 +1,8 @@
-import { and, count, desc, eq, ilike } from "drizzle-orm"
+import { and, count, desc, eq, ilike, ne, sql } from "drizzle-orm"
 import { error, t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
-import { users } from "../db/schema"
+import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { departmentEnumDef } from "@timesheet/constants"
 
 const querySchema = t.Object({
   search: t.Optional(t.Nullable(t.String())),
@@ -17,16 +16,12 @@ const querySchema = t.Object({
       default: 10,
     })
   ),
-  department: t.Optional(
-    t.UnionEnum(departmentEnumDef, {
-      default: undefined,
-    })
-  ),
+  departmentId: t.Optional(t.Numeric()),
 })
 
 const updateUserBodySchema = t.Object({
   email: t.Optional(t.String({ format: "email" })),
-  department: t.Optional(t.UnionEnum(departmentEnumDef)),
+  departmentId: t.Optional(t.Numeric()),
   emailVerified: t.Optional(
     t.Boolean({
       error: {
@@ -49,55 +44,79 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
         "/",
         async ({ db, query }) => {
           try {
-            const { page = 1, limit = 10, search, department } = query
+            const { page = 1, limit = 10, search, departmentId } = query
             const offset = (page - 1) * limit
 
-            const whereList = []
+            const whereConditions = []
             if (search && search !== "") {
-              whereList.push(ilike(users.email, `%${search}%`))
+              whereConditions.push(ilike(users.email, `%${search}%`))
             }
-            if (department) {
-              if (
-                departmentEnumDef.includes(
-                  department as (typeof departmentEnumDef)[number]
-                )
-              ) {
-                whereList.push(
-                  eq(
-                    users.department,
-                    department as (typeof departmentEnumDef)[number]
-                  )
-                )
-              }
+            if (departmentId) {
+              whereConditions.push(eq(users.departmentId, departmentId))
             }
 
-            const userList = await db
+            const startOfWeek = sql`date_trunc('week', current_timestamp)`
+            const endOfWeek = sql`date_trunc('week', current_timestamp) + interval '1 week'`
+
+            const userListQuery = db
               .select({
                 id: users.id,
                 email: users.email,
                 role: users.role,
                 emailVerified: users.emailVerified,
-                department: users.department,
+                accountStatus: users.accountStatus,
+                departmentId: users.departmentId,
+                departmentName: departments.name,
                 createdAt: users.createdAt,
+                totalSecondsThisWeek: sql<number>`(
+                  SELECT coalesce(sum(${timeEntries.durationSeconds}), 0)
+                  FROM ${timeEntries}
+                  WHERE ${timeEntries.userId} = ${users.id}
+                  AND ${timeEntries.startTime} >= ${startOfWeek}
+                  AND ${timeEntries.startTime} < ${endOfWeek}
+                )`,
               })
               .from(users)
+              .innerJoin(departments, eq(users.departmentId, departments.id))
               .orderBy(desc(users.createdAt))
               .limit(limit)
               .offset(offset)
-              .where(and(...whereList))
 
-            const total = await db
-              .select({ count: count() })
-              .from(users)
-              .where(
-                search && search !== ""
-                  ? ilike(users.email, `%${search}%`)
-                  : undefined
-              )
+            if (whereConditions.length > 0) {
+              userListQuery.where(and(...whereConditions))
+            }
+
+            const userListRaw = await userListQuery
+
+            if (userListRaw.length === 0) {
+              const totalQuery = db.select({ count: count() }).from(users)
+              if (whereConditions.length > 0) {
+                totalQuery.where(and(...whereConditions))
+              }
+              const totalResult = await totalQuery
+              return {
+                users: [],
+                total: totalResult[0]?.count ?? 0,
+              }
+            }
+
+            const userListFormatted = userListRaw.map((user) => {
+              const { totalSecondsThisWeek, ...rest } = user
+              return {
+                ...rest,
+                totalHoursThisWeek: totalSecondsThisWeek / 3600,
+              }
+            })
+
+            const totalQuery = db.select({ count: count() }).from(users)
+            if (whereConditions.length > 0) {
+              totalQuery.where(and(...whereConditions))
+            }
+            const totalResult = await totalQuery
 
             return {
-              users: userList,
-              total: total[0]?.count ?? 0,
+              users: userListFormatted,
+              total: totalResult[0]?.count ?? 0,
             }
           } catch (e) {
             console.error("Error fetching user list for admin:", e)
@@ -110,7 +129,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
           detail: {
             summary: "Get list of all users (Admin)",
             description:
-              "Fetches a complete list of registered users. Requires admin privileges.",
+              "Fetches a list of registered users with department names. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
           query: querySchema,
@@ -118,109 +137,152 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       )
       .get(
         "/user/:id",
-        async ({ db, params }) => {
-          const userId = params.id
-          const user = await db.query.users.findFirst({
-            where: eq(users.id, Number(userId)),
-          })
+        async ({ db, params, error }) => {
+          const userId = Number(params.id)
+          if (isNaN(userId)) {
+            return error(400, "Invalid user ID format")
+          }
+
+          const userData = await db
+            .select({
+              id: users.id,
+              email: users.email,
+              role: users.role,
+              emailVerified: users.emailVerified,
+              accountStatus: users.accountStatus,
+              verificationToken: users.verificationToken,
+              createdAt: users.createdAt,
+              updatedAt: users.updatedAt,
+              departmentId: users.departmentId,
+              departmentName: departments.name,
+            })
+            .from(users)
+            .innerJoin(departments, eq(users.departmentId, departments.id))
+            .where(eq(users.id, userId))
+            .limit(1)
+
+          const user = userData[0]
+
+          if (!user) {
+            return error(404, `User with ID ${userId} not found`)
+          }
           return user
         },
         {
           detail: {
             summary: "Get user by ID (Admin)",
             description:
-              "Fetches a user by their ID. Requires admin privileges.",
+              "Fetches a user by their ID, including department name. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
-          params: t.Object({
-            id: t.String(),
-          }),
+          params: t.Object({ id: t.Numeric() }),
         }
       )
       .patch(
         "/:id",
-        async ({ db, params, body }) => {
+        async ({ db, params, body, error }) => {
           const userId = params.id
-          const { email, department, emailVerified } = body
+          const { email, departmentId, emailVerified } = body
 
-          if (!email && !department && !emailVerified) {
-            throw error(
+          if (
+            email === undefined &&
+            departmentId === undefined &&
+            emailVerified === undefined
+          ) {
+            return error(
               400,
-              "No update data provided. Provide email or department."
+              "No update data provided. Provide email, departmentId, or emailVerified."
             )
           }
 
-          const updateData: Partial<{
-            email: string
-            department: (typeof departmentEnumDef)[number]
-            emailVerified: boolean
-            updatedAt: Date
-          }> = {
-            updatedAt: new Date(), // Always update the timestamp
-          }
-          if (email) {
-            // Optional: Check if email already exists for another user
-            const existingUser = await db.query.users.findFirst({
-              where: eq(users.email, email),
+          if (departmentId !== undefined) {
+            const departmentExists = await db.query.departments.findFirst({
+              where: eq(departments.id, departmentId),
+              columns: { id: true },
             })
-            if (existingUser && existingUser.id !== userId) {
-              throw error(
+            if (!departmentExists) {
+              return error(400, `Invalid departmentId: ${departmentId}`)
+            }
+          }
+
+          const updateData: Partial<
+            typeof users.$inferInsert & { updatedAt: Date }
+          > = {
+            updatedAt: new Date(),
+          }
+          if (email !== undefined) {
+            const existingUser = await db.query.users.findFirst({
+              where: and(eq(users.email, email), ne(users.id, userId)),
+              columns: { id: true },
+            })
+            if (existingUser) {
+              return error(
                 409,
                 `Email "${email}" is already in use by another user.`
               )
             }
             updateData.email = email
           }
-          if (department) {
-            // Basic validation already done by schema, but double check just in case
-            if (!departmentEnumDef.includes(department)) {
-              throw error(400, `Invalid department value: ${department}`)
-            }
-            updateData.department = department
+          if (departmentId !== undefined) {
+            updateData.departmentId = departmentId
           }
-
-          if (emailVerified) {
+          if (emailVerified !== undefined) {
             updateData.emailVerified = emailVerified
           }
 
           try {
-            const updatedUser = await db
+            const updatedUserResult = await db
               .update(users)
               .set(updateData)
               .where(eq(users.id, userId))
               .returning({
                 id: users.id,
                 email: users.email,
-                department: users.department,
+                departmentId: users.departmentId,
                 emailVerified: users.emailVerified,
                 updatedAt: users.updatedAt,
               })
 
-            if (!updatedUser || updatedUser.length === 0) {
-              throw error(404, `User with ID ${userId} not found.`)
+            if (!updatedUserResult || updatedUserResult.length === 0) {
+              return error(404, `User with ID ${userId} not found.`)
             }
 
-            return updatedUser[0] // Return the first (and only) updated user record
+            const finalUserData = await db
+              .select({
+                id: users.id,
+                email: users.email,
+                departmentId: users.departmentId,
+                departmentName: departments.name,
+                emailVerified: users.emailVerified,
+                updatedAt: users.updatedAt,
+              })
+              .from(users)
+              .innerJoin(departments, eq(users.departmentId, departments.id))
+              .where(eq(users.id, updatedUserResult[0].id))
+              .limit(1)
+
+            return finalUserData[0]
           } catch (e) {
             console.error(`Error updating user ${userId}:`, e)
+            if (e instanceof Error && e.message.includes("already in use")) {
+              return error(409, e.message)
+            }
             if (
               e instanceof Error &&
-              "status" in e &&
-              typeof e.status === "number"
+              e.message.includes("Invalid departmentId")
             ) {
-              // Re-throw specific errors
-              throw e
+              return error(400, e.message)
             }
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
-            throw error(500, `Failed to update user: ${message}`)
+            return error(500, `Failed to update user: ${message}`)
           }
         },
         {
           detail: {
             summary: "Update User Details (Admin)",
             description:
-              "Updates a user's email and/or department. Requires admin privileges.",
+              "Updates a user's email, departmentId, and/or emailVerified status. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
           params: userIdParamsSchema,

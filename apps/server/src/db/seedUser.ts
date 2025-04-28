@@ -40,11 +40,12 @@ export const seedAdminUser = async () => {
   } else {
     console.log(`Creating admin user ${adminEmail}...`)
     const hashedPassword = await bcrypt.hash(adminPassword, 10)
+
     await db.insert(schema.users).values({
       email: adminEmail,
       passwordHash: hashedPassword,
       role: "admin",
-      department: "backend", // Or a default/configurable department
+      departmentId: 3,
       emailVerified: true,
     })
     console.log(`Admin user ${adminEmail} seeded successfully.`)
