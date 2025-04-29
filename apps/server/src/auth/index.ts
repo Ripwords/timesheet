@@ -151,7 +151,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           maxAge: 7 * 86400,
           path: "/",
           secure: true,
-          sameSite: "lax",
+          sameSite: "none",
         })
 
         return { message: "Signed in successfully" }
