@@ -19,7 +19,6 @@
     "@elysiajs/server-timing": "^1.2.1",
     "@elysiajs/swagger": "^1.2.2",
     "@rasla/logify": "^5.0.0",
-    "@timesheet/constants": "workspace:*",
     "bcryptjs": "^3.0.2",
     "elysia": "latest",
     "nodemailer": "^6.10.1",

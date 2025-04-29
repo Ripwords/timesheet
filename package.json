@@ -13,8 +13,7 @@
     "typescript": "^5"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",

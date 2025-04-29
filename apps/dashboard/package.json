@@ -10,7 +10,6 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@timesheet/constants": "workspace:*",
     "@elysiajs/eden": "^1.2.0",
     "@internationalized/date": "^3.8.0",
     "@nuxt/eslint": "1.3.0",
