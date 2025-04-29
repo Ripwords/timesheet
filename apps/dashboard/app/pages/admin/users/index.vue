@@ -12,7 +12,6 @@ import {
   UIcon,
   UCard,
 } from "#components"
-import { useToast } from "#imports"
 
 definePageMeta({
   middleware: "admin",
@@ -46,6 +45,13 @@ const editedData = reactive<{
 })
 const isSaving = ref(false)
 const isVerifying = ref(false)
+const isDeactivating = ref(false)
+const userStatus = ref(true)
+
+// State for confirmation modal
+const isConfirmModalOpen = ref(false)
+const confirmActionType = ref<"activate" | "deactivate" | null>(null)
+const confirmUser = ref<User | null>(null)
 
 const { data: departments } = await useLazyAsyncData(
   "departments",
@@ -62,13 +68,15 @@ const {
   status,
   refresh,
 } = await useLazyAsyncData(
-  "users-admin",
+  `users-admin-${userStatus.value ? "active" : "inactive"}`,
   async () => {
+    const status = userStatus.value ? "active" : "inactive"
     const { data } = await eden.api.admin.users.index.get({
       query: {
         page: page.value,
         ...(search.value && { search: search.value }),
         ...(departmentId.value && { departmentId: departmentId.value }),
+        ...(status && { status }),
       },
     })
     return {
@@ -77,7 +85,7 @@ const {
     }
   },
   {
-    watch: [page, departmentId],
+    watch: [page, departmentId, userStatus],
   }
 )
 
@@ -169,12 +177,14 @@ const columns: ColumnDef<User, unknown>[] = [
           onClick: () => editUser(user),
         }),
         h(UButton, {
-          icon: "i-heroicons-trash",
+          icon: userStatus.value ? "i-heroicons-trash" : "i-heroicons-check",
           size: "xl",
           variant: "outline",
-          color: "error",
-          ariaLabel: "Delete",
-          onClick: () => deleteUser(user),
+          color: userStatus.value ? "error" : "success",
+          ariaLabel: userStatus.value ? "Deactivate" : "Activate",
+          loading: isDeactivating.value && editingUser.value?.id === user.id,
+          onClick: () =>
+            userStatus.value ? deactivateUser(user) : activateUser(user),
         }),
       ])
     },
@@ -194,11 +204,79 @@ function editUser(user: User) {
   }
 }
 
-function deleteUser(user: User) {
-  console.log("Delete user:", user.id)
-  if (confirm(`Are you sure you want to delete user "${user.email}"?`)) {
-    alert(`Deleting user ID: ${user.id} (Not implemented)`)
+async function activateUser(user: User) {
+  // Set state for confirmation modal
+  confirmActionType.value = "activate"
+  confirmUser.value = user
+  isConfirmModalOpen.value = true
+}
+
+async function deactivateUser(user: User) {
+  // Set state for confirmation modal
+  confirmActionType.value = "deactivate"
+  confirmUser.value = user
+  isConfirmModalOpen.value = true
+}
+
+// Function to execute the action after modal confirmation
+async function executeConfirmedAction() {
+  if (!confirmUser.value || !confirmActionType.value) return
+
+  const user = confirmUser.value
+  const action = confirmActionType.value
+
+  isDeactivating.value = true // Reuse loading state
+  isConfirmModalOpen.value = false // Close modal immediately
+
+  try {
+    if (action === "activate") {
+      await eden.api.admin.users({ id: user.id }).activate.patch()
+      toast.add({
+        title: "User Activated",
+        description: `User ${user.email} has been marked as active.`,
+        color: "success",
+      })
+    } else {
+      // action === "deactivate"
+      await eden.api.admin.users({ id: user.id }).delete()
+      toast.add({
+        title: "User Deactivated",
+        description: `User ${user.email} has been marked as inactive.`,
+        color: "success",
+      })
+    }
+    await refresh()
+  } catch (error: unknown) {
+    const failedAction = action === "activate" ? "Activation" : "Deactivation"
+    console.error(`Failed to ${action} user:`, error)
+    let message = `Failed to ${action} user ${user.email}.`
+    if (
+      error &&
+      typeof error === "object" &&
+      "value" in error &&
+      error.value &&
+      typeof error.value === "object" &&
+      "message" in error.value
+    ) {
+      message = String(error.value.message) || message
+    }
+    toast.add({
+      title: `${failedAction} Failed`,
+      description: message,
+      color: "error",
+    })
+  } finally {
+    isDeactivating.value = false
+    confirmUser.value = null
+    confirmActionType.value = null
   }
+}
+
+// Function to cancel the confirmation modal
+function cancelConfirmation() {
+  isConfirmModalOpen.value = false
+  confirmUser.value = null
+  confirmActionType.value = null
 }
 
 async function saveUserChanges() {
@@ -229,7 +307,6 @@ async function saveUserChanges() {
     const updatedUserResponse = await eden.api.admin
       .users({ id: userId })
       .patch(payload)
-    // Access .data property
     toast.add({
       title: "User Updated",
       description: `User ${updatedUserResponse.data?.email} updated successfully.`,
@@ -296,46 +373,57 @@ function cancelEdit() {
     </div>
     <UCard>
       <template #header>
-        <div class="flex gap-3">
-          <UInput
-            v-model="search"
-            class="w-[30vw]"
-            placeholder="Search..."
+        <div class="flex items-center justify-between">
+          <div class="flex gap-3">
+            <UInput
+              v-model="search"
+              class="w-[30vw]"
+              placeholder="Search..."
+            />
+            <USelectMenu
+              v-model="departmentId"
+              class="w-50"
+              placeholder="Select Department"
+              :items="departments"
+              value-key="id"
+              label-key="departmentName"
+              :search-input="{
+                placeholder: 'Search items...',
+              }"
+            >
+              <template #item="{ item }">
+                <Department :department-id="item.id" />
+              </template>
+              <template #default="{ modelValue }">
+                <Department
+                  v-if="modelValue"
+                  :department-id="modelValue"
+                />
+              </template>
+              <template #trailing>
+                <button
+                  v-if="departmentId"
+                  :class="[
+                    'ml-2 px-1  hover:text-red-600 !pointer-events-auto',
+                  ]"
+                  @click.stop="
+                    () => {
+                      departmentId = ''
+                    }
+                  "
+                >
+                  ✕
+                </button>
+              </template>
+            </USelectMenu>
+          </div>
+
+          <USwitch
+            v-model="userStatus"
+            :default-value="true"
+            :loading="status === 'pending'"
+            label="Active"
           />
-          <USelectMenu
-            v-model="departmentId"
-            class="w-50"
-            placeholder="Select Department"
-            :items="departments"
-            value-key="id"
-            label-key="departmentName"
-            :search-input="{
-              placeholder: 'Search items...',
-            }"
-          >
-            <template #item="{ item }">
-              <Department :department-id="item.id" />
-            </template>
-            <template #default="{ modelValue }">
-              <Department
-                v-if="modelValue"
-                :department-id="modelValue"
-              />
-            </template>
-            <template #trailing>
-              <button
-                v-if="departmentId"
-                :class="['ml-2 px-1  hover:text-red-600 !pointer-events-auto']"
-                @click.stop="
-                  () => {
-                    departmentId = ''
-                  }
-                "
-              >
-                ✕
-              </button>
-            </template>
-          </USelectMenu>
         </div>
       </template>
       <UTable
@@ -367,7 +455,7 @@ function cancelEdit() {
     <!-- Edit User Modal -->
     <UModal
       v-model:open="isEditModalOpen"
-      :prevent-close="isSaving || isVerifying"
+      :prevent-close="isSaving || isVerifying || isDeactivating"
     >
       <template #content>
         <UCard v-if="editingUser">
@@ -383,7 +471,7 @@ function cancelEdit() {
                 variant="ghost"
                 icon="i-heroicons-x-mark-20-solid"
                 class="-my-1"
-                :disabled="isSaving || isVerifying"
+                :disabled="isSaving || isVerifying || isDeactivating"
                 @click="cancelEdit"
               />
             </div>
@@ -401,7 +489,7 @@ function cancelEdit() {
               <UInput
                 v-model="editedData.email"
                 class="w-50"
-                :disabled="isSaving || isVerifying"
+                :disabled="isSaving || isVerifying || isDeactivating"
               />
             </UFormField>
 
@@ -418,7 +506,7 @@ function cancelEdit() {
                 value-key="id"
                 label-key="departmentName"
                 :search-input="{ placeholder: 'Search departments...' }"
-                :disabled="isSaving || isVerifying"
+                :disabled="isSaving || isVerifying || isDeactivating"
               >
                 <template #item="{ item }">
                   <Department :department-id="item.id" />
@@ -459,7 +547,7 @@ function cancelEdit() {
                 variant="outline"
                 label="Verify Email Now"
                 :loading="isVerifying"
-                :disabled="isSaving"
+                :disabled="isSaving || isDeactivating"
                 @click="verifyUserEmail"
               />
             </UFormField>
@@ -469,7 +557,7 @@ function cancelEdit() {
                 label="Cancel"
                 color="neutral"
                 variant="ghost"
-                :disabled="isSaving || isVerifying"
+                :disabled="isSaving || isVerifying || isDeactivating"
                 @click="cancelEdit"
               />
               <UButton
@@ -477,11 +565,66 @@ function cancelEdit() {
                 label="Save Changes"
                 color="primary"
                 :loading="isSaving"
-                :disabled="isVerifying"
+                :disabled="isVerifying || isDeactivating"
               />
             </div>
           </UForm> </UCard
       ></template>
+    </UModal>
+
+    <!-- Confirmation Modal -->
+    <UModal
+      v-model:open="isConfirmModalOpen"
+      :prevent-close="isDeactivating"
+    >
+      <template #content>
+        <UCard
+          v-if="confirmUser && confirmActionType"
+          class="confirmation-modal"
+        >
+          <template #header>
+            <h3 class="text-base font-semibold">
+              Confirm
+              {{
+                confirmActionType === "activate" ? "Activation" : "Deactivation"
+              }}
+            </h3>
+          </template>
+
+          <p class="mb-4">
+            Are you sure you want to
+            <strong class="font-medium">{{ confirmActionType }}</strong> user
+            <strong class="font-medium">{{ confirmUser.email }}</strong
+            >?
+            <span v-if="confirmActionType === 'deactivate'"
+              >This will prevent them from logging in.</span
+            >
+            <span v-else>This will allow them to log in again.</span>
+          </p>
+
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                :disabled="isDeactivating"
+                @click="cancelConfirmation"
+              />
+              <UButton
+                :label="`Confirm ${
+                  confirmActionType === 'activate'
+                    ? 'Activation'
+                    : 'Deactivation'
+                }`"
+                :color="confirmActionType === 'activate' ? 'success' : 'error'"
+                :loading="isDeactivating"
+                @click="executeConfirmedAction"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
     </UModal>
   </div>
 </template>

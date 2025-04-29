@@ -195,13 +195,39 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         const projectId = params.id
 
         try {
+          // Check for associated time entries
+          const timeEntriesCount = await db
+            .select({ count: count() })
+            .from(schema.timeEntries)
+            .where(eq(schema.timeEntries.projectId, projectId))
+
+          if (timeEntriesCount[0]?.count > 0) {
+            return error(
+              400,
+              "Project cannot be deleted because it has associated time entries."
+            )
+          }
+
+          // Check for associated budget injections
+          const budgetInjectionsCount = await db
+            .select({ count: count() })
+            .from(schema.projectBudgetInjections)
+            .where(eq(schema.projectBudgetInjections.projectId, projectId))
+
+          if (budgetInjectionsCount[0]?.count > 0) {
+            return error(
+              400,
+              "Project cannot be deleted because it has associated budget injections."
+            )
+          }
+
+          // Proceed with deletion if no associated data found
           const deletedProject = await db
             .delete(schema.projects)
             .where(eq(schema.projects.id, projectId))
             .returning({ id: schema.projects.id }) // Return the id of the deleted item
 
           if (!deletedProject || deletedProject.length === 0) {
-            // If nothing was returned, the project didn't exist
             return error(404, "Project not found")
           }
 

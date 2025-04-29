@@ -18,6 +18,7 @@ const querySchema = t.Object({
     })
   ),
   departmentId: t.Optional(UUID),
+  status: t.Optional(t.UnionEnum(["active", "inactive"])),
 })
 
 const updateUserBodySchema = t.Object({
@@ -45,7 +46,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
         "/",
         async ({ db, query }) => {
           try {
-            const { page = 1, limit = 10, search, departmentId } = query
+            const { page = 1, limit = 10, search, departmentId, status } = query
             const offset = (page - 1) * limit
 
             const whereConditions = []
@@ -54,6 +55,9 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
             }
             if (departmentId) {
               whereConditions.push(eq(users.departmentId, departmentId))
+            }
+            if (status) {
+              whereConditions.push(eq(users.accountStatus, status))
             }
 
             const startOfWeek = sql`date_trunc('week', current_timestamp)`
@@ -285,6 +289,86 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
           },
           params: userIdParamsSchema,
           body: updateUserBodySchema,
+        }
+      )
+      .patch(
+        "/:id/activate",
+        async ({ db, params, error }) => {
+          const userId = params.id
+
+          try {
+            const updatedUserResult = await db
+              .update(users)
+              .set({ accountStatus: "active", updatedAt: new Date() })
+              .where(eq(users.id, userId))
+              .returning({
+                id: users.id,
+                accountStatus: users.accountStatus,
+              })
+
+            if (!updatedUserResult || updatedUserResult.length === 0) {
+              return error(404, `User with ID ${userId} not found.`)
+            }
+
+            return {
+              message: `User ${userId} activated successfully.`,
+              user: updatedUserResult[0],
+            }
+          } catch (e) {
+            console.error(`Error activating user ${userId}:`, e)
+            const message =
+              e instanceof Error ? e.message : "Unknown error occurred"
+            return error(500, `Failed to activate user: ${message}`)
+          }
+        },
+        {
+          detail: {
+            summary: "Activate User (Admin)",
+            description:
+              "Marks a user's accountStatus as 'active'. Requires admin privileges.",
+            tags: ["Admin", "Users"],
+          },
+          params: userIdParamsSchema,
+        }
+      )
+      .delete(
+        "/:id",
+        async ({ db, params, error }) => {
+          const userId = params.id
+
+          try {
+            const updatedUserResult = await db
+              .update(users)
+              .set({ accountStatus: "inactive", updatedAt: new Date() })
+              .where(eq(users.id, userId))
+              .returning({
+                id: users.id,
+                accountStatus: users.accountStatus,
+              })
+
+            if (!updatedUserResult || updatedUserResult.length === 0) {
+              return error(404, `User with ID ${userId} not found.`)
+            }
+
+            return {
+              message: `User ${userId} deactivated successfully.`,
+              user: updatedUserResult[0],
+            }
+          } catch (e) {
+            console.error(`Error deactivating user ${userId}:`, e)
+            const message =
+              e instanceof Error ? e.message : "Unknown error occurred"
+            return error(500, `Failed to deactivate user: ${message}`)
+          }
+        },
+        {
+          detail: {
+            summary: "Deactivate User (Admin)",
+            description:
+              "Marks a user's accountStatus as 'inactive'. Requires admin privileges.",
+            tags: ["Admin", "Users"],
+          },
+          params: userIdParamsSchema,
         }
       )
 )

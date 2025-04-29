@@ -7,9 +7,9 @@ const todayStr = dayjs().format("YYYY-MM-DD")
 const sevenDaysAgoStr = dayjs().subtract(6, "day").format("YYYY-MM-DD") // Include today
 
 const { data: user } = await eden.api.auth.profile.get()
-const currentUserId = user?.userId
+const currentUserId = user?.id
 if (!currentUserId) {
-  useRouter().push("/login")
+  useRouter().push("/auth/login")
 }
 
 // State for chart data

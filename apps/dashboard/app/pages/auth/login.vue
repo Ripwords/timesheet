@@ -16,21 +16,18 @@ async function submit() {
     password: state.password,
   })
 
-  console.log(data)
-
-  const { data: profile } = await eden.api.auth.profile.get()
-  console.log(profile)
-
   if (error) {
     toast.add({
       title: "Error",
-      description: "Invalid email or password",
+      color: "error",
+      description: String(error.value),
     })
   }
 
   if (data) {
     toast.add({
       title: "Success",
+      color: "success",
       description: "Logged in successfully",
     })
     navigateTo("/")

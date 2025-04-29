@@ -13,7 +13,7 @@ import { UUID } from "../../utils/validtors"
 seedAdminUser()
 export const auth = baseApp("auth").group("/auth", (app) =>
   app
-    .derive(({ jwt, cookie }) => {
+    .derive(({ jwt, cookie, db }) => {
       return {
         getUser: async () => {
           const authCookie = cookie.auth
@@ -24,7 +24,22 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           if (!profile) {
             return null
           }
-          return profile as { userId: string; email: string; role: string }
+
+          const user = await db.query.users.findFirst({
+            where: (users, { eq }) => eq(users.id, profile.userId),
+            columns: {
+              id: true,
+              email: true,
+              role: true,
+              accountStatus: true,
+            },
+          })
+
+          if (!user || user.accountStatus === "inactive") {
+            return null
+          }
+
+          return user
         },
       }
     })
@@ -108,6 +123,10 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         if (!user.emailVerified) {
           return error(403, "Please verify your email before signing in.")
+        }
+
+        if (user.accountStatus === "inactive") {
+          return error(403, "Your account is inactive. Please contact support.")
         }
 
         const isPasswordValid = await bcrypt.compare(
