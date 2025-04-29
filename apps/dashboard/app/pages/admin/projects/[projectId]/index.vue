@@ -4,8 +4,13 @@ const project = ref({
   id: 1,
   name: "Acme Website Redesign",
   budgetInjections: [
-    { id: 1, amount: 5000, date: "2024-01-01" },
-    { id: 2, amount: 2000, date: "2024-03-01" },
+    { id: 1, amount: 5000, date: "2024-01-01", description: "Initial budget" },
+    {
+      id: 2,
+      amount: 2000,
+      date: "2024-03-01",
+      description: "Additional budget",
+    },
   ],
 })
 
@@ -70,7 +75,7 @@ const currentProfit = computed(() => totalBudget.value - totalCost.value)
           :key="b.id"
           class="py-2 flex justify-between"
         >
-          <span>{{ b.date }}: </span>
+          <span>{{ b.date }}: {{ b.description }}</span>
           <span class="font-mono">${{ b.amount }}</span>
         </li>
       </ul>
