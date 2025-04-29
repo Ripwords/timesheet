@@ -23,37 +23,39 @@ export const seedAdminUser = async () => {
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@example.com"
   const adminPassword = process.env.ADMIN_PASSWORD ?? "password"
 
-  // Check if admin user already exists
-  const existingAdmin = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.email, adminEmail))
-    .limit(1)
-
-  if (existingAdmin.length > 0) {
-    console.log(`Admin user ${adminEmail} already exists. Updating role...`)
-    await db
-      .update(schema.users)
-      .set({ role: "admin", emailVerified: true, updatedAt: new Date() })
+  await db.transaction(async (tx) => {
+    // Check if admin user already exists
+    const existingAdmin = await tx
+      .select({ id: schema.users.id })
+      .from(schema.users)
       .where(eq(schema.users.email, adminEmail))
-    console.log(`Admin user ${adminEmail} updated to admin role.`)
-  } else {
-    console.log(`Creating admin user ${adminEmail}...`)
-    const hashedPassword = await bcrypt.hash(adminPassword, 10)
-
-    const adminDepartment = await db
-      .select({ id: schema.departments.id })
-      .from(schema.departments)
-      .where(eq(schema.departments.name, "Administration"))
       .limit(1)
 
-    await db.insert(schema.users).values({
-      email: adminEmail,
-      passwordHash: hashedPassword,
-      role: "admin",
-      departmentId: adminDepartment?.[0]?.id,
-      emailVerified: true,
-    })
-    console.log(`Admin user ${adminEmail} seeded successfully.`)
-  }
+    if (existingAdmin.length > 0) {
+      console.log(`Admin user ${adminEmail} already exists. Updating role...`)
+      await tx
+        .update(schema.users)
+        .set({ role: "admin", emailVerified: true, updatedAt: new Date() })
+        .where(eq(schema.users.email, adminEmail))
+      console.log(`Admin user ${adminEmail} updated to admin role.`)
+    } else {
+      console.log(`Creating admin user ${adminEmail}...`)
+      const hashedPassword = await bcrypt.hash(adminPassword, 10)
+
+      const adminDepartment = await tx
+        .select({ id: schema.departments.id })
+        .from(schema.departments)
+        .where(eq(schema.departments.name, "Administration"))
+        .limit(1)
+
+      await tx.insert(schema.users).values({
+        email: adminEmail,
+        passwordHash: hashedPassword,
+        role: "admin",
+        departmentId: adminDepartment?.[0]?.id,
+        emailVerified: true,
+      })
+      console.log(`Admin user ${adminEmail} seeded successfully.`)
+    }
+  })
 }
