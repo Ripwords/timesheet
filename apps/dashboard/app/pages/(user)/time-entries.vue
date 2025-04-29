@@ -7,7 +7,7 @@ const dayjs = useDayjs()
 dayjs.extend(duration)
 
 const toast = useToast()
-const eden = useEden()
+const { $eden } = useNuxtApp()
 
 interface TimeEntry {
   id: string
@@ -41,7 +41,7 @@ const {
   refresh: refreshEntries,
 } = await useLazyAsyncData("timeEntries", async () => {
   try {
-    const { data, error } = await eden.api["time-entries"].index.get({
+    const { data, error } = await $eden.api["time-entries"].index.get({
       query: {
         startDate: dayjs().subtract(3, "day").toISOString(),
         endDate: dayjs().endOf("day").toISOString(),
@@ -95,7 +95,7 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   "projects",
   async () => {
     try {
-      const { data, error } = await eden.api.projects.index.get({
+      const { data, error } = await $eden.api.projects.index.get({
         query: {},
       })
       if (error) {
@@ -267,7 +267,7 @@ const saveEntry = async () => {
         return
       }
       // Call PUT endpoint
-      result = await eden.api["time-entries"]
+      result = await $eden.api["time-entries"]
         .id({
           id: editingEntry.value.id,
         })
@@ -279,7 +279,7 @@ const saveEntry = async () => {
     } else {
       // Add Mode
       // Call POST endpoint
-      result = await eden.api["time-entries"].index.post({
+      result = await $eden.api["time-entries"].index.post({
         ...payload,
         startTime: dayjs(payload.startTime).toDate(),
         endTime: dayjs(payload.endTime).toDate(),
@@ -317,7 +317,7 @@ const deleteEntry = async (id: string) => {
   }
 
   try {
-    const { error } = await eden.api["time-entries"]
+    const { error } = await $eden.api["time-entries"]
       .id({
         id: id,
       })

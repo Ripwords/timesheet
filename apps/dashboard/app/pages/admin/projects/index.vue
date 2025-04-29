@@ -8,11 +8,11 @@ definePageMeta({
 
 // Infer the response type, then extract the non-nullable array item type
 type ProjectsResponse = Awaited<
-  ReturnType<typeof eden.api.projects.index.get>
+  ReturnType<typeof $eden.api.projects.index.get>
 >["data"]
 type Project = NonNullable<ProjectsResponse>["projects"][number] // Get the item type from the array
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 const page = ref(1)
 const search = ref("")
@@ -26,7 +26,7 @@ const {
 } = await useLazyAsyncData(
   "projects-admin",
   async () => {
-    const { data } = await eden.api.projects.index.get({
+    const { data } = await $eden.api.projects.index.get({
       query: {
         page: page.value,
         search: search.value,

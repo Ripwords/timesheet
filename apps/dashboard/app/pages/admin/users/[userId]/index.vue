@@ -19,7 +19,7 @@ interface WeeklyBreakdownRow {
 const { params } = useRoute("admin-users-userId")
 const userId = params.userId
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 dayjs.extend(duration)
 
@@ -32,7 +32,7 @@ const {
   status: userStatus,
   error: userError,
 } = await useLazyAsyncData(`user-${userId}`, async () => {
-  const { data } = await eden.api.admin.users
+  const { data } = await $eden.api.admin.users
     .user({
       id: userId,
     })
@@ -57,7 +57,7 @@ const {
       .add(7, "days")
       .toISOString()
 
-    const { data } = await eden.api["time-entries"].index.get({
+    const { data } = await $eden.api["time-entries"].index.get({
       query: {
         userId,
         startDate: monthStart,

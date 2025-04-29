@@ -4,11 +4,11 @@ const state = reactive({
   password: "",
 })
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const toast = useToast()
 
 async function submit() {
-  const { data, error } = await eden.api.auth.signin.post({
+  const { data, error } = await $eden.api.auth.signin.post({
     email: state.email,
     password: state.password,
   })

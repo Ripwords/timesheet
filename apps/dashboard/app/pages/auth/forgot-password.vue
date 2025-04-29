@@ -3,7 +3,7 @@ const state = reactive({
   email: "",
 })
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const toast = useToast()
 const disabled = ref(false)
 
@@ -17,7 +17,7 @@ async function submitForgotPassword() {
     return
   }
 
-  const { data, error } = await eden.api.auth["forgot-password"].post({
+  const { data, error } = await $eden.api.auth["forgot-password"].post({
     email: state.email,
   })
 

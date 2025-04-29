@@ -3,12 +3,12 @@ definePageMeta({
   middleware: "admin",
 })
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 
 // State for chart data
 const { data: projectTotalsData, status: projectTotalsStatus } =
   await useLazyAsyncData("projects-total", async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "none",
@@ -19,7 +19,7 @@ const { data: projectTotalsData, status: projectTotalsStatus } =
 
 const { data: userTotalsData, status: userTotalsStatus } =
   await useLazyAsyncData("users-total", async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "user",
         timeUnit: "none",
@@ -30,7 +30,7 @@ const { data: userTotalsData, status: userTotalsStatus } =
 
 const { data: projectTimeSeriesData, status: projectTimeSeriesStatus } =
   await useLazyAsyncData("projects-time-series", async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "day",
@@ -41,7 +41,7 @@ const { data: projectTimeSeriesData, status: projectTimeSeriesStatus } =
 
 const { data: userTimeSeriesData, status: userTimeSeriesStatus } =
   await useLazyAsyncData("users-time-series", async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "user",
         timeUnit: "day",

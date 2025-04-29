@@ -13,7 +13,7 @@ const projectId = params.projectId
 const userId = params.userId
 const activeAccordion = ref("")
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 const { monthOptions, selectedMonth } = useDropdownMonths()
 
@@ -22,7 +22,7 @@ dayjs.extend(isSameOrAfter)
 dayjs.extend(isSameOrBefore)
 
 const { data: user } = await useLazyAsyncData(`user-${userId}`, async () => {
-  const { data } = await eden.api.admin.users
+  const { data } = await $eden.api.admin.users
     .user({
       id: userId,
     })
@@ -33,7 +33,7 @@ const { data: user } = await useLazyAsyncData(`user-${userId}`, async () => {
 const { data: userTimeEntries } = await useLazyAsyncData(
   `user-time-entries-${projectId}`,
   async () => {
-    const { data } = await eden.api["time-entries"]
+    const { data } = await $eden.api["time-entries"]
       .project({
         id: projectId,
       })
@@ -188,7 +188,7 @@ const formattedOverallTotalDuration = computed(() => {
 const { data: project } = await useLazyAsyncData(
   `project-${projectId}`,
   async () => {
-    const { data } = await eden.api.projects.id({ id: projectId }).get()
+    const { data } = await $eden.api.projects.id({ id: projectId }).get()
     return data
   }
 )

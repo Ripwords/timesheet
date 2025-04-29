@@ -1,9 +1,9 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   // Fetch user profile to check role
+  const { $eden } = useNuxtApp()
   const checkAuthStatus = async () => {
-    const eden = useEden()
     try {
-      const { data } = await eden.api.auth.profile.get()
+      const { data } = await $eden.api.auth.profile.get()
       return data
     } catch /* istanbul ignore next -- ignore error */ {
       // It's okay if this fails (e.g., 401), means user is not logged in

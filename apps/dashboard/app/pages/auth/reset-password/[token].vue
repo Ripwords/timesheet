@@ -7,7 +7,7 @@ const state = reactive({
   confirmPassword: "",
 })
 
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const toast = useToast()
 
 async function submitPasswordReset() {
@@ -36,7 +36,7 @@ async function submitPasswordReset() {
     return
   }
 
-  const { data, error } = await eden.api.auth["reset-password"].post({
+  const { data, error } = await $eden.api.auth["reset-password"].post({
     token,
     password: state.password,
   })

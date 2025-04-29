@@ -1,12 +1,12 @@
 <script lang="ts" setup>
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 
 // Fetch data for summary widgets
 const todayStr = dayjs().format("YYYY-MM-DD")
 const sevenDaysAgoStr = dayjs().subtract(6, "day").format("YYYY-MM-DD") // Include today
 
-const { data: user } = await eden.api.auth.profile.get()
+const { data: user } = await $eden.api.auth.profile.get()
 const currentUserId = user?.id
 if (!currentUserId) {
   useRouter().push("/auth/login")
@@ -19,7 +19,7 @@ const error = ref<string | null>(null)
 const { data: projectTotalsData } = await useLazyAsyncData(
   "project-user-totals",
   async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "none",
@@ -32,7 +32,7 @@ const { data: projectTotalsData } = await useLazyAsyncData(
 const { data: dailyTotalsData } = await useLazyAsyncData(
   "daily-totals",
   async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "day",
@@ -45,7 +45,7 @@ const { data: dailyTotalsData } = await useLazyAsyncData(
 const { data: weeklyTotalsData } = await useLazyAsyncData(
   "weekly-totals",
   async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "week",
@@ -58,7 +58,7 @@ const { data: weeklyTotalsData } = await useLazyAsyncData(
 const { data: last7DaysData } = await useLazyAsyncData(
   "last-7-days",
   async () => {
-    const { data } = await eden.api.admin.reports.aggregate.get({
+    const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
         timeUnit: "none",
@@ -71,7 +71,7 @@ const { data: last7DaysData } = await useLazyAsyncData(
 )
 
 const { data: todayData } = await useLazyAsyncData("today", async () => {
-  const { data } = await eden.api.admin.reports.aggregate.get({
+  const { data } = await $eden.api.admin.reports.aggregate.get({
     query: {
       groupBy: "project",
       timeUnit: "none",

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-const eden = useEden()
+const { $eden } = useNuxtApp()
 const toast = useToast()
 const disabled = ref(false)
 
 const { data: departments } = await useLazyAsyncData(
   "departments",
   async () => {
-    const { data } = await eden.api.departments.index.get()
+    const { data } = await $eden.api.departments.index.get()
 
     return data ?? []
   }
@@ -38,7 +38,7 @@ async function submit() {
     return
   }
 
-  const { data, error } = await eden.api.auth.signup.post({
+  const { data, error } = await $eden.api.auth.signup.post({
     email: state.email,
     password: state.password,
     departmentId: state.departmentId,

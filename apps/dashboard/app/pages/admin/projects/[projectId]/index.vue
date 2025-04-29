@@ -5,7 +5,7 @@ definePageMeta({
 
 const route = useRoute("admin-projects-projectId")
 const { projectId } = route.params
-const eden = useEden()
+const { $eden } = useNuxtApp()
 
 const { data: projectDetails, status } = await useLazyAsyncData(
   projectId ? `project-financials-${projectId}` : "project-financials-invalid",
@@ -15,7 +15,7 @@ const { data: projectDetails, status } = await useLazyAsyncData(
       return null // Prevent API call if ID is invalid
     }
     try {
-      const { data, error } = await eden.api.admin
+      const { data, error } = await $eden.api.admin
         .financials({
           projectId,
         })

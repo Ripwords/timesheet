@@ -171,6 +171,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
       const userProfile = await getUser()
 
       if (!userProfile) {
+        logError("Unauthorized")
         return error(401, "Unauthorized")
       }
 

@@ -17,8 +17,10 @@ definePageMeta({
   middleware: "admin",
 })
 
+const { $eden } = useNuxtApp()
+
 type UsersResponse = Awaited<
-  ReturnType<typeof eden.api.admin.users.index.get>
+  ReturnType<typeof $eden.api.admin.users.index.get>
 >["data"]
 type User = Omit<
   NonNullable<UsersResponse>["users"][number],
@@ -27,7 +29,6 @@ type User = Omit<
   emailVerified: boolean | null
 }
 
-const eden = useEden()
 const toast = useToast()
 const page = ref(1)
 const search = ref("")
@@ -56,7 +57,7 @@ const confirmUser = ref<User | null>(null)
 const { data: departments } = await useLazyAsyncData(
   "departments",
   async () => {
-    const { data } = await eden.api.admin.departments.index.get({
+    const { data } = await $eden.api.admin.departments.index.get({
       query: {},
     })
 
@@ -71,7 +72,7 @@ const {
   `users-admin-${userStatus.value ? "active" : "inactive"}`,
   async () => {
     const status = userStatus.value ? "active" : "inactive"
-    const { data } = await eden.api.admin.users.index.get({
+    const { data } = await $eden.api.admin.users.index.get({
       query: {
         page: page.value,
         ...(search.value && { search: search.value }),
@@ -230,7 +231,7 @@ async function executeConfirmedAction() {
 
   try {
     if (action === "activate") {
-      await eden.api.admin.users({ id: user.id }).activate.patch()
+      await $eden.api.admin.users({ id: user.id }).activate.patch()
       toast.add({
         title: "User Activated",
         description: `User ${user.email} has been marked as active.`,
@@ -238,7 +239,7 @@ async function executeConfirmedAction() {
       })
     } else {
       // action === "deactivate"
-      await eden.api.admin.users({ id: user.id }).delete()
+      await $eden.api.admin.users({ id: user.id }).delete()
       toast.add({
         title: "User Deactivated",
         description: `User ${user.email} has been marked as inactive.`,
@@ -304,7 +305,7 @@ async function saveUserChanges() {
   }
 
   try {
-    const updatedUserResponse = await eden.api.admin
+    const updatedUserResponse = await $eden.api.admin
       .users({ id: userId })
       .patch(payload)
     toast.add({
@@ -338,7 +339,7 @@ async function saveUserChanges() {
 async function verifyUserEmail() {
   if (!editingUser.value) return
   isVerifying.value = true
-  const result = await eden.api.admin
+  const result = await $eden.api.admin
     .users({ id: editingUser.value.id })
     .patch({ emailVerified: true })
   isVerifying.value = false

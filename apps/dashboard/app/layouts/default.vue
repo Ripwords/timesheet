@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from "@nuxt/ui"
 
-const eden = useEden()
-let user = await eden.api.auth.profile.get().then((res) => res.data)
+const { $eden } = useNuxtApp()
+let user = await $eden.api.auth.profile.get().then((res) => res.data)
 
 const route = useRoute()
 
@@ -11,14 +11,14 @@ const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
     return []
   }
 
-  user = await eden.api.auth.profile.get().then((res) => res.data)
+  user = await $eden.api.auth.profile.get().then((res) => res.data)
   const isAdmin = user?.role === "admin"
   const defaultItems = [
     {
       label: "Logout",
       icon: "i-lucide-log-out",
       onSelect: async () => {
-        await eden.api.auth.signout.post()
+        await $eden.api.auth.signout.post()
         await navigateTo("/auth/login") // Use await
       },
     },

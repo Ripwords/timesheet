@@ -1,8 +1,8 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const checkAuthStatus = async () => {
-    const eden = useEden()
+    const { $eden } = useNuxtApp()
     try {
-      const { data } = await eden.api.auth.profile.get()
+      const { data } = await $eden.api.auth.profile.get()
 
       return data
     } catch (error) {
