@@ -2,24 +2,41 @@
 import type { NavigationMenuItem } from "@nuxt/ui"
 
 const { $eden } = useNuxtApp()
-let user = await $eden.api.auth.profile.get().then((res) => res.data)
-
 const route = useRoute()
 
-const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
-  if (route.path.startsWith("/auth")) {
+// 1. Fetch user data ONCE using useAsyncData
+// This runs on the server, and the result is passed to the client for hydration.
+const {
+  data: user,
+  status,
+  error,
+} = useAsyncData(
+  "userData", // Unique key
+  () => $eden.api.auth.profile.get().then((res) => res.data),
+  { server: true } // Ensure it runs on the server
+)
+
+// 2. Use a regular `computed` based on the fetched user data
+const navItems = computed<NavigationMenuItem[][]>(() => {
+  // Handle loading/error states if desired
+  if (
+    status.value === "pending" ||
+    error.value ||
+    !user.value ||
+    route.path.startsWith("/auth")
+  ) {
     return []
   }
 
-  user = await $eden.api.auth.profile.get().then((res) => res.data)
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user.value.role === "admin"
   const defaultItems = [
     {
       label: "Logout",
       icon: "i-lucide-log-out",
+      // Use a function reference or inline function for handlers
       onSelect: async () => {
         await $eden.api.auth.signout.post()
-        await navigateTo("/auth/login") // Use await
+        await navigateTo("/auth/login")
       },
     },
   ]
@@ -27,19 +44,11 @@ const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
   if (isAdmin) {
     return [
       [
-        {
-          label: "Overview",
-          icon: "i-lucide-layout-dashboard", // Example icon
-          to: "/admin",
-        },
-        {
-          label: "Users",
-          icon: "i-lucide-users", // Example icon
-          to: "/admin/users",
-        },
+        { label: "Overview", icon: "i-lucide-layout-dashboard", to: "/admin" },
+        { label: "Users", icon: "i-lucide-users", to: "/admin/users" },
         {
           label: "Projects",
-          icon: "i-lucide-briefcase", // Example icon
+          icon: "i-lucide-briefcase",
           to: "/admin/projects",
         },
       ],
@@ -47,21 +56,20 @@ const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
     ]
   }
 
-  if (user && user.role === "user") {
-    return [
-      [
-        {
-          label: "Time Entries",
-          icon: "i-lucide-clock",
-          to: "/time-entries",
-        },
-      ],
-      defaultItems,
-    ]
-  }
-
-  return []
+  // No need to check role === 'user' again if not admin, assuming only two roles
+  // or adjust logic if more roles exist
+  return [
+    [
+      { label: "Time Entries", icon: "i-lucide-clock", to: "/time-entries" },
+      // { label: "Projects", icon: "i-lucide-folder-kanban", to: "/projects" },
+      // { label: "Profile", icon: "i-lucide-user-cog", to: "/profile" },
+    ],
+    defaultItems,
+  ]
 })
+
+// Optional: Watch for route changes if nav should update without full page reload
+watch(route, () => {})
 </script>
 
 <template>
@@ -75,7 +83,13 @@ const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
           class="text-lg font-bold"
           >Timesheet</ULink
         >
-        <UNavigationMenu :items="navItems" />
+        <!-- Conditionally render or show loading state -->
+        <UNavigationMenu
+          v-if="!pending && user"
+          :items="navItems"
+        />
+        <div v-else>Loading...</div>
+        <!-- Or a skeleton loader -->
       </UContainer>
     </header>
 
