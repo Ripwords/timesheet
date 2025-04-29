@@ -41,7 +41,7 @@ export const baseApp = (name: string) =>
     .decorate("db", db)
     .use(
       cors({
-        origin: "http://localhost:5173",
+        origin: process.env.DASHBOARD_URL ?? "http://localhost:5173",
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"],
