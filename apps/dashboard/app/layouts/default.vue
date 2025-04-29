@@ -85,7 +85,7 @@ watch(route, () => {})
         >
         <!-- Conditionally render or show loading state -->
         <UNavigationMenu
-          v-if="!pending && user"
+          v-if="status === 'success' && user"
           :items="navItems"
         />
         <div v-else>Loading...</div>
