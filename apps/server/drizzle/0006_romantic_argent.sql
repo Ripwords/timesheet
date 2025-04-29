@@ -1,1 +1,0 @@
-ALTER TABLE "time_entries" ADD COLUMN "updated_at" timestamp DEFAULT now() NOT NULL;

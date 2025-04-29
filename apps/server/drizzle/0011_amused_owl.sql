@@ -1,1 +1,0 @@
-ALTER TABLE "project_budget_injections" ADD COLUMN "description" text;
