@@ -1,7 +1,4 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: "auth",
-})
 const state = reactive({
   email: "",
   password: "",
@@ -36,7 +33,7 @@ async function submit() {
 </script>
 
 <template>
-  <UContainer class="flex items-center justify-center min-h-screen">
+  <div class="flex items-center justify-center">
     <UCard class="w-full max-w-sm">
       <template #header>
         <h1 class="text-xl font-bold text-center">Login</h1>
@@ -94,5 +91,5 @@ async function submit() {
         </p>
       </template>
     </UCard>
-  </UContainer>
+  </div>
 </template>

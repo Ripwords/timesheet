@@ -1,8 +1,5 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: "auth",
-})
-const { params } = useRoute("reset-password-token")
+const { params } = useRoute("auth-reset-password-token")
 const token = params.token as string
 
 const state = reactive({
@@ -65,7 +62,7 @@ async function submitPasswordReset() {
 </script>
 
 <template>
-  <UContainer class="flex items-center justify-center min-h-screen">
+  <div class="flex items-center justify-center">
     <UCard class="w-full max-w-sm">
       <template #header>
         <h1 class="text-xl font-bold text-center">Reset Password</h1>
@@ -117,5 +114,5 @@ async function submitPasswordReset() {
         </p>
       </template>
     </UCard>
-  </UContainer>
+  </div>
 </template>

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: "auth",
-})
 const state = reactive({
   email: "",
 })
@@ -48,7 +45,7 @@ async function submitForgotPassword() {
 </script>
 
 <template>
-  <UContainer class="flex items-center justify-center min-h-screen">
+  <div class="flex items-center justify-center">
     <UCard class="w-full max-w-sm">
       <template #header>
         <h1 class="text-xl font-bold text-center">Forgot Password</h1>
@@ -91,5 +88,5 @@ async function submitForgotPassword() {
         </p>
       </template>
     </UCard>
-  </UContainer>
+  </div>
 </template>

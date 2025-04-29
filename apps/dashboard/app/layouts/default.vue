@@ -2,10 +2,18 @@
 import type { NavigationMenuItem } from "@nuxt/ui"
 
 const eden = useEden()
-const user = await eden.api.auth.profile.get()
+let user = await eden.api.auth.profile.get().then((res) => res.data)
 
-const navItems = ref<NavigationMenuItem[][]>([
-  [
+const route = useRoute()
+
+const navItems = computedAsync<NavigationMenuItem[][]>(async () => {
+  if (route.path.startsWith("/auth")) {
+    return []
+  }
+
+  user = await eden.api.auth.profile.get().then((res) => res.data)
+  const isAdmin = user?.role === "admin"
+  const defaultItems = [
     {
       label: "Logout",
       icon: "i-lucide-log-out",
@@ -14,37 +22,45 @@ const navItems = ref<NavigationMenuItem[][]>([
         await navigateTo("/auth/login") // Use await
       },
     },
-  ],
-])
+  ]
 
-onMounted(async () => {
-  navItems.value.unshift(
-    user.data?.role === "admin"
-      ? [
-          {
-            label: "Overview",
-            icon: "i-lucide-layout-dashboard", // Example icon
-            to: "/admin",
-          },
-          {
-            label: "Users",
-            icon: "i-lucide-users", // Example icon
-            to: "/admin/users",
-          },
-          {
-            label: "Projects",
-            icon: "i-lucide-briefcase", // Example icon
-            to: "/admin/projects",
-          },
-        ]
-      : [
-          {
-            label: "Time Entries",
-            icon: "i-lucide-clock",
-            to: "/time-entries",
-          },
-        ]
-  )
+  if (isAdmin) {
+    return [
+      [
+        {
+          label: "Overview",
+          icon: "i-lucide-layout-dashboard", // Example icon
+          to: "/admin",
+        },
+        {
+          label: "Users",
+          icon: "i-lucide-users", // Example icon
+          to: "/admin/users",
+        },
+        {
+          label: "Projects",
+          icon: "i-lucide-briefcase", // Example icon
+          to: "/admin/projects",
+        },
+      ],
+      defaultItems,
+    ]
+  }
+
+  if (user && user.role === "user") {
+    return [
+      [
+        {
+          label: "Time Entries",
+          icon: "i-lucide-clock",
+          to: "/time-entries",
+        },
+      ],
+      defaultItems,
+    ]
+  }
+
+  return []
 })
 </script>
 

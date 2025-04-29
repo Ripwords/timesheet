@@ -1,8 +1,4 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: "auth",
-})
-
 const eden = useEden()
 const toast = useToast()
 const disabled = ref(false)
@@ -67,7 +63,7 @@ async function submit() {
 </script>
 
 <template>
-  <UContainer class="flex items-center justify-center min-h-screen">
+  <div class="flex items-center justify-center">
     <UCard class="w-full max-w-sm">
       <template #header>
         <h1 class="text-xl font-bold text-center">Register</h1>
@@ -155,5 +151,5 @@ async function submit() {
         </p>
       </template>
     </UCard>
-  </UContainer>
+  </div>
 </template>
