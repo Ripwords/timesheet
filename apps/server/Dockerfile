@@ -30,7 +30,7 @@ WORKDIR /usr/src/app/apps/server
 COPY --chmod=755 ./apps/server/entrypoint.sh /usr/src/app/apps/server/entrypoint.sh
 
 USER bun
-EXPOSE 3000/tcp
+EXPOSE 3100/tcp
 
 # Set the entrypoint script
 ENTRYPOINT ["/usr/src/app/apps/server/entrypoint.sh"]

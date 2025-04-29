@@ -21,7 +21,7 @@ services:
     build:
       dockerfile: ./apps/server/Dockerfile
     ports:
-      - 3201:3000
+      - 3201:3100
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
