@@ -77,7 +77,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
             })
             .returning({ id: schema.users.id, email: schema.users.email })
 
-          const verificationUrl = `http://localhost:${process.env.SERVER_PORT}/auth/verify-email/${verificationToken}`
+          const verificationUrl = `http://${process.env.SERVER_URL}/auth/verify-email/${verificationToken}`
           const message = `Welcome! Please verify your email by clicking this link: <a href="${verificationUrl}">Verify Email</a>`
 
           await sendEmail(email, "Verify Your Email", message)
@@ -149,6 +149,8 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           httpOnly: true,
           maxAge: 7 * 86400,
           path: "/",
+          secure: true,
+          sameSite: "lax",
         })
 
         return { message: "Signed in successfully" }

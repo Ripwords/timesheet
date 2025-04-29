@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from "@nuxt/ui"
 
-const eden = useEden() // Make eden available for logout
+const eden = useEden()
 const user = await eden.api.auth.profile.get()
 
 const navItems = ref<NavigationMenuItem[][]>([
@@ -10,7 +10,6 @@ const navItems = ref<NavigationMenuItem[][]>([
       label: "Logout",
       icon: "i-lucide-log-out",
       onSelect: async () => {
-        // Make async
         await eden.api.auth.signout.post()
         await navigateTo("/auth/login") // Use await
       },
