@@ -88,7 +88,7 @@ watch(route, () => {})
           v-if="status === 'success' && user"
           :items="navItems"
         />
-        <div v-else>Loading...</div>
+        <UNavigationMenu v-else />
         <!-- Or a skeleton loader -->
       </UContainer>
     </header>
