@@ -22,6 +22,7 @@ RUN bun run build
 
 FROM base AS release
 COPY --from=prerelease /usr/src/app/apps/server /usr/src/app/apps/server
+COPY --from=prerelease /usr/src/app/node_modules /usr/src/app/node_modules
 ENV NODE_ENV=production
 WORKDIR /usr/src/app/apps/server
 

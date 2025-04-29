@@ -14,6 +14,7 @@
     "db:seed": "bun run src/db/seedTestData.ts"
   },
   "dependencies": {
+    "elysia": "^1.2.25",
     "@elysiajs/cors": "^1.2.0",
     "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/server-timing": "^1.2.1",
@@ -21,7 +22,10 @@
     "@rasla/logify": "^5.0.0",
     "bcryptjs": "^3.0.2",
     "decimal.js": "^10.5.0",
-    "elysia": "latest",
+    "@elysiajs/cookie": "^0.8.0",
+    "drizzle-kit": "^0.31.0",
+    "drizzle-orm": "^0.43.1",
+    "postgres": "^3.4.5",
     "nodemailer": "^6.10.1",
     "pg": "^8.15.6"
   },
@@ -29,7 +33,7 @@
     "@faker-js/faker": "^9.7.0",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.14",
-    "bun-types": "latest",
+    "bun-types": "^1.2.11",
     "drizzle-seed": "^0.3.1"
   },
   "module": "src/index.ts",
