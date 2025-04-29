@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { departmentEnumDef } from "@timesheet/constants"
 definePageMeta({
   layout: "auth",
-})
-const state = reactive({
-  name: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
-  department: departmentEnumDef[0],
 })
 
 const eden = useEden()
 const toast = useToast()
 const disabled = ref(false)
+
+const { data: departments } = await useLazyAsyncData(
+  "departments",
+  async () => {
+    const { data } = await eden.api.departments.index.get()
+
+    return data ?? []
+  }
+)
+
+const state = reactive({
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  departmentId: departments.value?.[0]?.id,
+})
 
 async function submit() {
   disabled.value = true
@@ -24,10 +33,19 @@ async function submit() {
     })
     return
   }
+
+  if (!state.departmentId) {
+    toast.add({
+      title: "Error",
+      description: "Please select a department",
+    })
+    return
+  }
+
   const { data, error } = await eden.api.auth.signup.post({
     email: state.email,
     password: state.password,
-    department: state.department,
+    departmentId: state.departmentId,
   })
 
   if (error) {
@@ -76,8 +94,11 @@ async function submit() {
           class="mb-4"
         >
           <USelectMenu
-            v-model="state.department"
-            :items="[...departmentEnumDef]"
+            v-model="state.departmentId"
+            class="w-44"
+            :items="departments"
+            label-key="departmentName"
+            value-key="id"
           />
         </UFormField>
 

@@ -6,7 +6,7 @@ import { adminReportsRoutes } from "./admin/reports"
 import { adminUsersRoutes } from "./admin/users"
 import { adminDepartmentsRoutes } from "./admin/departments"
 import { adminFinancials } from "./admin/financials"
-
+import { publicDepartmentsRoutes } from "./departments"
 const app = baseApp("main")
   .group("/api", (app) =>
     app
@@ -16,6 +16,7 @@ const app = baseApp("main")
       .use(adminReportsRoutes)
       .use(adminUsersRoutes)
       .use(adminDepartmentsRoutes)
+      .use(publicDepartmentsRoutes)
       .use(adminFinancials)
   )
   .get("/", () => "Hello Elysia - Timesheet Backend")
