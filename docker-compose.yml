@@ -1,9 +1,11 @@
 services:
   db:
     image: postgres
+    env_file:
+      - ./apps/server/.env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: timesheet
     ports:
       - 5423:5432
