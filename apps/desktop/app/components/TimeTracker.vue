@@ -19,7 +19,7 @@ const totalAccumulatedDuration = ref(0) // Seconds accumulated before the curren
 const currentIntervalElapsedTime = ref(0) // Seconds elapsed in the current running interval
 const showProjectModal = ref(false)
 const finalSessionDuration = ref(0) // Store final duration when stopping
-const selectedProjectId = ref<number>()
+const selectedProjectId = ref<string>()
 const timeEntryDescription = ref("")
 
 // --- Projects ---

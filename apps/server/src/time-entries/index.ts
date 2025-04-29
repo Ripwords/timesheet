@@ -54,7 +54,9 @@ export const timeEntries = baseApp("time-entries").group(
         },
         {
           body: t.Object({
-            projectId: t.Numeric(),
+            projectId: t.String({
+              format: "uuid",
+            }),
             startTime: t.Date(), // Use t.Date(), assumes input can be parsed to Date
             endTime: t.Date(),
             durationSeconds: t.Integer(),
@@ -81,7 +83,7 @@ export const timeEntries = baseApp("time-entries").group(
           if (user.role !== "admin") {
             conditions.push(eq(schema.timeEntries.userId, user.userId))
           } else if (query.userId) {
-            conditions.push(eq(schema.timeEntries.userId, Number(query.userId)))
+            conditions.push(eq(schema.timeEntries.userId, query.userId))
           }
 
           // Add start date condition if provided
@@ -147,7 +149,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
-            userId: t.Optional(t.Number()),
+            userId: t.Optional(t.String({ format: "uuid" })),
           }),
         }
       )
@@ -165,7 +167,7 @@ export const timeEntries = baseApp("time-entries").group(
           if (user.role !== "admin") {
             conditions.push(eq(schema.timeEntries.userId, user.userId))
           } else if (query.userId) {
-            conditions.push(eq(schema.timeEntries.userId, Number(query.userId)))
+            conditions.push(eq(schema.timeEntries.userId, query.userId))
           }
 
           // Add start date condition if provided
@@ -199,14 +201,9 @@ export const timeEntries = baseApp("time-entries").group(
             }
           }
 
-          const projectId = Number(params.id) // Parse ID to number
-          if (isNaN(projectId)) {
-            return error(400, "Invalid time entry ID format")
-          }
-
           const timeEntry = await db.query.timeEntries.findMany({
             where: and(
-              eq(schema.timeEntries.projectId, projectId),
+              eq(schema.timeEntries.projectId, params.id),
               ...conditions
             ),
           })
@@ -227,7 +224,9 @@ export const timeEntries = baseApp("time-entries").group(
         },
         {
           params: t.Object({
-            id: t.Numeric(),
+            id: t.String({
+              format: "uuid",
+            }),
           }),
           query: t.Object({
             startDate: t.Optional(
@@ -242,7 +241,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
-            userId: t.Optional(t.Number()),
+            userId: t.Optional(t.String({ format: "uuid" })),
           }),
           detail: {
             summary: "Get a single time entry by ID",
@@ -381,14 +380,9 @@ export const timeEntries = baseApp("time-entries").group(
             return error(401, "Unauthorized")
           }
 
-          const entryId = Number(params.id) // Parse ID to number
-          if (isNaN(entryId)) {
-            return error(400, "Invalid time entry ID format")
-          }
-
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({
-            where: eq(schema.timeEntries.id, entryId), // Use numeric ID
+            where: eq(schema.timeEntries.id, params.id), // Use numeric ID
             columns: { id: true, userId: true }, // Only fetch necessary columns
           })
 
@@ -424,7 +418,7 @@ export const timeEntries = baseApp("time-entries").group(
                 }),
                 updatedAt: new Date(),
               })
-              .where(eq(schema.timeEntries.id, entryId)) // Use numeric ID
+              .where(eq(schema.timeEntries.id, params.id)) // Use numeric ID
               .returning() // Return the updated entry
 
             if (!updatedEntry || updatedEntry.length === 0) {
@@ -435,7 +429,7 @@ export const timeEntries = baseApp("time-entries").group(
 
             return updatedEntry[0]
           } catch (e) {
-            console.error(`Failed to update time entry ${entryId}:`, e)
+            console.error(`Failed to update time entry ${params.id}:`, e)
             // Handle potential foreign key constraint errors if projectId is invalid
             if (
               e instanceof Error &&
@@ -448,10 +442,12 @@ export const timeEntries = baseApp("time-entries").group(
         },
         {
           params: t.Object({
-            id: t.Numeric(),
+            id: t.String({
+              format: "uuid",
+            }),
           }),
           body: t.Object({
-            projectId: t.Optional(t.Numeric()),
+            projectId: t.Optional(t.String({ format: "uuid" })),
             startTime: t.Optional(t.Date()),
             endTime: t.Optional(t.Date()),
             durationSeconds: t.Optional(t.Integer()),
@@ -472,14 +468,9 @@ export const timeEntries = baseApp("time-entries").group(
             return error(401, "Unauthorized")
           }
 
-          const entryId = Number(params.id) // Parse ID to number
-          if (isNaN(entryId)) {
-            return error(400, "Invalid time entry ID format")
-          }
-
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({
-            where: eq(schema.timeEntries.id, entryId), // Use numeric ID
+            where: eq(schema.timeEntries.id, params.id), // Use numeric ID
             columns: { id: true, userId: true }, // Only fetch necessary columns
           })
 
@@ -498,7 +489,7 @@ export const timeEntries = baseApp("time-entries").group(
           try {
             const deletedEntry = await db
               .delete(schema.timeEntries)
-              .where(eq(schema.timeEntries.id, entryId)) // Use numeric ID
+              .where(eq(schema.timeEntries.id, params.id)) // Use numeric ID
               .returning({ id: schema.timeEntries.id }) // Return the id of the deleted item
 
             if (!deletedEntry || deletedEntry.length === 0) {
@@ -507,14 +498,16 @@ export const timeEntries = baseApp("time-entries").group(
 
             return deletedEntry[0]
           } catch (e) {
-            console.error(`Failed to delete time entry ${entryId}:`, e)
+            console.error(`Failed to delete time entry ${params.id}:`, e)
             // Handle potential DB errors if necessary
             return error(500, "Internal Server Error")
           }
         },
         {
           params: t.Object({
-            id: t.Numeric(),
+            id: t.String({
+              format: "uuid",
+            }),
           }),
           detail: {
             summary: "Delete a time entry by ID",

@@ -42,16 +42,6 @@ const cumulativeBudget = computed(() => {
       .reduce((sum, b) => sum + b.amount, 0)
   )
 })
-const totalBudget = computed(() =>
-  props.budgetInjections.reduce((sum, b) => sum + b.amount, 0)
-)
-const profitOverTime = computed(() => {
-  let profit = totalBudget.value
-  return props.costOverTime.map((e) => {
-    profit -= e.cost
-    return profit
-  })
-})
 
 // See: https://github.com/apertureless/vue-chartjs/issues/1048
 const chartData = computed(() => ({
@@ -64,15 +54,6 @@ const chartData = computed(() => ({
       borderColor: "rgba(248, 113, 113, 1)",
       borderWidth: 2,
       type: "bar",
-    },
-    {
-      label: "Profit",
-      data: profitOverTime.value,
-      backgroundColor: "#34d399",
-      borderColor: "#34d399",
-      type: "line",
-      fill: false,
-      tension: 0.4,
     },
     {
       label: "Budget",

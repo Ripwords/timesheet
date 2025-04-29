@@ -1,13 +1,13 @@
 import {
+  boolean,
+  integer,
+  numeric,
+  pgEnum,
   pgTable,
-  serial,
   text,
   timestamp,
-  pgEnum,
-  integer,
+  uuid,
   type AnyPgColumn,
-  boolean,
-  numeric,
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
@@ -16,26 +16,39 @@ export const accountStatusEnum = pgEnum("account_status", [
   "inactive",
 ])
 
+export const departmentColorEnum = pgEnum("department_color", [
+  "info",
+  "error",
+  "primary",
+  "secondary",
+  "success",
+  "warning",
+  "neutral",
+])
+
 export const departments = pgTable("departments", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  color: departmentColorEnum("color").default("info").notNull(),
   maxSessionMinutes: integer("max_session_minutes").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
-export type Department = typeof departments.$inferSelect
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   accountStatus: accountStatusEnum("account_status")
     .default("active")
     .notNull(),
   email: text("email").unique().notNull(),
-  passwordHash: text("password_hash").notNull(), // Store hashed passwords, never plain text!
+  passwordHash: text("password_hash").notNull(),
   role: userRoleEnum("role").default("user").notNull(),
-  departmentId: integer("department_id")
+  departmentId: uuid("department_id")
     .notNull()
     .references((): AnyPgColumn => departments.id, { onDelete: "restrict" }),
+  ratePerHour: numeric("rate_per_hour", { precision: 10, scale: 2 })
+    .default("0.00")
+    .notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   verificationToken: text("verification_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -44,21 +57,19 @@ export const users = pgTable("users", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
-export type User = typeof users.$inferSelect
 
 export const resetPasswordTokens = pgTable("reset_password_tokens", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id")
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
     .notNull()
     .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 })
-export type ResetPasswordToken = typeof resetPasswordTokens.$inferSelect
 
 export const projects = pgTable("projects", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
@@ -66,14 +77,13 @@ export const projects = pgTable("projects", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
-export type Project = typeof projects.$inferSelect
 
 export const timeEntries = pgTable("time_entries", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id")
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
     .notNull()
     .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
-  projectId: integer("project_id")
+  projectId: uuid("project_id")
     .notNull()
     .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
@@ -86,31 +96,28 @@ export const timeEntries = pgTable("time_entries", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
-export type TimeEntry = typeof timeEntries.$inferSelect
 
 export const departmentDefaultDescription = pgTable(
   "department_default_description",
   {
-    id: serial("id").primaryKey(),
-    departmentId: integer("department_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    departmentId: uuid("department_id")
       .notNull()
       .references((): AnyPgColumn => departments.id, { onDelete: "restrict" }),
     description: text("description").notNull(),
   }
 )
-export type DepartmentDefaultDescription =
-  typeof departmentDefaultDescription.$inferSelect
 
 export const projectBudgetInjections = pgTable("project_budget_injections", {
-  id: serial("id").primaryKey(),
-  projectId: integer("project_id")
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
     .notNull()
     .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
   budget: numeric("budget").notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
 })
-export type ProjectBudgetInjection = typeof projectBudgetInjections.$inferSelect

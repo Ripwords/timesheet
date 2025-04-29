@@ -153,13 +153,13 @@ export const adminReportsRoutes = baseApp("reports").group(
           ), // day, week, month, year, or 'none' for total
           // Ensure IDs are numbers
           userIds: t.Optional(
-            t.Array(t.Numeric(), {
-              error: "Invalid userIds format, must be array of numbers",
+            t.Array(t.String({ format: "uuid" }), {
+              error: "Invalid userIds format, must be array of UUIDs",
             })
           ),
           projectIds: t.Optional(
-            t.Array(t.Numeric(), {
-              error: "Invalid projectIds format, must be array of numbers",
+            t.Array(t.String({ format: "uuid" }), {
+              error: "Invalid projectIds format, must be array of UUIDs",
             })
           ),
         }),

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "rate_per_hour" numeric(10, 2) DEFAULT '0.00' NOT NULL;

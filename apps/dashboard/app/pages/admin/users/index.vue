@@ -32,12 +32,12 @@ const eden = useEden()
 const toast = useToast()
 const page = ref(1)
 const search = ref("")
-const departmentId = ref(0)
+const departmentId = ref("")
 const isEditModalOpen = ref(false)
 const editingUser = ref<User | null>(null) // Store the user being edited
 const editedData = reactive<{
   email: string
-  departmentId: number | undefined
+  departmentId: string | undefined
   emailVerified: boolean | null
 }>({
   email: "",
@@ -91,7 +91,21 @@ watchDebounced(
 
 // Define columns using TanStack types and cell functions with INFERRED User type
 const columns: ColumnDef<User, unknown>[] = [
-  { accessorKey: "id", header: "ID" },
+  {
+    accessorKey: "id",
+    header: "ID",
+    cell: (context: CellContext<User, unknown>) =>
+      h("div", {}, [
+        h(
+          "span",
+          { class: "text-sm" },
+          `${context.row.original.id.slice(
+            0,
+            8
+          )}...${context.row.original.id.slice(-4)}`
+        ),
+      ]),
+  },
   { accessorKey: "email", header: "Email" },
   { accessorKey: "department", header: "Department" },
   {
@@ -167,7 +181,7 @@ const columns: ColumnDef<User, unknown>[] = [
   },
 ]
 
-function viewUserDetails(userId: number | string) {
+function viewUserDetails(userId: string) {
   useRouter().push(`/admin/users/${userId}`)
 }
 
@@ -194,7 +208,7 @@ async function saveUserChanges() {
   const userId = editingUser.value.id
   const payload: {
     email?: string
-    departmentId?: number
+    departmentId?: string
   } = {}
 
   if (editedData.email !== editingUser.value.email) {
@@ -292,7 +306,7 @@ function cancelEdit() {
             v-model="departmentId"
             class="w-50"
             placeholder="Select Department"
-            :items="[...departments]"
+            :items="departments"
             value-key="id"
             label-key="departmentName"
             :search-input="{
@@ -314,7 +328,7 @@ function cancelEdit() {
                 :class="['ml-2 px-1  hover:text-red-600 !pointer-events-auto']"
                 @click.stop="
                   () => {
-                    departmentId = 0
+                    departmentId = ''
                   }
                 "
               >
@@ -400,7 +414,7 @@ function cancelEdit() {
                 v-model="editedData.departmentId"
                 class="w-50"
                 placeholder="Select Department"
-                :items="[...departments]"
+                :items="departments"
                 value-key="id"
                 label-key="departmentName"
                 :search-input="{ placeholder: 'Search departments...' }"

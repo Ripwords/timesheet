@@ -7,17 +7,23 @@ import { authGuard } from "../middleware/authGuard"
 
 // Schema for validating the request body when creating/updating a description
 const descriptionBodySchema = t.Object({
-  departmentId: t.Numeric({ error: "Valid department ID is required." }),
+  departmentId: t.String({
+    format: "uuid",
+    error: "Valid department ID is required.",
+  }),
 })
 
 // Schema for validating URL parameters containing the description ID
 const descriptionIdParamsSchema = t.Object({
-  id: t.Numeric({ error: "Description ID must be a valid number." }),
+  id: t.String({
+    format: "uuid",
+    error: "Description ID must be a valid UUID.",
+  }),
 })
 
 // Schema for validating query parameters for filtering descriptions
 const departmentIdsQuerySchema = t.Object({
-  departmentIds: t.Optional(t.Array(t.Number())),
+  departmentIds: t.Optional(t.Array(t.String({ format: "uuid" }))),
 })
 
 export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
@@ -34,6 +40,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             const descriptionsQuery = db
               .select({
                 id: departments.id,
+                departmentColor: departments.color,
                 departmentName: departments.name,
               })
               .from(departments)

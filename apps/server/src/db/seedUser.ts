@@ -51,7 +51,7 @@ export const seedAdminUser = async () => {
       email: adminEmail,
       passwordHash: hashedPassword,
       role: "admin",
-      departmentId: adminDepartment[0].id,
+      departmentId: adminDepartment?.[0]?.id,
       emailVerified: true,
     })
     console.log(`Admin user ${adminEmail} seeded successfully.`)

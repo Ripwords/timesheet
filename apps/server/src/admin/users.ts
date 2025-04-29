@@ -16,12 +16,12 @@ const querySchema = t.Object({
       default: 10,
     })
   ),
-  departmentId: t.Optional(t.Numeric()),
+  departmentId: t.Optional(t.String({ format: "uuid" })),
 })
 
 const updateUserBodySchema = t.Object({
   email: t.Optional(t.String({ format: "email" })),
-  departmentId: t.Optional(t.Numeric()),
+  departmentId: t.Optional(t.String({ format: "uuid" })),
   emailVerified: t.Optional(
     t.Boolean({
       error: {
@@ -32,7 +32,7 @@ const updateUserBodySchema = t.Object({
 })
 
 const userIdParamsSchema = t.Object({
-  id: t.Numeric(),
+  id: t.String({ format: "uuid" }),
 })
 
 export const adminUsersRoutes = baseApp("adminUsers").group(
@@ -138,10 +138,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       .get(
         "/user/:id",
         async ({ db, params, error }) => {
-          const userId = Number(params.id)
-          if (isNaN(userId)) {
-            return error(400, "Invalid user ID format")
-          }
+          const userId = params.id
 
           const userData = await db
             .select({
@@ -175,7 +172,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               "Fetches a user by their ID, including department name. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
-          params: t.Object({ id: t.Numeric() }),
+          params: t.Object({ id: t.String({ format: "uuid" }) }),
         }
       )
       .patch(

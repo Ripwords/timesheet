@@ -1,7 +1,9 @@
 import { baseApp } from "../../utils/baseApp"
-import { User } from "../db/schema"
+import { users } from "../db/schema"
 
-export const authGuard = (role: User["role"] = "user") =>
+type UserRole = (typeof users.$inferSelect)["role"]
+
+export const authGuard = (role: UserRole = "user") =>
   baseApp("authGuard").resolve(
     { as: "scoped" },
     async ({ jwt, cookie, error }) => {

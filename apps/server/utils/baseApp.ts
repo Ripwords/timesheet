@@ -54,7 +54,9 @@ export const baseApp = (name: string) =>
         secret: JWT_SECRET,
         exp: "7d",
         schema: t.Object({
-          userId: t.Number(),
+          userId: t.String({
+            format: "uuid",
+          }),
           email: t.String(),
           role: t.String(),
         }),

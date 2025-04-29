@@ -9,8 +9,8 @@ definePageMeta({
 })
 
 const { params } = useRoute("admin-users-userId-project-projectId")
-const projectId = Number(params.projectId)
-const userId = Number(params.userId)
+const projectId = params.projectId
+const userId = params.userId
 const activeAccordion = ref("")
 
 const eden = useEden()
@@ -54,7 +54,7 @@ const { data: userTimeEntries } = await useLazyAsyncData(
 
 // --- Table Columns ---
 interface TimeEntryRow {
-  id: number
+  id: string
   date: string
   description: string
   duration: string

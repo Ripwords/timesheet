@@ -7,7 +7,7 @@ definePageMeta({
 })
 
 interface WeeklyBreakdownRow {
-  projectId: number
+  projectId: string
   projectName: string
   week1: string
   week2: string
@@ -17,7 +17,7 @@ interface WeeklyBreakdownRow {
 }
 
 const { params } = useRoute("admin-users-userId")
-const userId = Number(params.userId)
+const userId = params.userId
 
 const eden = useEden()
 const dayjs = useDayjs()
@@ -89,7 +89,7 @@ const processedData = computed(() => {
   const endOfMonth = dayjs(selectedMonth.value).endOf("month")
 
   const projectHours: Record<
-    number,
+    string,
     { name: string; weeks: number[]; total: number }
   > = {}
 
@@ -159,7 +159,7 @@ const processedData = computed(() => {
     .filter(([_, data]) => data.total > 0)
     .map(
       ([projectId, data]): WeeklyBreakdownRow => ({
-        projectId: Number(projectId),
+        projectId,
         projectName: data.name,
         week1: formatDuration(data.weeks[0] || 0),
         week2: formatDuration(data.weeks[1] || 0),
@@ -173,7 +173,7 @@ const processedData = computed(() => {
     rows,
     totals: [
       {
-        projectId: 0,
+        projectId: "",
         projectName:
           rows.length > 0
             ? rows.reduce((longest, current) =>

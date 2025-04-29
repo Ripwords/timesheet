@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 const props = defineProps<{
-  departmentId: number
+  departmentId: string
 }>()
 
 const eden = useEden()
@@ -13,47 +13,21 @@ const { data: departments } = useAsyncData(
         departmentIds: [props.departmentId],
       },
     })
-    return data
+    return data?.[0]
   },
   {
     watch: [() => props.departmentId],
   }
 )
 
-type Color =
-  | "info"
-  | "error"
-  | "primary"
-  | "secondary"
-  | "success"
-  | "warning"
-  | "neutral"
-
-const color = computed<Color>(() => {
-  switch (departments.value?.[0]?.id) {
-    case 1:
-      return "info"
-    case 2:
-      return "error"
-    case 3:
-      return "primary"
-    case 4:
-      return "secondary"
-    case 5:
-      return "success"
-    default:
-      return "neutral"
-  }
-})
-
 const departmentLabel = computed(() => {
-  return departments.value?.[0]?.departmentName
+  return departments.value?.departmentName
 })
 </script>
 
 <template>
   <UBadge
-    :color
+    :color="departments?.departmentColor ?? 'neutral'"
     variant="subtle"
     >{{ departmentLabel }}</UBadge
   >

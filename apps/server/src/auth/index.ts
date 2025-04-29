@@ -23,7 +23,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           if (!profile) {
             return null
           }
-          return profile as { userId: number; email: string; role: string }
+          return profile as { userId: string; email: string; role: string }
         },
       }
     })
@@ -88,7 +88,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         body: t.Object({
           email: t.String({ format: "email" }),
           password: t.String({ minLength: 8 }),
-          departmentId: t.Number(),
+          departmentId: t.String({ format: "uuid" }),
         }),
       }
     )

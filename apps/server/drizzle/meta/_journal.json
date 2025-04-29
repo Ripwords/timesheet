@@ -64,6 +64,27 @@
       "when": 1745835211244,
       "tag": "0008_curved_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1745893470004,
+      "tag": "0009_grey_firebird",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1745894824537,
+      "tag": "0010_mature_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1745895578493,
+      "tag": "0011_amused_owl",
+      "breakpoints": true
     }
   ]
 }

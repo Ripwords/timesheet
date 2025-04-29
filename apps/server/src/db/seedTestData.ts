@@ -20,13 +20,13 @@ const SEED_USERS_COUNT = 30
 const SEED_PROJECTS_COUNT = 20
 const SEED_TIME_ENTRIES_COUNT = 500
 const DEPARTMENTS_TO_SEED = [
-  { name: "Frontend Design", maxSessionMinutes: 480 },
-  { name: "Frontend JS", maxSessionMinutes: 480 },
-  { name: "Backend", maxSessionMinutes: 480 },
-  { name: "UI/UX", maxSessionMinutes: 480 },
-  { name: "Digital Marketing", maxSessionMinutes: 420 },
-  { name: "Administration", maxSessionMinutes: 540 },
-]
+  { name: "Frontend Design", maxSessionMinutes: 480, color: "info" },
+  { name: "Frontend JS", maxSessionMinutes: 480, color: "error" },
+  { name: "Backend", maxSessionMinutes: 480, color: "primary" },
+  { name: "UI/UX", maxSessionMinutes: 480, color: "secondary" },
+  { name: "Digital Marketing", maxSessionMinutes: 420, color: "success" },
+  { name: "Administration", maxSessionMinutes: 540, color: "warning" },
+] as (typeof schema.departments.$inferInsert)[]
 
 const seedTestData = async () => {
   console.log("🌱 Starting test data seeding...")
@@ -74,6 +74,7 @@ const seedTestData = async () => {
     usersToInsert.push({
       email: email,
       passwordHash: passwordHash,
+      ratePerHour: faker.number.int({ min: 20, max: 100 }).toString(),
       role: "user",
       accountStatus: "active",
       departmentId: randomDepartmentId, // Assign departmentId FK
@@ -140,6 +141,7 @@ const seedTestData = async () => {
     for (const budget of splits) {
       budgetInjectionsToInsert.push({
         projectId,
+        description: faker.lorem.sentence(),
         budget: budget.toString(), // numeric expects string
       })
     }

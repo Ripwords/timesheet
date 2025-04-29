@@ -54,7 +54,21 @@ watchDebounced(
 
 // Define columns using accessorKey/label for data, key/label for actions
 const columns: ColumnDef<Project, unknown>[] = [
-  { accessorKey: "id", header: "ID" },
+  {
+    accessorKey: "id",
+    header: "ID",
+    cell: (context: CellContext<Project, unknown>) =>
+      h("div", {}, [
+        h(
+          "span",
+          { class: "text-sm" },
+          `${context.row.original.id.slice(
+            0,
+            8
+          )}...${context.row.original.id.slice(-4)}`
+        ),
+      ]),
+  },
   { accessorKey: "name", header: "Name" },
   { accessorKey: "updatedAt", header: "Updated At" },
   {
@@ -69,7 +83,7 @@ const columns: ColumnDef<Project, unknown>[] = [
           variant: "outline",
           color: "primary",
           ariaLabel: "View Details",
-          onClick: () => viewProjectDetails(Number(project.id)),
+          onClick: () => viewProjectDetails(project.id),
         }),
         h(UButton, {
           icon: "i-heroicons-pencil-square",
@@ -92,7 +106,7 @@ const columns: ColumnDef<Project, unknown>[] = [
   },
 ]
 
-function viewProjectDetails(projectId: number) {
+function viewProjectDetails(projectId: string) {
   useRouter().push(`/admin/projects/${projectId}`)
 }
 

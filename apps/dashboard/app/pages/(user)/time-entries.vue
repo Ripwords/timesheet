@@ -10,8 +10,8 @@ const toast = useToast()
 const eden = useEden()
 
 interface TimeEntry {
-  id: number
-  projectId: number
+  id: string
+  projectId: string
   projectName?: string // Added for display
   startTime: string | Date // ISO string from API, Date object in form
   endTime: string | Date // ISO string from API, Date object in form
@@ -28,7 +28,7 @@ const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, en
 
 // Modal form state
 const modalState = reactive({
-  projectId: 0,
+  projectId: "",
   startTime: "", // Using string for datetime-local input YYYY-MM-DDTHH:mm
   endTime: "", // Using string for datetime-local input YYYY-MM-DDTHH:mm
   description: "", // Assuming description might be added later
@@ -192,7 +192,7 @@ const openModal = (entry: TimeEntry | null = null) => {
     // modalState.description = entry.description || '' // If description exists
   } else {
     // Add mode: Reset form
-    modalState.projectId = 0
+    modalState.projectId = ""
     modalState.startTime = ""
     modalState.endTime = ""
     modalState.description = ""
@@ -204,7 +204,7 @@ const closeModal = () => {
   isModalOpen.value = false
   // Reset potentially dirty form state after modal closes
   editingEntry.value = null
-  modalState.projectId = 0
+  modalState.projectId = ""
   modalState.startTime = ""
   modalState.endTime = ""
   modalState.description = ""
@@ -310,7 +310,7 @@ const saveEntry = async () => {
   }
 }
 
-const deleteEntry = async (id: number) => {
+const deleteEntry = async (id: string) => {
   // Optional: Add a confirmation dialog here
   if (!confirm("Are you sure you want to delete this time entry?")) {
     return
