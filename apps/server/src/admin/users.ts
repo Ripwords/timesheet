@@ -4,7 +4,7 @@ import { baseApp } from "../../utils/baseApp"
 import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
-
+import { error as logError } from "@rasla/logify"
 const querySchema = t.Object({
   search: t.Optional(t.Nullable(t.String())),
   page: t.Optional(
@@ -124,7 +124,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               total: totalResult[0]?.count ?? 0,
             }
           } catch (e) {
-            console.error("Error fetching user list for admin:", e)
+            logError(`Error fetching user list for admin: ${e}`)
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
             throw error(500, `Failed to fetch user list: ${message}`)
@@ -265,7 +265,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
 
             return finalUserData[0]
           } catch (e) {
-            console.error(`Error updating user ${userId}:`, e)
+            logError(`Error updating user ${userId}: ${e}`)
             if (e instanceof Error && e.message.includes("already in use")) {
               return error(409, e.message)
             }
@@ -315,7 +315,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               user: updatedUserResult[0],
             }
           } catch (e) {
-            console.error(`Error activating user ${userId}:`, e)
+            logError(`Error activating user ${userId}: ${e}`)
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
             return error(500, `Failed to activate user: ${message}`)
@@ -355,7 +355,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               user: updatedUserResult[0],
             }
           } catch (e) {
-            console.error(`Error deactivating user ${userId}:`, e)
+            logError(`Error deactivating user ${userId}: ${e}`)
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
             return error(500, `Failed to deactivate user: ${message}`)

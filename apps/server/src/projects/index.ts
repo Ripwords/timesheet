@@ -3,7 +3,7 @@ import * as schema from "../db/schema"
 import { t } from "elysia"
 import { and, count, eq, ilike } from "drizzle-orm"
 import { authGuard } from "../middleware/authGuard"
-
+import { error as logError } from "@rasla/logify"
 const querySchema = t.Object({
   page: t.Optional(t.Number({ default: 1 })),
   limit: t.Optional(t.Number({ default: 10 })),
@@ -38,7 +38,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
 
           return newProject[0]
         } catch (e) {
-          console.error("Failed to create project:", e)
+          logError(`Failed to create project: ${e}`)
           // Consider more specific error handling based on potential DB errors
           // Example check for specific constraints if needed
           // if (e instanceof Error && e.message.includes(...)) {
@@ -164,7 +164,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
 
           return updatedProject[0]
         } catch (e) {
-          console.error(`Failed to update project ${projectId}:`, e)
+          logError(`Failed to update project ${projectId}: ${e}`)
           return error(500, "Internal Server Error")
         }
       },
@@ -234,7 +234,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           set.status = 200 // Explicitly set 200 OK
           return { message: `Project ${projectId} deleted successfully` }
         } catch (e) {
-          console.error(`Failed to delete project ${projectId}:`, e)
+          logError(`Failed to delete project ${projectId}: ${e}`)
           return error(500, "Internal Server Error")
         }
       },

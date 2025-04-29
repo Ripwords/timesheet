@@ -9,6 +9,7 @@ import { sendEmail } from "../../utils/mail"
 import * as schema from "../db/schema"
 import { seedAdminUser } from "../db/seedUser"
 import { UUID } from "../../utils/validtors"
+import { error as logError } from "@rasla/logify"
 
 seedAdminUser()
 export const auth = baseApp("auth").group("/auth", (app) =>
@@ -96,7 +97,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           ) {
             return error(409, "User with this email already exists.")
           }
-          console.error("Signup Error:", e)
+          logError(`Signup Error: ${e}`)
           return error(500, "Failed to create user.")
         }
       },
@@ -214,7 +215,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
               "If an account with that email exists, a password reset link has been sent.",
           }
         } catch (emailError) {
-          console.error("Failed to send password reset email:", emailError)
+          logError(`Failed to send password reset email: ${emailError}`)
           // Optionally, revert the token saving if email fails, or log for retry
           return error(500, "Failed to send password reset email.")
         }
@@ -253,15 +254,14 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         // 3. Check if a valid token was found
         if (!validTokenRecord) {
-          console.log("No valid reset token found or token expired/mismatched.")
+          logError("No valid reset token found or token expired/mismatched.")
           return error(400, "Invalid or expired reset token.")
         }
 
         // Ensure userId is present on the valid token record
         if (!validTokenRecord.userId) {
-          console.error(
-            "User ID missing from valid reset token record:",
-            validTokenRecord.id
+          logError(
+            `User ID missing from valid reset token record: ${validTokenRecord.id}`
           )
           return error(500, "Internal server error during password reset.")
         }

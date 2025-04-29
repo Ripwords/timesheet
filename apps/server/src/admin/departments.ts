@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm"
-import { error, t } from "elysia"
+import { t, error } from "elysia"
+import { error as logError } from "@rasla/logify"
 
 import { baseApp } from "../../utils/baseApp"
 import { departments, departmentDefaultDescription } from "../db/schema"
@@ -55,7 +56,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
             return descriptions
           } catch (e) {
-            console.error("Error fetching default descriptions:", e)
+            logError(`Error fetching default descriptions: ${e}`)
             throw error(500, "Failed to fetch default descriptions")
           }
         },
@@ -116,7 +117,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
             return newDescriptionResult[0]
           } catch (e: any) {
-            console.error("Error creating default description:", e)
+            logError(`Error creating default description: ${e}`)
             if (e.code === "23505") {
               return error(
                 409,
@@ -185,7 +186,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
             return updatedDescriptionResult[0]
           } catch (e: any) {
-            console.error(`Error updating default description ${params.id}:`, e)
+            logError(`Error updating default description ${params.id}: ${e}`)
             if (e.code === "23505") {
               return error(
                 409,
@@ -225,7 +226,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
             return { success: true, id: deletedDescription[0].id }
           } catch (e: any) {
-            console.error(`Error deleting default description ${params.id}:`, e)
+            logError(`Error deleting default description ${params.id}: ${e}`)
             if (e.status) throw e
             throw error(500, "Failed to delete default description")
           }

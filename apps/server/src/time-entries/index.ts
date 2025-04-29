@@ -4,7 +4,7 @@ import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
-
+import { error as logError } from "@rasla/logify"
 export const timeEntries = baseApp("time-entries").group(
   "/time-entries",
   (app) =>
@@ -42,7 +42,7 @@ export const timeEntries = baseApp("time-entries").group(
 
             return newTimeEntry[0]
           } catch (e) {
-            console.error("Failed to create time entry:", e)
+            logError(`Failed to create time entry: ${e}`)
             // Handle potential foreign key constraint errors if projectId is invalid
             if (
               e instanceof Error &&
@@ -95,7 +95,7 @@ export const timeEntries = baseApp("time-entries").group(
               if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
               conditions.push(gte(schema.timeEntries.startTime, start))
             } catch (e) {
-              console.error("Invalid startDate format:", startDate, e)
+              logError(`Invalid startDate format: ${startDate} ${e}`)
               return error(400, "Invalid startDate format. Use ISO 8601.")
             }
           }
@@ -113,7 +113,7 @@ export const timeEntries = baseApp("time-entries").group(
               end.setUTCDate(end.getUTCDate() + 1)
               conditions.push(lte(schema.timeEntries.startTime, end))
             } catch (e) {
-              console.error("Invalid endDate format:", endDate, e)
+              logError(`Invalid endDate format: ${endDate} ${e}`)
               return error(400, "Invalid endDate format. Use ISO 8601.")
             }
           }
@@ -179,7 +179,7 @@ export const timeEntries = baseApp("time-entries").group(
               if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
               conditions.push(gte(schema.timeEntries.startTime, start))
             } catch (e) {
-              console.error("Invalid startDate format:", startDate, e)
+              logError(`Invalid startDate format: ${startDate} ${e}`)
               return error(400, "Invalid startDate format. Use ISO 8601.")
             }
           }
@@ -197,7 +197,7 @@ export const timeEntries = baseApp("time-entries").group(
               end.setUTCDate(end.getUTCDate() + 1)
               conditions.push(lte(schema.timeEntries.startTime, end))
             } catch (e) {
-              console.error("Invalid endDate format:", endDate, e)
+              logError(`Invalid endDate format: ${endDate} ${e}`)
               return error(400, "Invalid endDate format. Use ISO 8601.")
             }
           }
@@ -298,9 +298,8 @@ export const timeEntries = baseApp("time-entries").group(
 
             return defaultDescriptions
           } catch (e) {
-            console.error(
-              `Failed to fetch default descriptions for department ${userDepartment}:`,
-              e
+            logError(
+              `Failed to fetch default descriptions for department ${userDepartment}: ${e}`
             )
             return error(500, "Internal Server Error")
           }
@@ -430,7 +429,7 @@ export const timeEntries = baseApp("time-entries").group(
 
             return updatedEntry[0]
           } catch (e) {
-            console.error(`Failed to update time entry ${params.id}:`, e)
+            logError(`Failed to update time entry ${params.id}: ${e}`)
             // Handle potential foreign key constraint errors if projectId is invalid
             if (
               e instanceof Error &&
@@ -499,7 +498,7 @@ export const timeEntries = baseApp("time-entries").group(
 
             return deletedEntry[0]
           } catch (e) {
-            console.error(`Failed to delete time entry ${params.id}:`, e)
+            logError(`Failed to delete time entry ${params.id}: ${e}`)
             // Handle potential DB errors if necessary
             return error(500, "Internal Server Error")
           }

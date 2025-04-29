@@ -2,6 +2,7 @@ import { desc } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { departments } from "../db/schema"
 import { error } from "elysia"
+import { error as logError } from "@rasla/logify"
 
 export const publicDepartmentsRoutes = baseApp("publicDepartments").group(
   "/departments",
@@ -23,7 +24,7 @@ export const publicDepartmentsRoutes = baseApp("publicDepartments").group(
 
           return descriptions
         } catch (e) {
-          console.error("Error fetching default descriptions:", e)
+          logError(`Error fetching default descriptions: ${e}`)
           throw error(500, "Failed to fetch default descriptions")
         }
       },
