@@ -3,7 +3,7 @@
 set -e
 
 # Define database connection URL
-DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/timesheet"
+DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
 export DATABASE_URL
 
 # Run database migrations
