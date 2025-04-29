@@ -4,6 +4,7 @@ import { error, t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { departments, departmentDefaultDescription } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
+import { UUID } from "../../utils/validtors"
 
 // Schema for validating the request body when creating/updating a description
 const descriptionBodySchema = t.Object({
@@ -23,7 +24,7 @@ const descriptionIdParamsSchema = t.Object({
 
 // Schema for validating query parameters for filtering descriptions
 const departmentIdsQuerySchema = t.Object({
-  departmentIds: t.Optional(t.Array(t.String({ format: "uuid" }))),
+  departmentIds: t.Optional(t.Array(UUID)),
 })
 
 export const adminDepartmentsRoutes = baseApp("adminDepartments").group(

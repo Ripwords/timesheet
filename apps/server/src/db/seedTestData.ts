@@ -118,8 +118,7 @@ const seedTestData = async () => {
   for (const projectId of allProjectIds) {
     // 1-3 injections per project
     const numInjections = faker.number.int({ min: 1, max: 3 })
-    // Total budget for this project: random between 30,000 and 100,000
-    const totalBudget = faker.number.int({ min: 30000, max: 100000 })
+    const totalBudget = faker.number.int({ min: 10000, max: 24000 })
     // Generate random splits for the injections
     let splits = []
     if (numInjections === 1) {

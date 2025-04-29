@@ -3,6 +3,7 @@ import { error, t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
+import { UUID } from "../../utils/validtors"
 
 const querySchema = t.Object({
   search: t.Optional(t.Nullable(t.String())),
@@ -16,12 +17,12 @@ const querySchema = t.Object({
       default: 10,
     })
   ),
-  departmentId: t.Optional(t.String({ format: "uuid" })),
+  departmentId: t.Optional(UUID),
 })
 
 const updateUserBodySchema = t.Object({
   email: t.Optional(t.String({ format: "email" })),
-  departmentId: t.Optional(t.String({ format: "uuid" })),
+  departmentId: t.Optional(UUID),
   emailVerified: t.Optional(
     t.Boolean({
       error: {
@@ -32,7 +33,7 @@ const updateUserBodySchema = t.Object({
 })
 
 const userIdParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
+  id: UUID,
 })
 
 export const adminUsersRoutes = baseApp("adminUsers").group(
@@ -172,7 +173,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               "Fetches a user by their ID, including department name. Requires admin privileges.",
             tags: ["Admin", "Users"],
           },
-          params: t.Object({ id: t.String({ format: "uuid" }) }),
+          params: t.Object({ id: UUID }),
         }
       )
       .patch(

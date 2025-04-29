@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
+import { UUID } from "../../utils/validtors"
 
 interface AggregateDataPoint {
   [key: string]: string | number | Date | undefined // More specific index signature
@@ -153,12 +154,12 @@ export const adminReportsRoutes = baseApp("reports").group(
           ), // day, week, month, year, or 'none' for total
           // Ensure IDs are numbers
           userIds: t.Optional(
-            t.Array(t.String({ format: "uuid" }), {
+            t.Array(UUID, {
               error: "Invalid userIds format, must be array of UUIDs",
             })
           ),
           projectIds: t.Optional(
-            t.Array(t.String({ format: "uuid" }), {
+            t.Array(UUID, {
               error: "Invalid projectIds format, must be array of UUIDs",
             })
           ),

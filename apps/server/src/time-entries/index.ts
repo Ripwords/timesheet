@@ -3,6 +3,7 @@ import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
+import { UUID } from "../../utils/validtors"
 
 export const timeEntries = baseApp("time-entries").group(
   "/time-entries",
@@ -149,7 +150,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
-            userId: t.Optional(t.String({ format: "uuid" })),
+            userId: t.Optional(UUID),
           }),
         }
       )
@@ -241,7 +242,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
-            userId: t.Optional(t.String({ format: "uuid" })),
+            userId: t.Optional(UUID),
           }),
           detail: {
             summary: "Get a single time entry by ID",
@@ -447,7 +448,7 @@ export const timeEntries = baseApp("time-entries").group(
             }),
           }),
           body: t.Object({
-            projectId: t.Optional(t.String({ format: "uuid" })),
+            projectId: t.Optional(UUID),
             startTime: t.Optional(t.Date()),
             endTime: t.Optional(t.Date()),
             durationSeconds: t.Optional(t.Integer()),

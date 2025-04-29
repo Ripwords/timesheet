@@ -8,6 +8,7 @@ import { baseApp } from "../../utils/baseApp"
 import { sendEmail } from "../../utils/mail"
 import * as schema from "../db/schema"
 import { seedAdminUser } from "../db/seedUser"
+import { UUID } from "../../utils/validtors"
 
 seedAdminUser()
 export const auth = baseApp("auth").group("/auth", (app) =>
@@ -88,7 +89,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         body: t.Object({
           email: t.String({ format: "email" }),
           password: t.String({ minLength: 8 }),
-          departmentId: t.String({ format: "uuid" }),
+          departmentId: UUID,
         }),
       }
     )
