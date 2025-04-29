@@ -42,11 +42,22 @@ export const seedAdminUser = async () => {
       console.log(`Creating admin user ${adminEmail}...`)
       const hashedPassword = await bcrypt.hash(adminPassword, 10)
 
-      const adminDepartment = await tx
+      let adminDepartment = await tx
         .select({ id: schema.departments.id })
         .from(schema.departments)
         .where(eq(schema.departments.name, "Administration"))
         .limit(1)
+
+      if (!adminDepartment?.[0]?.id) {
+        adminDepartment = await tx
+          .insert(schema.departments)
+          .values({
+            name: "Administration",
+            color: "neutral",
+            maxSessionMinutes: 0,
+          })
+          .returning({ id: schema.departments.id })
+      }
 
       await tx.insert(schema.users).values({
         email: adminEmail,
