@@ -17,6 +17,10 @@ export default defineNuxtConfig({
     },
   },
   pwa: {
+    registerType: "autoUpdate",
+    workbox: {
+      navigateFallback: null,
+    },
     manifest: {
       name: "Timesheet",
       short_name: "Timesheet",
