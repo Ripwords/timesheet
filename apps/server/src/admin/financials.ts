@@ -61,8 +61,8 @@ export const adminFinancials = baseApp("adminFinancials").group(
           const formattedBudgetInjections = budgetInjectionsData.map(
             (b: (typeof budgetInjectionsData)[number]) => ({
               id: b.id,
-              amount: new Decimal(b.budget).toNumber(), // Convert numeric string to number
-              date: formatToYearMonth(b.createdAt), // Format date as YYYY-MM for consistency? Or keep full date? Let's use YYYY-MM for now based on chart.
+              amount: new Decimal(b.budget).toNumber(),
+              date: formatToYearMonth(b.createdAt),
               description: b.description ?? "",
             })
           )
@@ -177,6 +177,107 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }),
           detail: {
             summary: "Update an existing budget injection (Admin)",
+            tags: ["Admin", "Financials"],
+          },
+        }
+      )
+      // DELETE Budget Injection
+      .delete(
+        "/budget-injection/:injectionId",
+        async ({ params, db }) => {
+          const { injectionId } = params
+
+          try {
+            const deletedInjection = await db
+              .delete(projectBudgetInjections)
+              .where(eq(projectBudgetInjections.id, injectionId))
+              .returning({ id: projectBudgetInjections.id })
+
+            if (deletedInjection.length === 0) {
+              throw error(404, "Budget injection not found.")
+            }
+
+            return { success: true, deletedId: deletedInjection[0].id }
+          } catch (e: any) {
+            if (e.status === 404) throw e
+            logError(`Error deleting budget injection: ${e}`)
+            throw error(500, `Failed to delete budget injection: ${e.message}`)
+          }
+        },
+        {
+          params: t.Object({
+            injectionId: UUID,
+          }),
+          detail: {
+            summary: "Delete a budget injection (Admin)",
+            tags: ["Admin", "Financials"],
+          },
+        }
+      )
+      // POST Create Budget Injection
+      .post(
+        "/budget-injection/:projectId",
+        async ({ params, body, db }) => {
+          const { projectId } = params
+          const { amount, description } = body
+
+          // Optional: Check if project exists first
+          const projectExists = await db.query.projects.findFirst({
+            where: eq(projects.id, projectId),
+            columns: { id: true },
+          })
+          if (!projectExists) {
+            throw error(404, "Project not found.")
+          }
+
+          // Validate amount is positive
+          if (amount <= 0) {
+            throw error(400, "Budget amount must be positive.")
+          }
+
+          const budgetDecimal = new Decimal(amount)
+
+          try {
+            const newInjection = await db
+              .insert(projectBudgetInjections)
+              .values({
+                projectId: projectId,
+                budget: budgetDecimal.toFixed(), // Store precise value
+                description: description,
+              })
+              .returning({
+                id: projectBudgetInjections.id,
+                projectId: projectBudgetInjections.projectId,
+                budget: projectBudgetInjections.budget,
+                description: projectBudgetInjections.description,
+                createdAt: projectBudgetInjections.createdAt,
+              })
+
+            if (newInjection.length === 0) {
+              // This case is unlikely with insert but good practice
+              throw error(500, "Failed to create budget injection.")
+            }
+
+            // Format the returned budget back to a number for the response
+            return {
+              ...newInjection[0],
+              budget: new Decimal(newInjection[0].budget).toNumber(),
+            }
+          } catch (e: any) {
+            logError(`Error creating budget injection: ${e}`)
+            throw error(500, `Failed to create budget injection: ${e.message}`)
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+          }),
+          body: t.Object({
+            amount: t.Number({ minimum: 0.01 }),
+            description: t.Optional(t.String()),
+          }),
+          detail: {
+            summary: "Create a new budget injection for a project (Admin)",
             tags: ["Admin", "Financials"],
           },
         }

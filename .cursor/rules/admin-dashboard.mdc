@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 
 Description: Outlines the page structure and core functionalities for the Nuxt Admin Dashboard, focusing on user, project, and time entry analytics.
