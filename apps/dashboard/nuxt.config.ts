@@ -16,6 +16,36 @@ export default defineNuxtConfig({
       serverUrl: "http://localhost:3100",
     },
   },
+  pwa: {
+    manifest: {
+      name: "Timesheet",
+      short_name: "Timesheet",
+      description: "Timesheet",
+      icons: [
+        {
+          src: "pwa-64x64.png",
+          sizes: "64x64",
+          type: "image/png",
+        },
+        {
+          src: "pwa-192x192.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+        {
+          src: "pwa-512x512.png",
+          sizes: "512x512",
+          type: "image/png",
+        },
+        {
+          src: "maskable-icon-512x512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
+      ],
+    },
+  },
   css: ["~/assets/css/main.css"],
   modules: [
     "@nuxt/eslint",
