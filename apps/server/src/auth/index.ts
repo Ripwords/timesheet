@@ -152,6 +152,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           path: "/",
           secure: true,
           sameSite: "none",
+          domain: process.env.DOMAIN,
         })
 
         return { message: "Signed in successfully" }
