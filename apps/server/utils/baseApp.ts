@@ -11,6 +11,7 @@ import { drizzle } from "drizzle-orm/postgres-js"
 import * as schema from "../src/db/schema"
 import * as dotenv from "dotenv"
 import { logger } from "@rasla/logify"
+import { eq } from "drizzle-orm"
 
 dotenv.config({ path: "../../.env" })
 
@@ -61,3 +62,25 @@ export const baseApp = (name: string) =>
       })
     )
     .use(swagger())
+    .macro({
+      adminOnly: () => ({
+        resolve: async ({ db, jwt, cookie, error }) => {
+          const profile = await jwt.verify(cookie.auth.value)
+          if (!profile) {
+            return error(401, "Unauthorized")
+          }
+
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.id, profile.userId),
+          })
+
+          if (user?.role !== "admin") {
+            return error(403, "Forbidden")
+          }
+
+          return {
+            isAdmin: true,
+          }
+        },
+      }),
+    })

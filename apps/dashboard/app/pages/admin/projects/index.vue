@@ -23,6 +23,23 @@ const page = ref(1)
 const search = ref("")
 const sort = ref<"createdAt" | "name">("createdAt")
 const order = ref<"asc" | "desc">("desc")
+const toast = useToast()
+
+// State for the new project modal
+const isNewProjectModalOpen = ref(false)
+const newProjectName = ref("")
+const isCreatingProject = ref(false) // For loading state on button
+
+// State for delete confirmation modal
+const isDeleteConfirmModalOpen = ref(false)
+const projectToDelete = ref<Project | null>(null)
+const isDeletingProject = ref(false)
+
+// State for edit modal
+const isEditModalOpen = ref(false)
+const projectToEdit = ref<Project | null>(null)
+const editedProjectName = ref("")
+const isUpdatingProject = ref(false)
 
 const {
   data: projects,
@@ -116,14 +133,159 @@ function viewProjectDetails(projectId: string) {
 }
 
 function editProject(project: Project) {
-  console.log("Edit project:", project.id)
-  alert(`Editing project ID: ${project.id} (Not implemented)`)
+  projectToEdit.value = project
+  editedProjectName.value = project.name // Pre-fill with current name
+  isEditModalOpen.value = true
 }
 
 function deleteProject(project: Project) {
-  console.log("Delete project:", project.id)
-  if (confirm(`Are you sure you want to delete project "${project.name}"?`)) {
-    alert(`Deleting project ID: ${project.id} (Not implemented)`)
+  projectToDelete.value = project
+  isDeleteConfirmModalOpen.value = true
+}
+
+// Function to handle the actual deletion after confirmation
+async function confirmDeleteProject() {
+  if (!projectToDelete.value) return
+
+  isDeletingProject.value = true
+  try {
+    const { error } = await $eden.api.projects
+      .id({ id: projectToDelete.value.id })
+      .delete()
+
+    if (error) {
+      const errorMessage =
+        typeof error.value === "object" &&
+        error.value !== null &&
+        "message" in error.value
+          ? String(error.value.message)
+          : String(error.value) || "Failed to delete project."
+
+      toast.add({
+        title: `Error (${error.status})`,
+        description: errorMessage,
+        color: "error",
+      })
+    } else {
+      toast.add({
+        title: "Success",
+        description: `Project "${projectToDelete.value.name}" deleted successfully.`,
+        color: "success",
+      })
+      await refresh()
+    }
+  } catch (err: unknown) {
+    toast.add({
+      title: "Error",
+      description:
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      color: "error",
+    })
+  }
+
+  isDeletingProject.value = false
+  isDeleteConfirmModalOpen.value = false
+  projectToDelete.value = null
+}
+
+// Function to handle updating a project name
+async function updateProject() {
+  if (!projectToEdit.value) return
+  if (!editedProjectName.value.trim()) {
+    toast.add({
+      title: "Error",
+      description: "Project name cannot be empty.",
+      color: "error",
+    })
+    return
+  }
+  // Check if name hasn't actually changed
+  if (editedProjectName.value.trim() === projectToEdit.value.name) {
+    isEditModalOpen.value = false // Just close if no change
+    return
+  }
+
+  isUpdatingProject.value = true
+  try {
+    const { data, error } = await $eden.api.projects
+      .id({ id: projectToEdit.value.id })
+      .put({
+        name: editedProjectName.value.trim(),
+      })
+
+    if (error) {
+      const errorMessage =
+        typeof error.value === "object" &&
+        error.value !== null &&
+        "message" in error.value
+          ? String(error.value.message)
+          : String(error.value) || "Failed to update project."
+      toast.add({
+        title: `Error (${error.status})`,
+        description: errorMessage,
+        color: "error",
+      })
+    } else {
+      toast.add({
+        title: "Success",
+        description: `Project "${data?.name}" updated successfully.`,
+        color: "success",
+      })
+      await refresh() // Refresh the project list
+    }
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "An unexpected error occurred."
+    toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    isUpdatingProject.value = false
+    isEditModalOpen.value = false
+    projectToEdit.value = null // Clear the selected project
+    editedProjectName.value = "" // Clear the edit input
+  }
+}
+
+// Function to create a new project
+async function createProject() {
+  if (!newProjectName.value.trim()) {
+    toast.add({
+      title: "Error",
+      description: "Project name cannot be empty.",
+      color: "error",
+    })
+    return
+  }
+
+  isCreatingProject.value = true
+  try {
+    const { data, error } = await $eden.api.projects.index.post({
+      name: newProjectName.value.trim(),
+    })
+
+    if (error) {
+      toast.add({
+        title: "Error",
+        description: String(error.value) || "Failed to create project",
+        color: "error",
+      })
+      return
+    }
+
+    toast.add({
+      title: "Success",
+      description: `Project "${data?.name}" created successfully.`,
+      color: "success",
+    })
+    isNewProjectModalOpen.value = false
+    newProjectName.value = ""
+    refresh()
+  } catch (err: unknown) {
+    console.error("Error creating project:", err)
+    const message =
+      err instanceof Error ? err.message : "An unexpected error occurred."
+    toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    isCreatingProject.value = false
   }
 }
 </script>
@@ -135,7 +297,7 @@ function deleteProject(project: Project) {
       <UButton
         icon="i-heroicons-plus-circle"
         label="New Project"
-        @click="useRouter().push('/admin/projects/new')"
+        @click="isNewProjectModalOpen = true"
       />
     </div>
 
@@ -157,6 +319,7 @@ function deleteProject(project: Project) {
           label: 'No projects found.',
         }"
         :loading="status === 'pending'"
+        class="w-full"
       >
         <template #updatedAt-cell="{ row }">
           {{ dayjs(row.original.updatedAt).format("MMM D, hh:mm A") }}
@@ -170,5 +333,78 @@ function deleteProject(project: Project) {
         />
       </div>
     </UCard>
+
+    <!-- New Project Modal -->
+    <UModal v-model:open="isNewProjectModalOpen">
+      <template #content>
+        <AdminProjectsFormCard
+          v-model="newProjectName"
+          title="Create New Project"
+          :loading="isCreatingProject"
+          submit-label="Create"
+          @submit="createProject"
+          @cancel="isNewProjectModalOpen = false"
+        />
+      </template>
+    </UModal>
+
+    <!-- Delete Confirmation Modal -->
+    <UModal v-model:open="isDeleteConfirmModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h3
+              class="text-lg font-semibold text-error-500 dark:text-error-400"
+            >
+              Confirm Deletion
+            </h3>
+          </template>
+
+          <p class="mb-4">
+            Are you sure you want to delete the project
+            <strong class="font-semibold"
+              >"{{ projectToDelete?.name ?? "..." }}"</strong
+            >?
+            <br />
+            <span class="text-sm text-warning-500 dark:text-warning-400"
+              >This action cannot be undone. Associated time entries or budget
+              injections must be removed first if they exist.</span
+            >
+          </p>
+
+          <template #footer>
+            <div class="flex justify-end space-x-3">
+              <UButton
+                label="Cancel"
+                variant="ghost"
+                :disabled="isDeletingProject"
+                @click="isDeleteConfirmModalOpen = false"
+              />
+              <UButton
+                label="Delete"
+                color="error"
+                icon="i-heroicons-trash"
+                :loading="isDeletingProject"
+                @click="confirmDeleteProject"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Edit Project Modal -->
+    <UModal v-model:open="isEditModalOpen">
+      <template #content>
+        <AdminProjectsFormCard
+          v-model="editedProjectName"
+          title="Edit Project"
+          :loading="isUpdatingProject"
+          submit-label="Update"
+          @submit="updateProject"
+          @cancel="isEditModalOpen = false"
+        />
+      </template>
+    </UModal>
   </div>
 </template>

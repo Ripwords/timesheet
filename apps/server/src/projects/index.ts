@@ -17,9 +17,8 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     .use(authGuard())
     .post(
       "/",
-      async ({ db, body, error, getUser }) => {
-        const user = await getUser()
-        if (user?.role !== "admin") {
+      async ({ db, body, error, isAdmin }) => {
+        if (!isAdmin) {
           return error(403, "Forbidden")
         }
 
@@ -28,7 +27,6 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .insert(schema.projects)
             .values({
               name: body.name,
-              // Assuming createdAt and updatedAt are handled by the DB or ORM defaults
             })
             .returning() // Return the newly created project
 
@@ -39,11 +37,6 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           return newProject[0]
         } catch (e) {
           logError(`Failed to create project: ${e}`)
-          // Consider more specific error handling based on potential DB errors
-          // Example check for specific constraints if needed
-          // if (e instanceof Error && e.message.includes(...)) {
-          //     return error(400, `...`);
-          // }
           return error(500, "Internal Server Error")
         }
       },
@@ -55,6 +48,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           summary: "Create a new project",
           tags: ["Projects"],
         },
+        adminOnly: true,
       }
     )
     // READ All Projects
@@ -102,38 +96,11 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         query: querySchema,
       }
     )
-    // READ Single Project
-    .get(
-      "/id/:id",
-      async ({ db, params, error }) => {
-        const projectId = params.id
-        const project = await db.query.projects.findFirst({
-          where: eq(schema.projects.id, projectId),
-        })
-
-        if (!project) {
-          return error(404, "Project not found")
-        }
-        return project
-      },
-      {
-        params: t.Object({
-          id: t.String({
-            format: "uuid",
-          }),
-        }),
-        detail: {
-          summary: "Get a single project by ID",
-          tags: ["Projects"],
-        },
-      }
-    )
     // UPDATE Project
     .put(
       "/id/:id",
-      async ({ db, params, body, error, getUser }) => {
-        const user = await getUser()
-        if (user?.role !== "admin") {
+      async ({ db, params, body, error, isAdmin }) => {
+        if (!isAdmin) {
           return error(403, "Forbidden")
         }
 
@@ -181,14 +148,14 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           summary: "Update a project by ID",
           tags: ["Projects"],
         },
+        adminOnly: true,
       }
     )
     // DELETE Project
     .delete(
       "/id/:id",
-      async ({ db, params, error, set, getUser }) => {
-        const user = await getUser()
-        if (user?.role !== "admin") {
+      async ({ db, params, error, set, isAdmin }) => {
+        if (!isAdmin) {
           return error(403, "Forbidden")
         }
 
@@ -248,6 +215,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           summary: "Delete a project by ID",
           tags: ["Projects"],
         },
+        adminOnly: true,
       }
     )
 )
