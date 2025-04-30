@@ -2,16 +2,9 @@
 import { treaty } from "@elysiajs/eden"
 import type { App } from "@timesheet/server"
 
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
-
   const baseURL = config.public.serverUrl
-
-  // Only on server (SSR)
-  const headers =
-    import.meta.server && nuxtApp.ssrContext?.event?.req?.headers
-      ? { cookie: nuxtApp.ssrContext.event.req.headers.cookie || "" }
-      : undefined
 
   const client = treaty<App>(baseURL, {
     fetch: {
@@ -19,11 +12,16 @@ export default defineNuxtPlugin((nuxtApp) => {
     },
     // @ts-expect-error bun fetch type error
     fetcher: (url, options) => {
+      const headersFromNuxt = import.meta.server
+        ? useRequestHeaders(["cookie"])
+        : undefined
+
       return fetch(url, {
         ...options,
+        credentials: "include",
         headers: new Headers({
           ...options?.headers,
-          ...headers,
+          ...headersFromNuxt,
         }),
       })
     },
