@@ -10,6 +10,7 @@ const {
   data: user,
   status,
   error,
+  refresh,
 } = useAsyncData(
   "userData", // Unique key
   () => $eden.api.auth.profile.get().then((res) => res.data),
@@ -68,8 +69,9 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
   ]
 })
 
-// Optional: Watch for route changes if nav should update without full page reload
-watch(route, () => {})
+watch(route, () => {
+  refresh()
+})
 </script>
 
 <template>

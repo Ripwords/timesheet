@@ -12,6 +12,17 @@ const state = reactive({
 const { $eden } = useNuxtApp()
 const toast = useToast()
 
+const route = useRoute("auth-login")
+const { query } = route
+
+if (query.verifiedEmail && import.meta.client) {
+  toast.add({
+    title: "Success",
+    color: "success",
+    description: "Email verified successfully",
+  })
+}
+
 async function submit() {
   const { data, error } = await $eden.api.auth.signin.post({
     email: state.email,

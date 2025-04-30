@@ -25,7 +25,6 @@ const DEPARTMENTS_TO_SEED = [
   { name: "Backend", maxSessionMinutes: 480, color: "primary" },
   { name: "UI/UX", maxSessionMinutes: 480, color: "secondary" },
   { name: "Digital Marketing", maxSessionMinutes: 420, color: "success" },
-  { name: "Administration", maxSessionMinutes: 540, color: "warning" },
 ] as (typeof schema.departments.$inferInsert)[]
 
 const seedTestData = async () => {
@@ -222,13 +221,6 @@ const seedTestData = async () => {
       "Create marketing content (blog, ads)",
       "Analyze campaign performance",
       "SEO optimization",
-    ],
-    Administration: [
-      // Descriptions for the added admin department
-      "Manage user accounts",
-      "System configuration",
-      "Generate reports",
-      "General administrative tasks",
     ],
   }
 

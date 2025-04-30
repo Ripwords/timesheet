@@ -78,7 +78,18 @@ export const auth = baseApp("auth").group("/auth", (app) =>
             })
             .returning({ id: schema.users.id, email: schema.users.email })
 
-          const verificationUrl = `http://${process.env.SERVER_URL}/auth/verify-email/${verificationToken}`
+          const serverUrl = process.env.SERVER_URL
+          if (!serverUrl) {
+            logError("SERVER_URL environment variable is not set.")
+            return error(500, "Server configuration error: SERVER_URL not set.")
+          }
+          const baseUrl = serverUrl.startsWith("http")
+            ? serverUrl
+            : `http://${serverUrl}`
+          const verificationUrl = new URL(
+            `/api/auth/verify-email/${verificationToken}`,
+            baseUrl
+          ).toString()
           const message = `Welcome! Please verify your email by clicking this link: <a href="${verificationUrl}">Verify Email</a>`
 
           await sendEmail(email, "Verify Your Email", message)
@@ -208,7 +219,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           userId: user.id,
         })
 
-        const resetUrl = `${process.env.DASHBOARD_URL}/reset-password/${resetToken}`
+        const resetUrl = `${process.env.DASHBOARD_URL}/auth/reset-password/${resetToken}`
 
         const message = `You requested a password reset. Click the link to reset your password: <a href="${resetUrl}">Reset Password</a>\nIf you didn't request this, please ignore this email.`
 
@@ -345,7 +356,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         set.status = 302
         set.headers = {
-          Location: `${process.env.DASHBOARD_URL}/auth/login`,
+          Location: `${process.env.DASHBOARD_URL}/auth/login?verifiedEmail=true`,
         }
         return { message: "Redirecting to dashboard." }
       },

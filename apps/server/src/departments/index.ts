@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm"
+import { desc, notInArray } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { departments } from "../db/schema"
 import { error } from "elysia"
@@ -20,7 +20,10 @@ export const publicDepartmentsRoutes = baseApp("publicDepartments").group(
             .from(departments)
             .orderBy(desc(departments.id))
 
-          const descriptions = await descriptionsQuery
+          // Filter any admin/administrative departments
+          const descriptions = await descriptionsQuery.where(
+            notInArray(departments.name, ["Administration"])
+          )
 
           return descriptions
         } catch (e) {
