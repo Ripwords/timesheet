@@ -11,7 +11,8 @@
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:reset": "bun run src/db/reset.ts",
-    "db:seed": "bun run src/db/seedTestData.ts"
+    "db:seed": "bun run src/db/seedTestData.ts",
+    "db:seed:prod": "bun run src/db/seedProdData.ts"
   },
   "dependencies": {
     "elysia": "^1.2.25",
