@@ -89,7 +89,7 @@ const seedProdData = async () => {
     }
 
     if (defaultDescriptionsToInsert.length > 0) {
-      await db
+      await tx
         .insert(schema.departmentDefaultDescription)
         .values(defaultDescriptionsToInsert)
         .onConflictDoNothing()
