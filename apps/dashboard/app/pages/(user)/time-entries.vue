@@ -2,6 +2,12 @@
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
 import { UButton } from "#components"
 import duration from "dayjs/plugin/duration"
+
+useSeoMeta({
+  title: "Time Entries",
+  description: "Time entries for the user",
+})
+
 // Composables
 const dayjs = useDayjs()
 dayjs.extend(duration)

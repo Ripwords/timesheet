@@ -3,6 +3,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin Dashboard",
+  description: "Admin dashboard for managing the application",
+})
+
 const { $eden } = useNuxtApp()
 
 // State for chart data

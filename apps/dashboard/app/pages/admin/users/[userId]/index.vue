@@ -6,6 +6,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin User",
+  description: "Admin user for managing the application",
+})
+
 interface WeeklyBreakdownRow {
   projectId: string
   projectName: string

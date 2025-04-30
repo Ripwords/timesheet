@@ -17,6 +17,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin Users",
+  description: "Manage users in the application",
+})
+
 const { $eden } = useNuxtApp()
 
 type UsersResponse = Awaited<

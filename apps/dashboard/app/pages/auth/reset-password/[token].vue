@@ -1,4 +1,9 @@
 <script setup lang="ts">
+useSeoMeta({
+  title: "Reset Password",
+  description: "Reset your password here.",
+})
+
 const { params } = useRoute("auth-reset-password-token")
 const token = params.token as string
 

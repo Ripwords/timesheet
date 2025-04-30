@@ -1,4 +1,9 @@
 <script setup lang="ts">
+useSeoMeta({
+  title: "Register",
+  description: "Register for an account",
+})
+
 const { $eden } = useNuxtApp()
 const toast = useToast()
 const disabled = ref(false)

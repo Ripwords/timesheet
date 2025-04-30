@@ -1,4 +1,9 @@
 <script setup lang="ts">
+useSeoMeta({
+  title: "Forgot Password",
+  description: "Forgot your password? Reset it here.",
+})
+
 const state = reactive({
   email: "",
 })

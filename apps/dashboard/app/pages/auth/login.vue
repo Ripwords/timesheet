@@ -1,4 +1,9 @@
 <script setup lang="ts">
+useSeoMeta({
+  title: "Login",
+  description: "Login to your account",
+})
+
 const state = reactive({
   email: "",
   password: "",

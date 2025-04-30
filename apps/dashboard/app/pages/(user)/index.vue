@@ -1,4 +1,9 @@
 <script lang="ts" setup>
+useSeoMeta({
+  title: "User Dashboard",
+  description: "User dashboard for managing the application",
+})
+
 const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 

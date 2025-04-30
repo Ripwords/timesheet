@@ -6,6 +6,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin Projects",
+  description: "Manage projects in the application",
+})
+
 // Infer the response type, then extract the non-nullable array item type
 type ProjectsResponse = Awaited<
   ReturnType<typeof $eden.api.projects.index.get>

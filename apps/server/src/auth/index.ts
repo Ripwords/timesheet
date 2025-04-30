@@ -145,6 +145,8 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           role: user.role,
         })
 
+        console.log(process.env.DOMAIN)
+
         cookie.auth.set({
           value: token,
           httpOnly: true,

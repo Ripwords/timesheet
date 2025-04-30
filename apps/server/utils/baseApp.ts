@@ -4,7 +4,6 @@ import { swagger } from "@elysiajs/swagger"
 import { serverTiming } from "@elysiajs/server-timing"
 import { cors } from "@elysiajs/cors"
 import { jwt } from "@elysiajs/jwt"
-import { cookie } from "@elysiajs/cookie"
 
 import postgres from "postgres"
 import { drizzle } from "drizzle-orm/postgres-js"
@@ -47,7 +46,6 @@ export const baseApp = (name: string) =>
         allowedHeaders: ["Content-Type", "Authorization"],
       })
     )
-    .use(cookie())
     .use(
       jwt({
         name: "jwt",

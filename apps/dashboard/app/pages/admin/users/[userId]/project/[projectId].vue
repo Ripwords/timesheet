@@ -8,6 +8,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin User Project",
+  description: "Admin user project for managing the application",
+})
+
 const { params } = useRoute("admin-users-userId-project-projectId")
 const projectId = params.projectId
 const userId = params.userId

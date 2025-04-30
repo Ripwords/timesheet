@@ -3,6 +3,11 @@ definePageMeta({
   middleware: "admin",
 })
 
+useSeoMeta({
+  title: "Admin Project",
+  description: "Admin project for managing the application",
+})
+
 const route = useRoute("admin-projects-projectId")
 const { projectId } = route.params
 const { $eden } = useNuxtApp()
