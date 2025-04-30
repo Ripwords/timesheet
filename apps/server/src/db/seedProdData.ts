@@ -100,7 +100,12 @@ const seedProdData = async () => {
   })
 }
 
-seedProdData().catch((error) => {
-  console.error("❌ Test data seeding failed:", error)
-  process.exit(1)
-})
+seedProdData()
+  .catch((error) => {
+    console.error("❌ Test data seeding failed:", error)
+    process.exit(1)
+  })
+  .finally(async () => {
+    console.log("🔌 Closing database connection after test data seed.")
+    await client.end()
+  })
