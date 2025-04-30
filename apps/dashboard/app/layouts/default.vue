@@ -11,10 +11,9 @@ const {
   status,
   error,
   refresh,
-} = useAsyncData(
+} = await useAsyncData(
   "userData", // Unique key
-  () => $eden.api.auth.profile.get().then((res) => res.data),
-  { server: true } // Ensure it runs on the server
+  () => $eden.api.auth.profile.get().then((res) => res.data)
 )
 
 // 2. Use a regular `computed` based on the fetched user data
@@ -36,7 +35,9 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
       icon: "i-lucide-log-out",
       // Use a function reference or inline function for handlers
       onSelect: async () => {
+        const authCookie = useCookie("auth")
         await $eden.api.auth.signout.post()
+        authCookie.value = null
         await navigateTo("/auth/login")
       },
     },
