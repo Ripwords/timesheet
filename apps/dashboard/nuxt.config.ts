@@ -25,5 +25,6 @@ export default defineNuxtConfig({
     "@nuxt/ui",
     "dayjs-nuxt",
     "@vueuse/nuxt",
+    "@vite-pwa/nuxt",
   ],
 })

@@ -1,4 +1,5 @@
 <template>
+  <NuxtPwaAssets />
   <UApp>
     <NuxtLayout>
       <NuxtRouteAnnouncer />
