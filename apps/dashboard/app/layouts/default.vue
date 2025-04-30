@@ -33,11 +33,8 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
     {
       label: "Logout",
       icon: "i-lucide-log-out",
-      // Use a function reference or inline function for handlers
       onSelect: async () => {
-        const authCookie = useCookie("auth")
         await $eden.api.auth.signout.post()
-        authCookie.value = null
         await navigateTo("/auth/login")
       },
     },

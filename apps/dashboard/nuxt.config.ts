@@ -21,6 +21,10 @@ export default defineNuxtConfig({
     workbox: {
       navigateFallback: null,
     },
+    devOptions: {
+      enabled: true,
+      type: "module",
+    },
     manifest: {
       name: "Timesheet",
       short_name: "Timesheet",

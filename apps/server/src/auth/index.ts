@@ -165,6 +165,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           path: "/",
           secure: true,
           sameSite: "none",
+          priority: "high",
           domain: process.env.DOMAIN,
         })
 
@@ -179,6 +180,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     )
     .post("/signout", ({ cookie }) => {
       cookie.auth.remove()
+      cookie.auth.domain = process.env.DOMAIN
       return { message: "Signed out successfully" }
     })
     .get("/profile", async ({ getUser, error }) => {
