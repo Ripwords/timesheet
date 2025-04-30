@@ -113,6 +113,7 @@ export const projectBudgetInjections = pgTable("project_budget_injections", {
   projectId: uuid("project_id")
     .notNull()
     .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
+  date: timestamp("date", { withTimezone: true }).notNull(),
   budget: numeric("budget").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

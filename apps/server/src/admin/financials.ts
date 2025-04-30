@@ -14,12 +14,11 @@ import { UUID } from "../../utils/validtors"
 
 // Helper function to format date to YYYY-MM
 const formatToYearMonth = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = (date.getMonth() + 1).toString().padStart(2, "0")
+  const year = new Date(date).getFullYear()
+  const month = (new Date(date).getMonth() + 1).toString().padStart(2, "0")
   return `${year}-${month}`
 }
 
-// Use baseApp and apply authGuard
 export const adminFinancials = baseApp("adminFinancials").group(
   "/admin/financials",
   (app) =>
@@ -52,7 +51,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
                 id: true,
                 budget: true, // numeric type
                 description: true,
-                createdAt: true, // use createdAt for the 'date' field?
+                date: true, // use createdAt for the 'date' field?
               },
               orderBy: [asc(projectBudgetInjections.createdAt)],
             })
@@ -62,7 +61,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
             (b: (typeof budgetInjectionsData)[number]) => ({
               id: b.id,
               amount: new Decimal(b.budget).toNumber(),
-              date: formatToYearMonth(b.createdAt),
+              date: b.date,
               description: b.description ?? "",
             })
           )
@@ -124,24 +123,30 @@ export const adminFinancials = baseApp("adminFinancials").group(
         "/budget-injection/:injectionId",
         async ({ params, body, db }) => {
           const { injectionId } = params
-          const { amount, description } = body
+          const { amount, description, date } = body
 
-          // Validate amount is positive
-          if (amount <= 0) {
-            throw error(400, "Budget amount must be positive.")
+          const updateObj: {
+            budget?: string
+            description?: string
+            date?: Date
+          } = {}
+
+          if (amount) {
+            updateObj.budget = new Decimal(amount).toFixed()
           }
 
-          // Convert amount to Decimal for precision before storing
-          const budgetDecimal = new Decimal(amount)
+          if (date) {
+            updateObj.date = date
+          }
+
+          if (description) {
+            updateObj.description = description
+          }
 
           try {
             const updatedInjection = await db
               .update(projectBudgetInjections)
-              .set({
-                budget: budgetDecimal.toFixed(), // Store as string/numeric representation
-                description: description,
-                // Add updatedAt timestamp if you have one
-              })
+              .set(updateObj)
               .where(eq(projectBudgetInjections.id, injectionId))
               .returning({
                 id: projectBudgetInjections.id,
@@ -172,7 +177,8 @@ export const adminFinancials = baseApp("adminFinancials").group(
             injectionId: UUID, // Assuming injection IDs are UUIDs like project IDs
           }),
           body: t.Object({
-            amount: t.Number({ minimum: 0.01 }), // Ensure positive amount
+            amount: t.Optional(t.Number({ minimum: 0.01 })), // Ensure positive amount
+            date: t.Optional(t.Date()),
             description: t.Optional(t.String()), // Description is optional
           }),
           detail: {
@@ -216,10 +222,10 @@ export const adminFinancials = baseApp("adminFinancials").group(
       )
       // POST Create Budget Injection
       .post(
-        "/budget-injection/:projectId",
+        "/budget-injection/new/:projectId",
         async ({ params, body, db }) => {
           const { projectId } = params
-          const { amount, description } = body
+          const { amount, description, date } = body
 
           // Optional: Check if project exists first
           const projectExists = await db.query.projects.findFirst({
@@ -241,16 +247,17 @@ export const adminFinancials = baseApp("adminFinancials").group(
             const newInjection = await db
               .insert(projectBudgetInjections)
               .values({
-                projectId: projectId,
-                budget: budgetDecimal.toFixed(), // Store precise value
-                description: description,
+                projectId,
+                date,
+                budget: budgetDecimal.toFixed(),
+                description,
               })
               .returning({
                 id: projectBudgetInjections.id,
                 projectId: projectBudgetInjections.projectId,
+                date: projectBudgetInjections.date,
                 budget: projectBudgetInjections.budget,
                 description: projectBudgetInjections.description,
-                createdAt: projectBudgetInjections.createdAt,
               })
 
             if (newInjection.length === 0) {
@@ -274,6 +281,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }),
           body: t.Object({
             amount: t.Number({ minimum: 0.01 }),
+            date: t.Date(),
             description: t.Optional(t.String()),
           }),
           detail: {

@@ -141,6 +141,7 @@ const seedTestData = async () => {
       budgetInjectionsToInsert.push({
         projectId,
         description: faker.lorem.sentence(),
+        date: faker.date.recent({ days: 90 }),
         budget: budget.toString(), // numeric expects string
       })
     }

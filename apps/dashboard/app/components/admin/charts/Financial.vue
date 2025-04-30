@@ -24,9 +24,15 @@ ChartJS.register(
   LineElement
 )
 
+const formatToYearMonth = (date: Date): string => {
+  const year = new Date(date).getFullYear()
+  const month = (new Date(date).getMonth() + 1).toString().padStart(2, "0")
+  return `${year}-${month}`
+}
+
 const props = defineProps<{
   costOverTime: { month: string; cost: number }[]
-  budgetInjections: { amount: number; date: string }[]
+  budgetInjections: { amount: number; date: Date }[]
   projectName?: string
 }>()
 
@@ -38,7 +44,7 @@ const cumulativeCosts = computed(() => {
 const cumulativeBudget = computed(() => {
   return months.value.map((month) =>
     props.budgetInjections
-      .filter((b) => b.date.slice(0, 7) <= month)
+      .filter((b) => formatToYearMonth(b.date) <= month)
       .reduce((sum, b) => sum + b.amount, 0)
   )
 })
