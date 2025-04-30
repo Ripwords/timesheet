@@ -1,10 +1,3 @@
-<template>
-  <Bar
-    :data="chartData"
-    :options="chartOptions"
-  />
-</template>
-
 <script setup lang="ts">
 import {
   Chart as ChartJS,
@@ -103,3 +96,10 @@ const chartOptions = computed((): ChartOptions<"bar"> => {
   }
 })
 </script>
+
+<template>
+  <Bar
+    :data="chartData"
+    :options="chartOptions"
+  />
+</template>
