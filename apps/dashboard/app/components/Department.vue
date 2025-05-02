@@ -21,13 +21,13 @@ const { data: departments } = useAsyncData(
 )
 
 const departmentLabel = computed(() => {
-  return departments.value?.departmentName
+  return departments.value?.name
 })
 </script>
 
 <template>
   <UBadge
-    :color="departments?.departmentColor ?? 'neutral'"
+    :color="departments?.color ?? 'neutral'"
     variant="subtle"
     >{{ departmentLabel }}</UBadge
   >

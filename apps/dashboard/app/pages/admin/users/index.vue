@@ -392,7 +392,7 @@ function cancelEdit() {
               placeholder="Select Department"
               :items="departments"
               value-key="id"
-              label-key="departmentName"
+              label-key="name"
               :search-input="{
                 placeholder: 'Search items...',
               }"
@@ -510,7 +510,7 @@ function cancelEdit() {
                 placeholder="Select Department"
                 :items="departments"
                 value-key="id"
-                label-key="departmentName"
+                label-key="name"
                 :search-input="{ placeholder: 'Search departments...' }"
                 :disabled="isSaving || isVerifying || isDeactivating"
               >

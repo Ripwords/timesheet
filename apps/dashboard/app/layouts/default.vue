@@ -50,6 +50,11 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
           icon: "i-lucide-briefcase",
           to: "/admin/projects",
         },
+        {
+          label: "Settings",
+          icon: "i-lucide-settings",
+          to: "/admin/settings",
+        },
       ],
       defaultItems,
     ]

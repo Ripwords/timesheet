@@ -96,6 +96,31 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         query: querySchema,
       }
     )
+    // READ Single Project
+    .get(
+      "/id/:id",
+      async ({ db, params, error }) => {
+        const projectId = params.id
+        const project = await db.query.projects.findFirst({
+          where: eq(schema.projects.id, projectId),
+          columns: { id: true, name: true },
+        })
+
+        if (!project) {
+          return error(404, "Project not found")
+        }
+        return project
+      },
+      {
+        params: t.Object({
+          id: t.String({ format: "uuid" }),
+        }),
+        detail: {
+          summary: "Get a single project by ID",
+          tags: ["Projects"],
+        },
+      }
+    )
     // UPDATE Project
     .put(
       "/id/:id",
