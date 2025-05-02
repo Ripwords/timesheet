@@ -10,18 +10,13 @@ export const timeEntries = baseApp("time-entries").group(
   (app) =>
     app
       .use(authGuard())
-      // CREATE Time Entry
       .post(
         "/",
         async ({ db, body, error, getUser }) => {
           const user = await getUser()
           if (!user) {
-            // Should be handled by authGuard, but good practice to check
             return error(401, "Unauthorized")
           }
-
-          // Validate project exists? Optional, depends on requirements.
-          // For now, assume projectId is valid.
 
           try {
             const newTimeEntry = await db
@@ -55,10 +50,8 @@ export const timeEntries = baseApp("time-entries").group(
         },
         {
           body: t.Object({
-            projectId: t.String({
-              format: "uuid",
-            }),
-            startTime: t.Date(), // Use t.Date(), assumes input can be parsed to Date
+            projectId: UUID,
+            startTime: t.Date(),
             endTime: t.Date(),
             durationSeconds: t.Integer(),
             description: t.Optional(t.String()),
@@ -69,7 +62,6 @@ export const timeEntries = baseApp("time-entries").group(
           },
         }
       )
-      // READ All Time Entries for User
       .get(
         "/",
         async ({ db, getUser, error, query }) => {
@@ -126,9 +118,9 @@ export const timeEntries = baseApp("time-entries").group(
               schema.projects,
               eq(schema.timeEntries.projectId, schema.projects.id)
             )
-            .where(and(...conditions)) // Apply all conditions
+            .where(and(...conditions))
             .orderBy(desc(schema.timeEntries.startTime))
-
+          console.log(userTimeEntries)
           return userTimeEntries
         },
         {

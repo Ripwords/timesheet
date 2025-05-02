@@ -22,15 +22,20 @@ interface TimeEntry {
   startTime: string | Date // ISO string from API, Date object in form
   endTime: string | Date // ISO string from API, Date object in form
   durationSeconds: number
-  // For display in table
   startTimeFormatted?: string
   endTimeFormatted?: string
   durationFormatted?: string
+  description?: string
 }
 
 // --- State ---
+const startDate = useState("startDate", () =>
+  dayjs().subtract(30, "day").toISOString()
+)
+const endDate = useState("endDate", () => dayjs().endOf("day").toISOString())
 const isModalOpen = ref(false)
 const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, entry object for 'Edit' mode
+const modalDurationInput = ref("") // For the duration input field (e.g., "1h 30m")
 
 // Modal form state
 const modalState = reactive({
@@ -45,57 +50,62 @@ const {
   data: timeEntries,
   status: loadingEntriesStatus,
   refresh: refreshEntries,
-} = await useLazyAsyncData("timeEntries", async () => {
-  try {
-    const { data, error } = await $eden.api["time-entries"].index.get({
-      query: {
-        startDate: dayjs().subtract(3, "day").toISOString(),
-        endDate: dayjs().endOf("day").toISOString(),
-      },
-    })
+} = await useAsyncData(
+  `time-entries-${startDate.value}-${endDate.value}`,
+  async () => {
+    try {
+      const { data, error } = await $eden.api["time-entries"].index.get({
+        query: {
+          startDate: startDate.value,
+          endDate: endDate.value,
+        },
+      })
 
-    if (error) {
+      if (error) {
+        toast.add({
+          title: "Error fetching time entries",
+          description: String(error.value),
+          color: "error",
+        })
+        return []
+      }
+
+      return data
+    } catch (error) {
+      console.error(error)
       toast.add({
         title: "Error fetching time entries",
-        description: String(error.value),
+        description: "An unexpected error occurred fetching entries.",
         color: "error",
       })
       return []
     }
-    return (
-      (data?.map((entry) => {
-        const project = projects.value?.find(
-          (p) => p.id === entry.time_entries.projectId
-        )
+  },
+  {
+    transform: (data) => {
+      return data?.map((entry) => {
         return {
           id: entry.time_entries.id,
+          description: entry.time_entries.description || "",
           projectId: entry.time_entries.projectId,
-          projectName: project?.name || "Unknown Project", // Handle missing project
+          projectName: entry.projects.name || "Unknown Project",
           startTime: entry.time_entries.startTime,
-          endTime: entry.time_entries.endTime,
-          durationSeconds: entry.time_entries.durationSeconds,
           startTimeFormatted: dayjs(entry.time_entries.startTime).format(
             "YYYY-MM-DD HH:mm"
           ),
+          endTime: entry.time_entries.endTime,
           endTimeFormatted: dayjs(entry.time_entries.endTime).format(
             "YYYY-MM-DD HH:mm"
           ),
-          durationFormatted:
-            dayjs
-              .duration(entry.time_entries.durationSeconds, "seconds")
-              .format("HH:mm:ss") || "00:00:00",
+          durationSeconds: entry.time_entries.durationSeconds,
+          durationFormatted: dayjs
+            .duration(entry.time_entries.durationSeconds, "seconds")
+            .format("HH:mm:ss"),
         }
-      }) satisfies TimeEntry[]) || []
-    )
-  } catch {
-    toast.add({
-      title: "Error",
-      description: "An unexpected error occurred fetching entries.",
-      color: "error",
-    })
-    return []
+      })
+    },
   }
-})
+)
 
 const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   "projects",
@@ -142,13 +152,112 @@ const modalDurationFormatted = computed(() => {
   return "00:00:00"
 })
 
+// Helper to parse duration strings "HH:mm" into seconds
+const parseDurationString = (durationStr: string): number | null => {
+  if (!durationStr || typeof durationStr !== "string") return null
+
+  const parts = durationStr.split(":")
+  if (parts.length !== 2) return null // Expecting HH:mm
+
+  const hourPart = parts[0]
+  const minutePart = parts[1]
+
+  if (hourPart === undefined || minutePart === undefined) return null
+
+  const hours = parseInt(hourPart, 10)
+  const minutes = parseInt(minutePart, 10)
+
+  if (
+    isNaN(hours) ||
+    isNaN(minutes) ||
+    hours < 0 ||
+    minutes < 0 ||
+    minutes >= 60
+  ) {
+    return null // Invalid numbers or minutes out of range
+  }
+
+  return hours * 3600 + minutes * 60
+}
+
+// Helper to format duration in seconds to "HH:mm" string
+const formatDuration = (totalSeconds: number): string => {
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0)
+    return "00:00"
+  const d = dayjs.duration(totalSeconds, "seconds")
+  // Note: dayjs duration format doesn't directly handle total hours > 24 well for HH:mm.
+  // We calculate total hours manually.
+  const totalHours = Math.floor(d.asHours())
+  const minutes = d.minutes()
+
+  const hoursStr = String(totalHours).padStart(2, "0")
+  const minutesStr =
+    typeof minutes === "number" && !isNaN(minutes)
+      ? String(minutes).padStart(2, "0")
+      : "00"
+
+  return `${hoursStr}:${minutesStr}`
+}
+
+// Watch the duration input field
+watch(modalDurationInput, (newDurationStr) => {
+  if (!modalState.startTime) return // Need start time to calculate end time
+
+  const start = dayjs(modalState.startTime)
+  if (!start.isValid()) return
+
+  const durationSeconds = parseDurationString(newDurationStr)
+
+  if (durationSeconds !== null && durationSeconds >= 0) {
+    const newEndTime = start.add(durationSeconds, "second")
+    // Update endTime only if it's different to avoid loops
+    const currentEndTimeFormatted = dayjs(modalState.endTime).format(
+      "YYYY-MM-DDTHH:mm:ss"
+    ) // Use seconds for precision
+    const newEndTimeFormatted = newEndTime.format("YYYY-MM-DDTHH:mm:ss")
+
+    if (newEndTimeFormatted !== currentEndTimeFormatted) {
+      modalState.endTime = newEndTime.format("YYYY-MM-DDTHH:mm") // Update the model for the input
+    }
+  }
+})
+
+// Watch startTime and endTime to update the duration input
+watch(
+  [() => modalState.startTime, () => modalState.endTime],
+  ([newStartTime, newEndTime]) => {
+    if (newStartTime && newEndTime) {
+      const start = dayjs(newStartTime)
+      const end = dayjs(newEndTime)
+
+      if (start.isValid() && end.isValid() && end.isAfter(start)) {
+        const durationSeconds = end.diff(start, "second")
+        const formattedDuration = formatDuration(durationSeconds)
+
+        // Update duration input only if it's different to avoid loops
+        const currentInputDurationSeconds = parseDurationString(
+          modalDurationInput.value
+        )
+        if (durationSeconds !== currentInputDurationSeconds) {
+          modalDurationInput.value = formattedDuration
+        }
+      } else {
+        // Reset duration input if dates are invalid or end is not after start
+        modalDurationInput.value = ""
+      }
+    } else {
+      modalDurationInput.value = ""
+    }
+  },
+  { deep: true } // Necessary because we are watching properties of a reactive object
+)
+
 // Determines if the 'Save' button in the modal should be enabled for editing
 const canEditEntry = computed(() => {
   if (!editingEntry.value) return true // Always allow saving for new entries
 
   const entryDate = dayjs(editingEntry.value.startTime)
   const today = dayjs()
-  // Allow editing only if the entry's start date is the same day as today
   return entryDate.isSame(today, "day")
 })
 
@@ -166,7 +275,7 @@ const columns: ColumnDef<TimeEntry, unknown>[] = [
       return h("div", { class: "space-x-2" }, [
         h(UButton, {
           icon: "i-heroicons-pencil-square",
-          size: "xs",
+          size: "xl",
           variant: "outline",
           color: "info",
           title: "Edit",
@@ -174,7 +283,7 @@ const columns: ColumnDef<TimeEntry, unknown>[] = [
         }),
         h(UButton, {
           icon: "i-heroicons-trash",
-          size: "xs",
+          size: "xl",
           variant: "outline",
           color: "error",
           title: "Delete",
@@ -195,13 +304,20 @@ const openModal = (entry: TimeEntry | null = null) => {
     // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
     modalState.startTime = dayjs(entry.startTime).format("YYYY-MM-DDTHH:mm")
     modalState.endTime = dayjs(entry.endTime).format("YYYY-MM-DDTHH:mm")
-    // modalState.description = entry.description || '' // If description exists
+    // Calculate and format initial duration for the input field
+    const initialDurationSeconds = dayjs(entry.endTime).diff(
+      dayjs(entry.startTime),
+      "second"
+    )
+    modalDurationInput.value = formatDuration(initialDurationSeconds)
+    modalState.description = entry.description || ""
   } else {
     // Add mode: Reset form
     modalState.projectId = ""
     modalState.startTime = ""
     modalState.endTime = ""
     modalState.description = ""
+    modalDurationInput.value = "" // Reset duration input
   }
   isModalOpen.value = true
 }
@@ -409,13 +525,25 @@ const deleteEntry = async (id: string) => {
             </UFormField>
 
             <div
-              label="Duration"
+              label="Duration (Calculated)"
               class="mb-4"
             >
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ modalDurationFormatted }} (calculated)
+                {{ modalDurationFormatted }} (calculated from start/end time)
               </p>
             </div>
+
+            <UFormField
+              label="Set Duration"
+              name="durationInput"
+              class="mb-4"
+            >
+              <UInput
+                v-model="modalDurationInput"
+                type="time"
+                placeholder="Enter duration to set End Time"
+              />
+            </UFormField>
 
             <UFormField
               label="Description"
@@ -423,6 +551,7 @@ const deleteEntry = async (id: string) => {
             >
               <UInput
                 v-model="modalState.description"
+                class="w-full"
                 placeholder="description..."
               />
             </UFormField>
@@ -462,11 +591,10 @@ const deleteEntry = async (id: string) => {
             >Add Entry</UButton
           >
         </div>
-        <!-- Add Filtering Controls Here Later -->
       </template>
 
       <UTable
-        :columns="columns"
+        :columns
         :data="timeEntries"
         :loading="loadingEntriesStatus === 'pending'"
         :empty-state="{
