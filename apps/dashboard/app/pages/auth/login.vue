@@ -1,6 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: "Login",
+  title: "Timesheet | Login",
   description: "Login to your account",
 })
 

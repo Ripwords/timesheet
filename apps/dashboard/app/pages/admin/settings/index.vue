@@ -8,7 +8,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: "Admin Settings",
+  title: "Timesheet | Admin Settings",
   description: "Manage application settings like departments and descriptions.",
 })
 

@@ -4,7 +4,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: "Admin Dashboard",
+  title: "Timesheet | Admin Dashboard",
   description: "Admin dashboard for managing the application",
 })
 

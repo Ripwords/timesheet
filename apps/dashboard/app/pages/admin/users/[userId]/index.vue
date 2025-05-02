@@ -7,7 +7,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: "Admin User",
+  title: "Timesheet | Admin User",
   description: "Admin user for managing the application",
 })
 

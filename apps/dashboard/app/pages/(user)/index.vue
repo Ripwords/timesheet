@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 useSeoMeta({
-  title: "User Dashboard",
+  title: "Timesheet | User Dashboard",
   description: "User dashboard for managing the application",
 })
 

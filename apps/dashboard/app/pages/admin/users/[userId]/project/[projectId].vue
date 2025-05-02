@@ -9,7 +9,7 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: "Admin User Project",
+  title: "Timesheet | Admin User Project",
   description: "Admin user project for managing the application",
 })
 

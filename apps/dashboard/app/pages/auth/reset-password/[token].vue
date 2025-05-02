@@ -1,6 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: "Reset Password",
+  title: "Timesheet | Reset Password",
   description: "Reset your password here.",
 })
 

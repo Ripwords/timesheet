@@ -1,6 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: "Register",
+  title: "Timesheet | Register",
   description: "Register for an account",
 })
 

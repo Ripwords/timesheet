@@ -1,24 +1,13 @@
 <script setup lang="ts">
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-
-import {
-  UButton,
-  UBadge,
-  UModal,
-  UForm,
-  UFormField,
-  UInput,
-  USelectMenu,
-  UIcon,
-  UCard,
-} from "#components"
+import { UButton, UBadge } from "#components"
 
 definePageMeta({
   middleware: "admin",
 })
 
 useSeoMeta({
-  title: "Admin Users",
+  title: "Timesheet | Admin Users",
   description: "Manage users in the application",
 })
 

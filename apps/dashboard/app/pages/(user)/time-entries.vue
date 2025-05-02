@@ -4,7 +4,7 @@ import { UButton } from "#components"
 import duration from "dayjs/plugin/duration"
 
 useSeoMeta({
-  title: "Time Entries",
+  title: "Timesheet | Time Entries",
   description: "Time entries for the user",
 })
 
