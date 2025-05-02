@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import duration from "dayjs/plugin/duration"
+
 useSeoMeta({
   title: "Timesheet | User Dashboard",
   description: "User dashboard for managing the application",
@@ -6,6 +8,8 @@ useSeoMeta({
 
 const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
+dayjs.extend(duration)
+const toast = useToast() // Added for feedback
 
 // Fetch data for summary widgets
 const todayStr = dayjs().format("YYYY-MM-DD")
@@ -21,9 +25,8 @@ if (!currentUserId) {
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-const { data: projectTotalsData } = await useLazyAsyncData(
-  "project-user-totals",
-  async () => {
+const { data: projectTotalsData, refresh: refreshProjectTotals } =
+  await useLazyAsyncData("project-user-totals", async () => {
     const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
@@ -31,12 +34,10 @@ const { data: projectTotalsData } = await useLazyAsyncData(
       },
     })
     return data ?? []
-  }
-)
+  })
 
-const { data: dailyTotalsData } = await useLazyAsyncData(
-  "daily-totals",
-  async () => {
+const { data: dailyTotalsData, refresh: refreshDailyTotals } =
+  await useLazyAsyncData("daily-totals", async () => {
     const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
@@ -44,12 +45,10 @@ const { data: dailyTotalsData } = await useLazyAsyncData(
       },
     })
     return data ?? []
-  }
-)
+  })
 
-const { data: weeklyTotalsData } = await useLazyAsyncData(
-  "weekly-totals",
-  async () => {
+const { data: weeklyTotalsData, refresh: refreshWeeklyTotals } =
+  await useLazyAsyncData("weekly-totals", async () => {
     const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
@@ -57,12 +56,10 @@ const { data: weeklyTotalsData } = await useLazyAsyncData(
       },
     })
     return data ?? []
-  }
-)
+  })
 
-const { data: last7DaysData } = await useLazyAsyncData(
-  "last-7-days",
-  async () => {
+const { data: last7DaysData, refresh: refreshLast7Days } =
+  await useLazyAsyncData("last-7-days", async () => {
     const { data } = await $eden.api.admin.reports.aggregate.get({
       query: {
         groupBy: "project",
@@ -72,20 +69,30 @@ const { data: last7DaysData } = await useLazyAsyncData(
       },
     })
     return data ?? []
+  })
+
+const { data: todayData, refresh: refreshToday } = await useLazyAsyncData(
+  "today",
+  async () => {
+    const { data } = await $eden.api.admin.reports.aggregate.get({
+      query: {
+        groupBy: "project",
+        timeUnit: "none",
+        startDate: todayStr,
+        endDate: todayStr,
+      },
+    })
+    return data ?? []
   }
 )
 
-const { data: todayData } = await useLazyAsyncData("today", async () => {
-  const { data } = await $eden.api.admin.reports.aggregate.get({
-    query: {
-      groupBy: "project",
-      timeUnit: "none",
-      startDate: todayStr,
-      endDate: todayStr,
-    },
-  })
-  return data ?? []
-})
+const refreshAllData = async () => {
+  await refreshProjectTotals()
+  await refreshDailyTotals()
+  await refreshWeeklyTotals()
+  await refreshLast7Days()
+  await refreshToday()
+}
 
 // --- Chart Data Formatting ---
 // Format data for the Bar Chart (Project Totals)
@@ -182,6 +189,294 @@ const uniqueProjectsLast7Days = computed(() => {
   )
   return projectIds.size
 })
+
+// --- Time Tracker State ---
+const timerInterval = ref<NodeJS.Timeout | null>(null)
+const timerStatus = ref<"stopped" | "running" | "paused">("stopped")
+const startTime = ref<number | null>(null) // Timestamp of the *very first* start after stopped
+const intervalStartTime = ref<number | null>(null) // Timestamp of the start of the current running interval (start or resume)
+const totalAccumulatedDuration = ref(0) // Seconds accumulated before the current running interval
+const currentIntervalElapsedTime = ref(0) // Seconds elapsed in the current running interval
+const showProjectModal = ref(false)
+const finalSessionDuration = ref(0) // Store final duration when stopping
+const selectedProjectId = ref<string | undefined>() // Changed type to allow undefined initially
+const timeEntryDescription = ref("")
+
+// --- Fetch Data for Timer ---
+// Fetch Projects for Select Menu
+const { data: projectsForSelect } = await useLazyAsyncData(
+  "projects-for-select",
+  async () => {
+    const { data: projectData } = await $eden.api.projects.index.get({
+      query: { limit: 0 },
+    })
+
+    if (!projectData) return []
+
+    return projectData.projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+    }))
+  }
+)
+
+// Fetch Default Descriptions
+const { data: defaultDescriptions } = await useLazyAsyncData(
+  `default-descriptions`,
+  async () => {
+    const { data: descriptionsData, error } = await $eden.api[
+      "time-entries"
+    ].defaults.get()
+    if (error?.value) {
+      console.error("Error fetching default descriptions:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Could not load default descriptions.",
+        color: "error",
+      })
+      // Return the expected structure even on error
+      return { defaultDescriptions: [], departmentThreshold: undefined }
+    }
+    // Ensure the structure matches expectations, providing defaults if null/undefined
+    return (
+      descriptionsData ?? {
+        defaultDescriptions: [],
+        departmentThreshold: undefined,
+      }
+    )
+  }
+)
+
+// --- Timer Computed Properties ---
+const formattedElapsedTime = computed(() => {
+  const totalSeconds =
+    totalAccumulatedDuration.value + currentIntervalElapsedTime.value
+  const duration = dayjs.duration(totalSeconds, "seconds")
+  // Ensure leading zeros
+  const hours = String(Math.floor(duration.asHours())).padStart(2, "0")
+  const minutes = String(duration.minutes()).padStart(2, "0")
+  const seconds = String(duration.seconds()).padStart(2, "0")
+  return `${hours}:${minutes}:${seconds}`
+})
+
+// Use optional chaining and provide a default threshold if data is loading/missing
+const exceedsDepartmentThreshold = computed(() => {
+  const threshold = defaultDescriptions?.value?.departmentThreshold
+  // Check if threshold is a valid number and duration exceeds it
+  return typeof threshold === "number" && finalSessionDuration.value > threshold
+})
+
+// --- Custom description logic ---
+const customDescription = ref("")
+const dropdownDescription = ref<string | undefined>() // Can be undefined if nothing selected
+
+// Watch for changes in threshold status or descriptions to update the final description
+watch(
+  [exceedsDepartmentThreshold, customDescription, dropdownDescription],
+  ([exceeds, custom, dropdown]) => {
+    if (exceeds) {
+      // If threshold exceeded, only custom description is allowed
+      timeEntryDescription.value = custom
+    } else {
+      // Otherwise, prefer custom, fallback to dropdown
+      timeEntryDescription.value = custom || dropdown || "" // Ensure it's always a string
+    }
+  }
+)
+
+// Reset descriptions when modal opens
+watch(
+  () => showProjectModal.value,
+  (isOpen) => {
+    if (isOpen) {
+      customDescription.value = ""
+      dropdownDescription.value = undefined // Reset dropdown selection
+      timeEntryDescription.value = "" // Reset final description
+    }
+  }
+)
+
+// --- Timer Methods ---
+const resetState = () => {
+  // Reset all timer state
+  timerStatus.value = "stopped"
+  startTime.value = null
+  intervalStartTime.value = null
+  totalAccumulatedDuration.value = 0
+  currentIntervalElapsedTime.value = 0
+  selectedProjectId.value = undefined
+  timeEntryDescription.value = ""
+  finalSessionDuration.value = 0 // Also reset final duration
+  customDescription.value = ""
+  dropdownDescription.value = undefined
+
+  // Note: No history refresh here as history table is separate
+}
+
+const startTimer = () => {
+  if (timerStatus.value === "running") return
+
+  const now = Date.now()
+  intervalStartTime.value = now // Mark the start of this interval
+
+  if (timerStatus.value === "stopped") {
+    startTime.value = now // Set the overall start time
+    totalAccumulatedDuration.value = 0 // Reset accumulated duration
+    currentIntervalElapsedTime.value = 0 // Reset current interval time
+  }
+  // If resuming from pause, totalAccumulatedDuration already holds the prior time
+
+  timerStatus.value = "running"
+  timerInterval.value = setInterval(() => {
+    if (intervalStartTime.value) {
+      // Calculate elapsed time for *this* interval
+      currentIntervalElapsedTime.value = dayjs().diff(
+        dayjs(intervalStartTime.value),
+        "second"
+      )
+    }
+  }, 1000)
+}
+
+const pauseTimer = () => {
+  if (
+    timerStatus.value !== "running" ||
+    !timerInterval.value ||
+    !intervalStartTime.value
+  )
+    return
+
+  clearInterval(timerInterval.value)
+  timerInterval.value = null
+
+  // Calculate duration of the interval that just ended and add it to the total
+  const durationThisInterval = dayjs().diff(
+    dayjs(intervalStartTime.value),
+    "second"
+  )
+  totalAccumulatedDuration.value += durationThisInterval
+
+  currentIntervalElapsedTime.value = 0 // Reset current interval timer
+  intervalStartTime.value = null // Clear interval start time
+  timerStatus.value = "paused"
+}
+
+const endTimer = () => {
+  if (timerStatus.value === "stopped") return
+
+  const endTime = Date.now()
+  const originalStartTimeForSave = startTime.value // Keep for saving
+  const statusBeforeStop = timerStatus.value
+
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+    timerInterval.value = null
+  }
+
+  // Calculate final duration
+  let finalDuration = totalAccumulatedDuration.value
+  if (statusBeforeStop === "running" && intervalStartTime.value) {
+    // If it was running, add the elapsed time from the final interval
+    finalDuration += dayjs(endTime).diff(
+      dayjs(intervalStartTime.value),
+      "second"
+    )
+  }
+  // If it was paused, totalAccumulatedDuration already has the correct total
+
+  finalSessionDuration.value = finalDuration // Store the final duration
+
+  // Reset timer display state *before* showing modal
+  timerStatus.value = "stopped"
+  intervalStartTime.value = null
+  totalAccumulatedDuration.value = 0
+  currentIntervalElapsedTime.value = 0
+  // Keep startTime.value = originalStartTimeForSave temporarily for modal save logic
+
+  // Show modal only if time elapsed
+  if (finalSessionDuration.value > 0 && originalStartTimeForSave) {
+    // Restore original overall start time *only* for the save function's context
+    startTime.value = originalStartTimeForSave
+    showProjectModal.value = true
+  } else {
+    // If no time elapsed or error, fully reset
+    resetState()
+  }
+}
+
+const saveSession = async () => {
+  const projectIdToSave = selectedProjectId.value
+  const descriptionToSave = timeEntryDescription.value
+  const startTimeForApi = startTime.value
+    ? dayjs(startTime.value).toDate()
+    : null
+  const finalDurationToSave = finalSessionDuration.value
+
+  // Double check required fields before proceeding
+  if (!projectIdToSave || !startTimeForApi || finalDurationToSave <= 0) {
+    toast.add({
+      title: "Error",
+      description: "Missing required data to save session.",
+      color: "error",
+    })
+    showProjectModal.value = false // Close modal
+    resetState() // Fully reset state
+    await refreshAllData()
+    return
+  }
+
+  const endTimeForApi = dayjs(startTimeForApi)
+    .add(finalDurationToSave, "second")
+    .toDate() // Calculate end time based on start + duration
+
+  // Prepare data for API
+  const timeEntryData = {
+    projectId: projectIdToSave, // Ensure this is the correct type expected by API (e.g., string or number)
+    startTime: startTimeForApi,
+    endTime: endTimeForApi,
+    durationSeconds: finalDurationToSave,
+    ...(descriptionToSave && { description: descriptionToSave }),
+  }
+
+  try {
+    const { data: savedEntry, error } = await $eden.api[
+      "time-entries"
+    ].index.post(timeEntryData)
+
+    if (error?.value) {
+      console.error("API Error saving session:", error.value)
+      toast.add({
+        title: "Error saving session",
+        description: `API Error: ${error.value || "Unknown error"}`, // More detailed error
+        color: "error",
+      })
+    } else if (savedEntry) {
+      toast.add({
+        title: "Session Saved!",
+        description: `Duration: ${dayjs
+          .duration(finalDurationToSave, "seconds")
+          .humanize()}`,
+        color: "success",
+      })
+    }
+  } catch (e) {
+    console.error("Catch block error saving session:", e)
+    toast.add({
+      title: "Error",
+      description: `An unexpected error occurred: ${e}`,
+      color: "error",
+    })
+  } finally {
+    // Reset state and close modal regardless of success or failure
+    showProjectModal.value = false
+    resetState()
+  }
+}
+
+const cancelSession = () => {
+  showProjectModal.value = false
+  resetState() // Ensure state is fully reset on cancel
+}
 </script>
 
 <template>
@@ -260,19 +555,58 @@ const uniqueProjectsLast7Days = computed(() => {
               uniqueProjectsLast7Days
             }}</span>
           </div>
-          <UButton
-            label="Start Timer"
-            icon="i-heroicons-play"
-            block
-            class="mt-4"
-          />
-          <UButton
-            label="Stop Timer"
-            icon="i-heroicons-stop"
-            block
-            color="error"
-            class="mt-4"
-          />
+
+          <!-- Time Tracker Card -->
+          <UCard>
+            <template #header>
+              <h2 class="text-lg font-medium">Time Tracker</h2>
+            </template>
+            <div
+              class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"
+            >
+              <div class="text-2xl font-mono">
+                {{ formattedElapsedTime }}
+              </div>
+              <div class="flex gap-2">
+                <UButton
+                  icon="i-heroicons-play"
+                  size="sm"
+                  variant="solid"
+                  aria-label="Start or Resume Timer"
+                  :disabled="timerStatus === 'running'"
+                  @click="startTimer"
+                >
+                  {{ timerStatus === "paused" ? "Resume" : "Start" }}
+                </UButton>
+                <UButton
+                  icon="i-heroicons-pause"
+                  size="sm"
+                  color="warning"
+                  variant="solid"
+                  aria-label="Pause Timer"
+                  :disabled="timerStatus !== 'running'"
+                  @click="pauseTimer"
+                >
+                  Pause
+                </UButton>
+                <UButton
+                  icon="i-heroicons-stop-circle"
+                  size="sm"
+                  color="error"
+                  variant="solid"
+                  aria-label="End Timer Session"
+                  :disabled="timerStatus === 'stopped'"
+                  @click="endTimer"
+                >
+                  End
+                </UButton>
+              </div>
+            </div>
+            <div class="p-4 text-sm text-gray-500 dark:text-gray-400">
+              Use the controls above to track your time. Click 'End' to save the
+              session.
+            </div>
+          </UCard>
         </div>
       </UCard>
 
@@ -343,5 +677,132 @@ const uniqueProjectsLast7Days = computed(() => {
         Please log in to view your dashboard.
       </p>
     </div>
+
+    <!-- Save Session Modal -->
+    <UModal v-model:open="showProjectModal">
+      <template #content>
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h3
+                class="text-base font-semibold leading-6 text-gray-900 dark:text-white"
+              >
+                Save Session
+              </h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Duration:
+                {{
+                  dayjs
+                    .duration(finalSessionDuration, "seconds")
+                    .format("HH:mm:ss")
+                }}
+                ({{
+                  dayjs.duration(finalSessionDuration, "seconds").humanize()
+                }})
+              </p>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-heroicons-x-mark-20-solid"
+                class="-my-1"
+                @click="cancelSession"
+              />
+            </div>
+          </template>
+
+          <div class="p-4 flex flex-col gap-4">
+            <UFormField
+              label="Project"
+              name="project"
+              required
+            >
+              <USelectMenu
+                v-model="selectedProjectId"
+                :items="projectsForSelect"
+                label-key="name"
+                value-key="id"
+                placeholder="Select project"
+                searchable
+                searchable-placeholder="Search projects..."
+              />
+            </UFormField>
+
+            <UFormField
+              label="Description"
+              name="description"
+            >
+              <template v-if="exceedsDepartmentThreshold">
+                <UInput
+                  v-model="customDescription"
+                  placeholder="Enter description (required for long session)..."
+                  required
+                  :ui="{ base: 'w-full' }"
+                />
+                <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  A custom description is required as the session exceeds the
+                  threshold ({{
+                    defaultDescriptions?.departmentThreshold
+                      ? dayjs
+                          .duration(
+                            defaultDescriptions.departmentThreshold,
+                            "seconds"
+                          )
+                          .humanize()
+                      : "N/A"
+                  }}).
+                </p>
+              </template>
+              <template v-else>
+                <!-- Dropdown for default/previous descriptions -->
+                <USelectMenu
+                  v-model="dropdownDescription"
+                  :items="
+                    defaultDescriptions?.defaultDescriptions?.map(
+                      (d) => d.description
+                    ) ?? []
+                  "
+                  placeholder="Select common task or type custom..."
+                  creatable
+                  searchable
+                  searchable-placeholder="Search or add description..."
+                  class="mb-2"
+                />
+                <!-- Input for custom description (optional unless threshold exceeded) -->
+                <UInput
+                  v-model="customDescription"
+                  placeholder="Or enter a custom description..."
+                  :ui="{ base: 'w-full' }"
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Select a common task or type a custom description. Custom
+                  input overrides selection.
+                </p>
+              </template>
+            </UFormField>
+          </div>
+
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="cancelSession"
+              >
+                Cancel
+              </UButton>
+              <UButton
+                label="Save Session"
+                color="primary"
+                :disabled="
+                  !selectedProjectId ||
+                  (exceedsDepartmentThreshold && !customDescription.trim())
+                "
+                @click="saveSession"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
   </div>
 </template>

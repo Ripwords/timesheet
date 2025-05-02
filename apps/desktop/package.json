@@ -13,24 +13,24 @@
   },
   "dependencies": {
     "@elysiajs/eden": "^1.2.0",
-    "@nuxt/ui": "3.0.2",
-    "@tauri-apps/api": "^2.4.1",
+    "@nuxt/ui": "3.1.0",
+    "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-deep-link": "^2.2.1",
     "@tauri-apps/plugin-http": "^2.4.3",
     "@tauri-apps/plugin-opener": "^2.2.6",
-    "@tauri-apps/plugin-positioner": "~2",
+    "@tauri-apps/plugin-positioner": "~2.2.0",
     "@timesheet/server": "workspace:*",
     "@vueuse/nuxt": "13.1.0",
     "dayjs-nuxt": "2.1.11",
     "nuxt": "^3.17.1",
-    "typescript": "^5.6.3",
+    "typescript": "^5.8.3",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.0"
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.4.1",
-    "@types/bun": "^1.2.9",
-    "@types/node": "^22.14.1",
+    "@tauri-apps/cli": "^2.5.0",
+    "@types/bun": "^1.2.11",
+    "@types/node": "^22.15.3",
     "elysia": "^1.2.25"
   }
 }
