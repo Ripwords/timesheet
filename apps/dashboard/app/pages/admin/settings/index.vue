@@ -1,13 +1,6 @@
 <script lang="ts" setup>
 import type { CellContext, ColumnDef } from "@tanstack/vue-table"
-import {
-  UBadge,
-  UButton,
-  UInput,
-  USelectMenu,
-  UTable,
-  UIcon,
-} from "#components"
+import { UBadge, UButton, UInput, UIcon } from "#components"
 import type { FormSubmitEvent } from "#ui/types"
 
 definePageMeta({
