@@ -41,7 +41,7 @@ const entryToDeleteId: Ref<string | null> = ref(null)
 
 // Modal form state
 const modalState = reactive({
-  projectId: "",
+  id: "",
   startTime: dayjs().format("YYYY-MM-DDTHH:mm"),
   endTime: dayjs().format("YYYY-MM-DDTHH:mm"),
   description: "",
@@ -114,7 +114,9 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   async () => {
     try {
       const { data, error } = await $eden.api.projects.index.get({
-        query: {},
+        query: {
+          limit: 0,
+        },
       })
       if (error) {
         toast.add({
@@ -302,7 +304,7 @@ const openModal = (entry: TimeEntry | null = null) => {
   editingEntry.value = entry
   if (entry) {
     // Edit mode: Pre-fill form
-    modalState.projectId = entry.projectId
+    modalState.id = entry.projectId
     // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
     modalState.startTime = dayjs(entry.startTime).format("YYYY-MM-DDTHH:mm")
     modalState.endTime = dayjs(entry.endTime).format("YYYY-MM-DDTHH:mm")
@@ -315,7 +317,7 @@ const openModal = (entry: TimeEntry | null = null) => {
     modalState.description = entry.description || ""
   } else {
     // Add mode: Reset form
-    modalState.projectId = ""
+    modalState.id = ""
     modalState.startTime = dayjs().format("YYYY-MM-DDTHH:mm")
     modalState.endTime = dayjs().format("YYYY-MM-DDTHH:mm")
     modalState.description = ""
@@ -328,7 +330,7 @@ const closeModal = () => {
   isModalOpen.value = false
   // Reset potentially dirty form state after modal closes
   editingEntry.value = null
-  modalState.projectId = ""
+  modalState.id = ""
   modalState.startTime = ""
   modalState.endTime = ""
   modalState.description = ""
@@ -336,7 +338,7 @@ const closeModal = () => {
 
 const saveEntry = async () => {
   // 1. Validate inputs
-  if (!modalState.projectId || !modalState.startTime || !modalState.endTime) {
+  if (!modalState.id || !modalState.startTime || !modalState.endTime) {
     toast.add({
       title: "Validation Error",
       description: "Project, Start Time, and End Time are required.",
@@ -371,11 +373,11 @@ const saveEntry = async () => {
 
   // 3. Prepare data payload
   const payload = {
-    projectId: modalState.projectId,
+    projectId: modalState.id,
     startTime: start.toISOString(), // Send ISO string to backend
     endTime: end.toISOString(), // Send ISO string to backend
     durationSeconds: durationSeconds,
-    // description: modalState.description // Include if description exists
+    description: modalState.description,
   }
 
   try {
@@ -501,7 +503,7 @@ const cancelDelete = () => {
               class="mb-4"
             >
               <USelectMenu
-                v-model="modalState.projectId"
+                v-model="modalState.id"
                 class="w-full"
                 :items="projects"
                 value-key="id"

@@ -56,7 +56,6 @@ export const projects = baseApp("projects").group("/projects", (app) =>
       "/",
       async ({ db, query }) => {
         const { page = 1, limit = 10, search, sort, order } = query
-
         const whereList = []
         if (search) {
           whereList.push(ilike(schema.projects.name, `%${search}%`))
@@ -74,8 +73,8 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             return [order === "asc" ? asc(sortField) : desc(sortField)]
           },
           where: and(...whereList),
-          limit,
-          offset: (page - 1) * limit,
+          limit: limit > 0 ? limit : undefined,
+          offset: limit > 0 ? (page - 1) * limit : undefined,
         })
 
         const total = await db
