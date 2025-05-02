@@ -36,13 +36,15 @@ const endDate = useState("endDate", () => dayjs().endOf("day").toISOString())
 const isModalOpen = ref(false)
 const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, entry object for 'Edit' mode
 const modalDurationInput = ref("") // For the duration input field (e.g., "1h 30m")
+const isDeleteConfirmOpen = ref(false)
+const entryToDeleteId: Ref<string | null> = ref(null)
 
 // Modal form state
 const modalState = reactive({
   projectId: "",
-  startTime: "", // Using string for datetime-local input YYYY-MM-DDTHH:mm
-  endTime: "", // Using string for datetime-local input YYYY-MM-DDTHH:mm
-  description: "", // Assuming description might be added later
+  startTime: dayjs().format("YYYY-MM-DDTHH:mm"),
+  endTime: dayjs().format("YYYY-MM-DDTHH:mm"),
+  description: "",
 })
 
 // --- Data Fetching ---
@@ -146,10 +148,10 @@ const modalDurationFormatted = computed(() => {
     const end = dayjs(modalState.endTime)
     if (start.isValid() && end.isValid() && end.isAfter(start)) {
       const duration = dayjs.duration(end.diff(start))
-      return duration.format("HH:mm:ss")
+      return duration.format("HH:mm")
     }
   }
-  return "00:00:00"
+  return "00:00"
 })
 
 // Helper to parse duration strings "HH:mm" into seconds
@@ -314,10 +316,10 @@ const openModal = (entry: TimeEntry | null = null) => {
   } else {
     // Add mode: Reset form
     modalState.projectId = ""
-    modalState.startTime = ""
-    modalState.endTime = ""
+    modalState.startTime = dayjs().format("YYYY-MM-DDTHH:mm")
+    modalState.endTime = dayjs().format("YYYY-MM-DDTHH:mm")
     modalState.description = ""
-    modalDurationInput.value = "" // Reset duration input
+    modalDurationInput.value = "00:00" // Reset duration input
   }
   isModalOpen.value = true
 }
@@ -433,15 +435,17 @@ const saveEntry = async () => {
 }
 
 const deleteEntry = async (id: string) => {
-  // Optional: Add a confirmation dialog here
-  if (!confirm("Are you sure you want to delete this time entry?")) {
-    return
-  }
+  entryToDeleteId.value = id
+  isDeleteConfirmOpen.value = true
+}
+
+const confirmDelete = async () => {
+  if (!entryToDeleteId.value) return
 
   try {
     const { error } = await $eden.api["time-entries"]
       .id({
-        id: id,
+        id: entryToDeleteId.value,
       })
       .delete()
     if (error) {
@@ -460,7 +464,15 @@ const deleteEntry = async (id: string) => {
       description: `An unexpected error occurred. ${e}`,
       color: "error",
     })
+  } finally {
+    isDeleteConfirmOpen.value = false
+    entryToDeleteId.value = null
   }
+}
+
+const cancelDelete = () => {
+  isDeleteConfirmOpen.value = false
+  entryToDeleteId.value = null
 }
 </script>
 
@@ -490,6 +502,7 @@ const deleteEntry = async (id: string) => {
             >
               <USelectMenu
                 v-model="modalState.projectId"
+                class="w-full"
                 :items="projects"
                 value-key="id"
                 label-key="name"
@@ -538,11 +551,7 @@ const deleteEntry = async (id: string) => {
               name="durationInput"
               class="mb-4"
             >
-              <UInput
-                v-model="modalDurationInput"
-                type="time"
-                placeholder="Enter duration to set End Time"
-              />
+              <TimeInput v-model="modalDurationInput" />
             </UFormField>
 
             <UFormField
@@ -580,6 +589,43 @@ const deleteEntry = async (id: string) => {
         </UCard>
       </template>
     </UModal>
+
+    <!-- Delete Confirmation Modal -->
+    <UModal
+      v-model:open="isDeleteConfirmOpen"
+      prevent-close
+      @close="cancelDelete"
+    >
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-lg font-semibold">Confirm Deletion</h2>
+          </template>
+
+          <p class="mb-4">
+            Are you sure you want to delete this time entry? This action cannot
+            be undone.
+          </p>
+
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="cancelDelete"
+                >Cancel</UButton
+              >
+              <UButton
+                color="error"
+                @click="confirmDelete"
+                >Delete Entry</UButton
+              >
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
     <UCard>
       <template #header>
         <div class="flex justify-between items-center">
