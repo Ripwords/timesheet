@@ -24,14 +24,58 @@ const departmentIdParamsSchema = t.Object({
   id: UUID, // Re-use UUID validator for department ID
 })
 
-const departmentBodySchema = t.Object({
+// OLD Schema (for reference, will be replaced below for PUT)
+// const departmentBodySchema = t.Object({
+//   name: t.String({ minLength: 1, error: "Department name cannot be empty." }),
+//   color: t.UnionEnum([...allowedColors]),
+//   maxSessionMinutes: t.Number({
+//     min: 0,
+//     error: "Max session minutes must be positive.",
+//   }),
+//   defaultDescriptions: t.Optional(
+//     t.Array(t.String({ minLength: 1 }), {
+//       error: "Default descriptions must be a non-empty array of strings.",
+//     })
+//   ),
+// })
+
+// NEW Schema for PUT body - granular description updates
+const departmentUpdateBodySchema = t.Object({
+  name: t.Optional(
+    t.String({ minLength: 1, error: "Department name cannot be empty." })
+  ),
+  color: t.Optional(t.UnionEnum([...allowedColors])),
+  maxSessionMinutes: t.Optional(
+    t.Number({ min: 0, error: "Max session minutes must be positive." })
+  ),
+  // Granular description changes
+  descriptionsToAdd: t.Optional(
+    t.Array(t.String({ minLength: 1 }), {
+      error: "Descriptions to add must be non-empty strings.",
+    })
+  ),
+  descriptionsToUpdate: t.Optional(
+    t.Array(
+      t.Object({
+        id: UUID, // ID of the description to update
+        description: t.String({ minLength: 1 }), // New text
+      }),
+      { error: "Invalid format for descriptions to update." }
+    )
+  ),
+  descriptionIdsToDelete: t.Optional(
+    t.Array(UUID, { error: "Invalid format for description IDs to delete." })
+  ),
+})
+
+// Schema for POST body (Create) - Keep using simple array for creation
+const departmentCreateBodySchema = t.Object({
   name: t.String({ minLength: 1, error: "Department name cannot be empty." }),
   color: t.UnionEnum([...allowedColors]),
   maxSessionMinutes: t.Number({
     min: 0,
     error: "Max session minutes must be positive.",
   }),
-  // Add optional field for default descriptions
   defaultDescriptions: t.Optional(
     t.Array(t.String({ minLength: 1 }), {
       error: "Default descriptions must be a non-empty array of strings.",
@@ -108,9 +152,10 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               throw error(404, `Department with ID ${id} not found.`)
             }
 
-            // Fetch associated default descriptions
+            // Fetch associated default descriptions with their IDs
             const descriptionsData = await db
               .select({
+                id: departmentDefaultDescription.id, // Select the ID
                 description: departmentDefaultDescription.description,
               })
               .from(departmentDefaultDescription)
@@ -119,7 +164,8 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             // Combine and return
             return {
               ...departmentData,
-              defaultDescriptions: descriptionsData.map((d) => d.description),
+              // Map to include both id and description
+              defaultDescriptions: descriptionsData, // No mapping needed if select is correct
             }
           } catch (e: any) {
             logError(`Error fetching department ${params.id}: ${e}`)
@@ -132,7 +178,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           detail: {
             summary: "Get Single Department (Admin)",
             description:
-              "Fetches a specific department by its ID, including its default descriptions. Requires admin privileges.",
+              "Fetches a specific department by its ID, including its default descriptions (with IDs). Requires admin privileges.",
             tags: ["Admin", "Departments"],
           },
         }
@@ -143,6 +189,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           // Use transaction for atomicity
           return db.transaction(async (tx) => {
             try {
+              // Use departmentCreateBodySchema here
               const { name, color, maxSessionMinutes, defaultDescriptions } =
                 body
 
@@ -193,7 +240,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           }) // End transaction
         },
         {
-          body: departmentBodySchema,
+          body: departmentCreateBodySchema,
           detail: {
             summary: "Create Department (Admin)",
             description:
@@ -209,63 +256,144 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           return db.transaction(async (tx) => {
             try {
               const { id } = params
-              const { name, color, maxSessionMinutes, defaultDescriptions } =
-                body
+              // Use departmentUpdateBodySchema here
+              const {
+                name,
+                color,
+                maxSessionMinutes,
+                descriptionsToAdd,
+                descriptionsToUpdate,
+                descriptionIdsToDelete,
+              } = body
 
-              // Check if another department with the new name already exists
-              const conflictingDepartment =
-                await tx.query.departments.findFirst({
-                  where: and(
-                    eq(departments.name, name),
-                    ne(departments.id, id)
-                  ),
-                  columns: { id: true },
-                })
-              if (conflictingDepartment) {
-                throw error(
-                  409,
-                  `Another department with name "${name}" already exists.`
+              // --- Update Department Core Details (if provided) ---
+              const updatePayload: Partial<typeof departments.$inferInsert> = {}
+              if (name !== undefined) updatePayload.name = name
+              if (color !== undefined) updatePayload.color = color
+              if (maxSessionMinutes !== undefined)
+                updatePayload.maxSessionMinutes = maxSessionMinutes
+
+              // Check for name conflict only if name is being updated
+              if (name !== undefined) {
+                const conflictingDepartment =
+                  await tx.query.departments.findFirst({
+                    where: and(
+                      eq(departments.name, name),
+                      ne(departments.id, id)
+                    ),
+                    columns: { id: true },
+                  })
+                if (conflictingDepartment) {
+                  throw error(
+                    409,
+                    `Another department with name "${name}" already exists.`
+                  )
+                }
+                updatePayload.updatedAt = new Date()
+              }
+
+              let departmentUpdated = false
+              if (Object.keys(updatePayload).length > 0) {
+                console.log(`[${id}] Updating core fields:`, updatePayload)
+                const updatedDepartmentResult = await tx
+                  .update(departments)
+                  .set(updatePayload)
+                  .where(eq(departments.id, id))
+                  .returning({ id: departments.id }) // Only need ID to confirm update
+
+                if (updatedDepartmentResult.length === 0) {
+                  // This check happens even if only descriptions are modified
+                  // If the department doesn't exist at all, we should error out.
+                  const exists = await tx.query.departments.findFirst({
+                    where: eq(departments.id, id),
+                    columns: { id: true },
+                  })
+                  if (!exists) {
+                    throw error(404, `Department with ID ${id} not found.`)
+                  }
+                  // If it exists but wasn't updated (e.g., no fields changed), it's okay
+                }
+                departmentUpdated = updatedDepartmentResult.length > 0
+                console.log(
+                  `[${id}] Core fields update result:`,
+                  departmentUpdated
                 )
               }
 
-              // Update department details
-              const updatedDepartmentResult = await tx
-                .update(departments)
-                .set({ name, color, maxSessionMinutes, updatedAt: new Date() })
-                .where(eq(departments.id, id))
-                .returning()
-
-              if (
-                !updatedDepartmentResult ||
-                updatedDepartmentResult.length === 0
-              ) {
-                throw error(404, `Department with ID ${id} not found.`)
-              }
-
-              // Manage default descriptions if the field is provided in the body
-              if (defaultDescriptions !== undefined) {
-                // Delete existing descriptions for this department
-                await tx
+              // --- Process Description Deletions ---
+              if (descriptionIdsToDelete && descriptionIdsToDelete.length > 0) {
+                console.log(
+                  `[${id}] Deleting descriptions by ID:`,
+                  descriptionIdsToDelete
+                )
+                const deleteResult = await tx
                   .delete(departmentDefaultDescription)
-                  .where(eq(departmentDefaultDescription.departmentId, id))
-                  .returning({ id: departmentDefaultDescription.id }) // Log deleted IDs
-
-                // Insert new descriptions if the array is not empty
-                if (defaultDescriptions.length > 0) {
-                  const descriptionsToInsert = defaultDescriptions.map(
-                    (description) => ({
-                      departmentId: id,
-                      description: description,
-                    })
+                  .where(
+                    and(
+                      eq(departmentDefaultDescription.departmentId, id),
+                      inArray(
+                        departmentDefaultDescription.id,
+                        descriptionIdsToDelete
+                      )
+                    )
                   )
-                  await tx
-                    .insert(departmentDefaultDescription)
-                    .values(descriptionsToInsert)
-                    .returning() // Log inserted rows
-                }
+                  .returning({ id: departmentDefaultDescription.id })
+                console.log(
+                  `[${id}] Deleted ${deleteResult.length} description(s) by ID.`
+                )
               }
 
-              return updatedDepartmentResult[0]
+              // --- Process Description Updates ---
+              if (descriptionsToUpdate && descriptionsToUpdate.length > 0) {
+                console.log(
+                  `[${id}] Updating descriptions:`,
+                  descriptionsToUpdate
+                )
+                // Use Promise.all for concurrent updates within the transaction
+                await Promise.all(
+                  descriptionsToUpdate.map(async (update) => {
+                    return tx
+                      .update(departmentDefaultDescription)
+                      .set({ description: update.description })
+                      .where(
+                        and(
+                          eq(departmentDefaultDescription.departmentId, id),
+                          eq(departmentDefaultDescription.id, update.id)
+                        )
+                      )
+                    // Optionally add .returning() if needed
+                  })
+                )
+                console.log(
+                  `[${id}] Processed ${descriptionsToUpdate.length} description update(s).`
+                )
+              }
+
+              // --- Process Description Additions ---
+              if (descriptionsToAdd && descriptionsToAdd.length > 0) {
+                const descriptionsToInsert = descriptionsToAdd.map(
+                  (description) => ({
+                    departmentId: id,
+                    description: description,
+                  })
+                )
+                console.log(
+                  `[${id}] Inserting ${descriptionsToInsert.length} new description(s)...`,
+                  descriptionsToInsert
+                )
+                const insertResult = await tx
+                  .insert(departmentDefaultDescription)
+                  .values(descriptionsToInsert)
+                  .returning()
+                console.log(
+                  `[${id}] Inserted ${insertResult.length} new description(s).`
+                )
+              }
+
+              console.log(`[${id}] Department update transaction successful.`)
+              // Return a simple success or fetch the updated data again if needed
+              // For simplicity, returning success status
+              return { success: true, id: id, departmentUpdated }
             } catch (e: any) {
               logError(
                 `[${params.id || "UNKNOWN"}] Error updating department: ${e}` // Add ID to error log
@@ -277,12 +405,12 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           }) // End transaction
         },
         {
-          params: departmentIdParamsSchema, // Use the schema for ID validation
-          body: departmentBodySchema,
+          params: departmentIdParamsSchema,
+          body: departmentUpdateBodySchema,
           detail: {
             summary: "Update Department (Admin)",
             description:
-              "Updates an existing department's details (name, color, max session). Optionally replaces its default descriptions if provided. Requires admin privileges.",
+              "Updates department details and/or performs granular changes (add/update/delete) to its default descriptions. Requires admin privileges.",
             tags: ["Admin", "Departments"],
           },
         }

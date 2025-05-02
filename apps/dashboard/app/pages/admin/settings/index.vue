@@ -1,8 +1,14 @@
 <script lang="ts" setup>
-import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-import { z } from "zod"
+import type { CellContext, ColumnDef } from "@tanstack/vue-table"
+import {
+  UBadge,
+  UButton,
+  UInput,
+  USelectMenu,
+  UTable,
+  UIcon,
+} from "#components"
 import type { FormSubmitEvent } from "#ui/types"
-import { UButton, UBadge, USelectMenu, UInput } from "#components"
 
 definePageMeta({
   middleware: "admin",
@@ -21,15 +27,21 @@ const toast = useToast()
 // Use the type derived from toast for consistency
 type AllowedColor = NonNullable<Parameters<typeof toast.add>["0"]["color"]>
 
+// Interface for a description object with ID
+interface DescriptionItem {
+  id: string // UUID from the database
+  description: string
+}
+
+// Interface for Department including typed descriptions
 interface Department {
   id: string
   name: string
   color: AllowedColor
   maxSessionMinutes: number
-  defaultDescriptions?: string[]
+  defaultDescriptions?: DescriptionItem[]
 }
 
-// Define allowed Nuxt UI colors matching the *database schema* (No 'gray')
 const allowedColors = [
   "primary",
   "secondary",
@@ -71,37 +83,45 @@ const isSaving = ref(false)
 const isDeleting = ref(false)
 const isLoadingEditData = ref(false)
 
-// --- Form --- //
-const deptSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  color: z.enum(allowedColors, {
-    errorMap: () => ({ message: "Invalid color selected" }),
-  }),
-  maxSessionMinutes: z.number().int().min(1, "Must be 1 or greater"),
-  defaultDescriptions: z.optional(
-    z
-      .array(z.string().min(1, "Description cannot be empty"))
-      .min(0)
-      .refine((items) => new Set(items).size === items.length, {
-        message: "Descriptions must be unique",
-      })
-  ),
+// State to hold the original descriptions fetched for comparison
+const originalDescriptions = ref<DescriptionItem[]>([])
+
+const newDeptData = reactive({
+  name: "",
+  color: "primary" as AllowedColor,
+  maxSessionMinutes: 0,
+  defaultDescriptions: [] as string[], // For adding, keep as string array
 })
 
-type DeptSchema = z.output<typeof deptSchema>
-
-const newDeptData = reactive<Partial<DeptSchema>>({
+// State for the 'Edit Department' modal (uses DescriptionItem)
+const editDeptData = reactive({
   name: "",
-  color: "primary",
+  color: "primary" as AllowedColor,
   maxSessionMinutes: 0,
-  defaultDescriptions: [],
+  defaultDescriptions: [] as DescriptionItem[], // Use DescriptionItem array
 })
 
-const editDeptData = reactive<Partial<DeptSchema>>({
-  name: "",
-  color: "primary",
-  maxSessionMinutes: 0,
-  defaultDescriptions: [],
+// --- Helper function to sort descriptions consistently by ID ---
+function sortDescriptionsById(
+  descriptions: DescriptionItem[]
+): DescriptionItem[] {
+  // Create a copy before sorting to avoid mutating the original refs
+  return [...descriptions].sort((a, b) => {
+    // Handle 'new-' IDs consistently if needed, though simple string sort might suffice
+    return a.id.localeCompare(b.id)
+  })
+}
+
+// --- Computed property to detect changes in descriptions ---
+const hasDescriptionChanges = computed(() => {
+  if (isLoadingEditData.value) {
+    return false // Don't show changes while loading
+  }
+  const sortedOriginal = sortDescriptionsById(originalDescriptions.value)
+  const sortedCurrent = sortDescriptionsById(editDeptData.defaultDescriptions)
+
+  // Compare JSON strings of sorted arrays
+  return JSON.stringify(sortedOriginal) !== JSON.stringify(sortedCurrent)
 })
 
 // --- Modal Control --- //
@@ -110,6 +130,7 @@ function openAddDeptModal() {
   newDeptData.color = "primary"
   newDeptData.maxSessionMinutes = 0
   newDeptData.defaultDescriptions = []
+  newDescriptionInput.value = ""
   isAddDeptModalOpen.value = true
 }
 
@@ -118,13 +139,20 @@ async function openEditDeptModal(dept: Department) {
   isLoadingEditData.value = true
   isEditDeptModalOpen.value = true
   editDescriptionInput.value = ""
+  originalDescriptions.value = []
 
   try {
+    // Fetch including description IDs
     const { data: fetchedDept, error } = await $eden.api.admin
       .departments({ id: dept.id })
       .get()
 
     if (error) {
+      toast.add({
+        title: "Error",
+        description: "Failed to fetch department details for editing",
+        color: "error",
+      })
       console.error("API Error fetching department details:", error.value)
       throw new Error(
         String(error.value) || "Failed to fetch department details for editing"
@@ -136,7 +164,15 @@ async function openEditDeptModal(dept: Department) {
       editDeptData.color = fetchedDept.color as AllowedColor
       editDeptData.maxSessionMinutes = fetchedDept.maxSessionMinutes ?? 0
       editDeptData.defaultDescriptions = fetchedDept.defaultDescriptions ?? []
+      originalDescriptions.value = JSON.parse(
+        JSON.stringify(editDeptData.defaultDescriptions)
+      )
     } else {
+      toast.add({
+        title: "Error",
+        description: `Department with ID ${dept.id} not found.`,
+        color: "error",
+      })
       throw new Error(`Department with ID ${dept.id} not found.`)
     }
   } catch (error: unknown) {
@@ -158,39 +194,227 @@ function openDeleteDeptModal(dept: Department) {
 
 // --- Helper functions for Description List --- //
 const newDescriptionInput = ref("")
-const editDescriptionInput = ref("")
+const editDescriptionInput = ref("") // Input for adding NEW items in edit mode
+// State to track which item is currently being edited inline
+const editingDescriptionId = ref<string | null>(null)
+const editingDescriptionText = ref("")
 
-function addDescription(target: "new" | "edit") {
-  const inputRef = target === "new" ? newDescriptionInput : editDescriptionInput
-  const dataRef = target === "new" ? newDeptData : editDeptData
-  const description = inputRef.value.trim()
-
-  if (description && !dataRef.defaultDescriptions?.includes(description)) {
-    dataRef.defaultDescriptions = [
-      ...(dataRef.defaultDescriptions || []),
-      description,
-    ]
-    inputRef.value = ""
+// Add a *new* description string to the 'Add' modal list
+function addDescriptionForNewDept() {
+  const description = newDescriptionInput.value.trim()
+  if (description && !newDeptData.defaultDescriptions.includes(description)) {
+    newDeptData.defaultDescriptions.push(description)
+    newDescriptionInput.value = ""
   }
 }
 
-function removeDescription(index: number, target: "new" | "edit") {
-  const dataRef = target === "new" ? newDeptData : editDeptData
-  if (dataRef.defaultDescriptions) {
-    dataRef.defaultDescriptions.splice(index, 1)
+// Remove a description string from the 'Add' modal list by index
+function removeDescriptionForNewDept(index: number) {
+  newDeptData.defaultDescriptions.splice(index, 1)
+}
+
+// Add a *new* description item to the 'Edit' modal list
+function addDescriptionForEditDept() {
+  const descriptionText = editDescriptionInput.value.trim()
+  if (descriptionText) {
+    // Check if text already exists (ignoring items marked for deletion implicitly)
+    const alreadyExists = editDeptData.defaultDescriptions.some(
+      (item) => item.description === descriptionText
+    )
+    if (!alreadyExists) {
+      const newItem: DescriptionItem = {
+        id: `new-${Date.now()}-${useId()}`, // Temporary ID
+        description: descriptionText,
+      }
+      // Create a new array with the new item added
+      editDeptData.defaultDescriptions = [
+        ...editDeptData.defaultDescriptions,
+        newItem,
+      ]
+      editDescriptionInput.value = ""
+    } else {
+      toast.add({
+        title: "Duplicate",
+        description: "Description text already exists.",
+        color: "warning",
+      })
+    }
   }
 }
+
+// Remove a description item from the 'Edit' modal list by its ID
+function removeDescriptionForEditDept(id: string) {
+  const index = editDeptData.defaultDescriptions.findIndex((d) => d.id === id)
+  if (index !== -1) {
+    // Create a new array excluding the item to be removed
+    const updatedDescriptions = editDeptData.defaultDescriptions.filter(
+      (d) => d.id !== id
+    )
+    editDeptData.defaultDescriptions = updatedDescriptions // Assign the new array
+
+    if (editingDescriptionId.value === id) {
+      cancelInlineEdit() // Cancel edit if the removed item was being edited
+    }
+  }
+}
+
+// Start inline editing for an existing description item
+function startInlineEdit(item: DescriptionItem) {
+  editingDescriptionId.value = item.id
+  editingDescriptionText.value = item.description
+}
+
+// Cancel inline editing
+function cancelInlineEdit() {
+  editingDescriptionId.value = null
+  editingDescriptionText.value = ""
+}
+
+// Save the inline edit
+function saveInlineEdit() {
+  if (!editingDescriptionId.value) return
+  const index = editDeptData.defaultDescriptions.findIndex(
+    (d) => d.id === editingDescriptionId.value
+  )
+  if (index !== -1) {
+    const newText = editingDescriptionText.value.trim()
+    const currentItem = editDeptData.defaultDescriptions[index]! // Add non-null assertion
+
+    if (
+      newText &&
+      currentItem.description !== newText // Use currentItem
+    ) {
+      // Check for duplicates before saving
+      const isDuplicate = editDeptData.defaultDescriptions.some(
+        (item, idx) => idx !== index && item.description === newText
+      )
+      if (!isDuplicate) {
+        // Create a new array with the updated item
+        const updatedDescriptions = [...editDeptData.defaultDescriptions]
+        updatedDescriptions[index] = { ...currentItem, description: newText } // Create new object for the item
+        editDeptData.defaultDescriptions = updatedDescriptions // Assign the new array
+      } else {
+        toast.add({
+          title: "Duplicate",
+          description: "Description text already exists.",
+          color: "warning",
+        })
+        return // Don't cancel edit on duplicate error
+      }
+    }
+  }
+  cancelInlineEdit() // Close editor after save (or if text is empty/unchanged)
+}
+
+// --- Table Columns Definition for Descriptions --- //
+const descriptionTableColumns: ColumnDef<DescriptionItem>[] = [
+  {
+    accessorKey: "description",
+    header: "Description Text",
+    cell: (context: CellContext<DescriptionItem, unknown>) => {
+      const item = context.row.original
+      // Use Vue's h function for rendering conditionally
+      if (editingDescriptionId.value === item.id) {
+        // Render input and buttons when editing this item
+        return h(
+          "div",
+          { class: "flex items-center space-x-1 py-1" }, // Add py-1 for consistency
+          [
+            h(UInput, {
+              modelValue: editingDescriptionText.value, // Use modelValue for v-model via h
+              "onUpdate:modelValue": (value: string | number) =>
+                (editingDescriptionText.value = String(value)),
+              class: "flex-grow text-sm",
+              size: "sm",
+              autofocus: true, // Autofocus when input appears
+              disabled: isSaving.value,
+              onKeydown: (event: KeyboardEvent) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  saveInlineEdit()
+                } else if (event.key === "Escape") {
+                  event.preventDefault()
+                  cancelInlineEdit()
+                }
+              },
+            }),
+            h(UButton, {
+              icon: "i-heroicons-check-20-solid",
+              size: "xs",
+              color: "success", // Corrected color name
+              variant: "ghost",
+              disabled: isSaving.value,
+              onClick: () => saveInlineEdit(),
+              ariaLabel: "Save Edit",
+            }),
+            h(UButton, {
+              icon: "i-heroicons-x-mark-20-solid",
+              size: "xs",
+              color: "error", // Corrected color name
+              variant: "ghost",
+              disabled: isSaving.value,
+              onClick: () => cancelInlineEdit(),
+              ariaLabel: "Cancel Edit",
+            }),
+          ]
+        )
+      } else {
+        // Render span when not editing (no click handler needed here)
+        return h(
+          "span",
+          {
+            class: "text-sm flex-grow py-1", // Add py-1
+          },
+          item.description
+        )
+      }
+    },
+  },
+  {
+    accessorKey: "actions",
+    header: "Actions",
+    cell: (context: CellContext<DescriptionItem, unknown>) => {
+      return h("div", { class: "flex items-center space-x-2" }, [
+        h(UButton, {
+          icon: "i-heroicons-pencil-square",
+          size: "sm", // Changed size from xl to sm
+          color: "warning",
+          variant: "outline",
+          ariaLabel: "Edit Description", // More specific label
+          // Ensure this item is not already being edited by someone else (or itself)
+          disabled:
+            editingDescriptionId.value !== null &&
+            editingDescriptionId.value !== context.row.original.id,
+          onClick: () => startInlineEdit(context.row.original), // This triggers the state change
+        }),
+        h(UButton, {
+          icon: "i-heroicons-trash",
+          size: "sm", // Changed size from xl to sm
+          color: "error",
+          variant: "outline",
+          ariaLabel: "Delete Description", // More specific label
+          // Disable delete while any item is being edited
+          disabled: editingDescriptionId.value !== null,
+          onClick: () => removeDescriptionForEditDept(context.row.original.id),
+        }),
+      ])
+    },
+  },
+]
 
 // --- API Actions --- //
-async function handleAddDepartment(event: FormSubmitEvent<DeptSchema>) {
+// Type for handleAddDepartment submit event can be inferred or use typeof newDeptData
+async function handleAddDepartment(event: FormSubmitEvent<typeof newDeptData>) {
   isSaving.value = true
   try {
+    // Payload uses the simple string array from newDeptData
     const payload = {
       name: event.data.name,
       color: event.data.color,
       maxSessionMinutes: event.data.maxSessionMinutes,
       defaultDescriptions: event.data.defaultDescriptions ?? [],
     }
+    // POST endpoint expects simple string array
     const { error } = await $eden.api.admin.departments.index.post(payload)
 
     if (error) {
@@ -215,40 +439,137 @@ async function handleAddDepartment(event: FormSubmitEvent<DeptSchema>) {
   isSaving.value = false
 }
 
-async function handleUpdateDepartment(event: FormSubmitEvent<DeptSchema>) {
-  if (!selectedDepartment.value?.id) return
-  isSaving.value = true
-  const deptId = selectedDepartment.value.id
-  const payload = {
-    name: event.data.name,
-    color: event.data.color,
-    maxSessionMinutes: event.data.maxSessionMinutes,
-    defaultDescriptions: event.data.defaultDescriptions ?? [],
-  }
-  // Log the payload being sent to the backend
-  // console.log("Updating department payload:", payload) // Removed debugging log
-  const { error } = await $eden.api.admin
-    .departments({ id: deptId })
-    .put(payload)
-
-  if (error) {
+// No longer uses FormSubmitEvent directly due to complex state
+async function handleUpdateDepartment() {
+  if (!selectedDepartment.value?.id) {
+    console.error("handleUpdateDepartment called with no selected department.")
     toast.add({
       title: "Error",
-      description: String(error.value) || "Failed to update department.",
+      description: "No department selected for update.",
       color: "error",
     })
-  } else {
+    isSaving.value = false // Ensure saving state is reset
+    return
+  }
+
+  isSaving.value = true
+  const deptId = selectedDepartment.value.id
+
+  // --- Diffing Logic --- Find changes between original and current descriptions
+  const originalMap = new Map(
+    originalDescriptions.value.map((d) => [d.id, d.description])
+  )
+  const currentMap = new Map(
+    editDeptData.defaultDescriptions.map((d) => [d.id, d.description])
+  )
+
+  const descriptionsToAdd: string[] = []
+  const descriptionsToUpdate: { id: string; description: string }[] = []
+  const descriptionIdsToDelete: string[] = []
+
+  // Check current items
+  currentMap.forEach((description, id) => {
+    if (id.startsWith("new-")) {
+      // Identify new items by temporary ID prefix
+      descriptionsToAdd.push(description)
+    } else if (originalMap.has(id)) {
+      // Existed before, check if changed
+      if (originalMap.get(id) !== description) {
+        descriptionsToUpdate.push({ id, description })
+      }
+    } else {
+      // This case should ideally not happen if temp IDs are used correctly
+      console.warn(
+        `[${deptId}] Found current item with non-new ID not in original map:`,
+        id
+      )
+    }
+  })
+
+  // Check original items to see which were deleted
+  originalMap.forEach((description, id) => {
+    if (!currentMap.has(id)) {
+      descriptionIdsToDelete.push(id)
+    }
+  })
+  // --- End Diffing Logic ---
+
+  // Construct the payload for the PUT request
+  const updatePayload: {
+    name?: string
+    color?: AllowedColor
+    maxSessionMinutes?: number
+    descriptionsToAdd?: string[]
+    descriptionsToUpdate?: { id: string; description: string }[]
+    descriptionIdsToDelete?: string[]
+  } = {}
+
+  // Add core fields only if they changed
+  if (editDeptData.name !== selectedDepartment.value.name) {
+    updatePayload.name = editDeptData.name
+  }
+  if (editDeptData.color !== selectedDepartment.value.color) {
+    updatePayload.color = editDeptData.color
+  }
+  if (
+    editDeptData.maxSessionMinutes !==
+    selectedDepartment.value.maxSessionMinutes
+  ) {
+    updatePayload.maxSessionMinutes = editDeptData.maxSessionMinutes
+  }
+
+  // Add description changes if any exist
+  if (descriptionsToAdd.length > 0)
+    updatePayload.descriptionsToAdd = descriptionsToAdd
+  if (descriptionsToUpdate.length > 0)
+    updatePayload.descriptionsToUpdate = descriptionsToUpdate
+  if (descriptionIdsToDelete.length > 0)
+    updatePayload.descriptionIdsToDelete = descriptionIdsToDelete
+
+  // Only send request if there's something to update
+  if (Object.keys(updatePayload).length === 0) {
+    toast.add({
+      title: "No Changes",
+      description: "No changes detected to save.",
+      color: "info",
+    })
+    isSaving.value = false
+    isEditDeptModalOpen.value = false // Close modal if no changes
+    return
+  }
+
+  console.log("Updating department granular payload:", updatePayload)
+
+  try {
+    const { error } = await $eden.api.admin
+      .departments({ id: deptId })
+      .put(updatePayload) // Send the granular payload
+
+    if (error) {
+      console.error("API Error updating department:", error.value)
+      throw new Error(
+        String(error.value) || "Failed to update department via API"
+      )
+    }
+
     toast.add({
       title: "Success",
       description: "Department updated.",
       color: "success",
     })
+    isEditDeptModalOpen.value = false
+    selectedDepartment.value = null
+    editDescriptionInput.value = ""
+    originalDescriptions.value = [] // Clear original descriptions
+    cancelInlineEdit() // Ensure edit state is reset
+    await refreshDepartments() // Refresh list view
+  } catch (error: unknown) {
+    console.error("Failed to update department:", error)
+    const message =
+      error instanceof Error ? error.message : "Could not update department."
+    toast.add({ title: "Error", description: message, color: "error" })
   }
 
-  isEditDeptModalOpen.value = false
-  selectedDepartment.value = null
-  editDescriptionInput.value = ""
-  await refreshDepartments()
   isSaving.value = false
 }
 
@@ -365,7 +686,6 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
         <UCard>
           <template #header>Add Department</template>
           <UForm
-            :schema="deptSchema"
             :state="newDeptData"
             class="space-y-4"
             @submit="handleAddDepartment"
@@ -438,7 +758,7 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
                     placeholder="Add a description..."
                     class="flex-grow"
                     :disabled="isSaving"
-                    @keydown.enter.prevent="addDescription('new')"
+                    @keydown.enter.prevent="addDescriptionForNewDept()"
                   />
                   <UButton
                     icon="i-heroicons-plus"
@@ -446,7 +766,7 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
                     variant="outline"
                     aria-label="Add Description"
                     :disabled="isSaving || !newDescriptionInput.trim()"
-                    @click="addDescription('new')"
+                    @click="addDescriptionForNewDept()"
                   />
                 </div>
                 <ul
@@ -466,7 +786,7 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
                       variant="ghost"
                       aria-label="Remove Description"
                       :disabled="isSaving"
-                      @click="removeDescription(index, 'new')"
+                      @click="removeDescriptionForNewDept(index)"
                     />
                   </li>
                 </ul>
@@ -501,8 +821,11 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
       v-model:open="isEditDeptModalOpen"
       :prevent-close="isSaving || isLoadingEditData"
     >
-      <template #content>
-        <UCard v-if="selectedDepartment">
+      <template
+        v-if="selectedDepartment"
+        #content
+      >
+        <UCard>
           <template #header>Edit Department</template>
 
           <div
@@ -518,7 +841,6 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
 
           <UForm
             v-else
-            :schema="deptSchema"
             :state="editDeptData"
             class="space-y-4"
             @submit="handleUpdateDepartment"
@@ -580,63 +902,53 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
               </USelectMenu>
             </UFormField>
 
-            <UFormField
-              label="Default Descriptions"
-              name="defaultDescriptions"
-            >
+            <UFormField name="defaultDescriptions">
+              <!-- Use the label slot to add the indicator -->
+              <template #label>
+                Default Descriptions
+                <UBadge
+                  v-if="hasDescriptionChanges"
+                  color="warning"
+                  variant="soft"
+                  size="xs"
+                  class="ml-1 align-middle"
+                >
+                  Unsaved Changes
+                </UBadge>
+              </template>
+
               <div class="space-y-2">
-                <p class="text-xs text-gray-500 dark:text-gray-400 pb-1">
-                  Editing will replace all existing descriptions for this
-                  department.
-                </p>
                 <div class="flex gap-2">
                   <UInput
                     v-model="editDescriptionInput"
-                    placeholder="Add a description..."
+                    placeholder="Add a new description..."
                     class="flex-grow"
-                    :disabled="isSaving"
-                    @keydown.enter.prevent="addDescription('edit')"
+                    :disabled="isSaving || editingDescriptionId !== null"
+                    @keydown.enter.prevent="addDescriptionForEditDept()"
                   />
                   <UButton
                     icon="i-heroicons-plus"
                     size="sm"
                     variant="outline"
-                    aria-label="Add Description"
+                    aria-label="Add New Description"
                     :disabled="
                       isSaving ||
-                      isLoadingEditData ||
-                      !editDescriptionInput.trim()
+                      !editDescriptionInput.trim() ||
+                      editingDescriptionId !== null
                     "
-                    @click="addDescription('edit')"
+                    @click="addDescriptionForEditDept()"
                   />
                 </div>
-                <ul
-                  v-if="editDeptData.defaultDescriptions?.length"
-                  class="divide-y divide-gray-200 dark:divide-gray-700"
+                <UTable
+                  :data="editDeptData.defaultDescriptions"
+                  :columns="descriptionTableColumns"
+                  :empty-state="{
+                    icon: 'i-heroicons-circle-stack-20-solid',
+                    label: 'No default descriptions.',
+                  }"
+                  class="max-h-75 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700"
                 >
-                  <li
-                    v-for="(desc, index) in editDeptData.defaultDescriptions"
-                    :key="index"
-                    class="py-2 flex justify-between items-center"
-                  >
-                    <span class="text-sm">{{ desc }}</span>
-                    <UButton
-                      icon="i-heroicons-x-mark-20-solid"
-                      size="xs"
-                      color="error"
-                      variant="ghost"
-                      aria-label="Remove Description"
-                      :disabled="isSaving || isLoadingEditData"
-                      @click="removeDescription(index, 'edit')"
-                    />
-                  </li>
-                </ul>
-                <p
-                  v-else
-                  class="text-xs text-gray-500 dark:text-gray-400"
-                >
-                  No default descriptions found or added yet.
-                </p>
+                </UTable>
               </div>
             </UFormField>
 
@@ -645,13 +957,18 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
                 label="Cancel"
                 variant="ghost"
                 :disabled="isSaving || isLoadingEditData"
-                @click="isEditDeptModalOpen = false"
+                @click="
+                  () => {
+                    isEditDeptModalOpen = false
+                    cancelInlineEdit()
+                  }
+                "
               />
               <UButton
                 type="submit"
                 label="Save Changes"
                 :loading="isSaving"
-                :disabled="isLoadingEditData"
+                :disabled="isLoadingEditData || editingDescriptionId !== null"
               />
             </div>
           </UForm>
@@ -663,12 +980,15 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
       v-model:open="isDeleteDeptModalOpen"
       :prevent-close="isDeleting"
     >
-      <template #content>
-        <UCard v-if="selectedDepartment">
+      <template
+        v-if="selectedDepartment"
+        #content
+      >
+        <UCard>
           <template #header>Confirm Deletion</template>
           <p>
             Are you sure you want to delete the department
-            <strong>"{{ selectedDepartment.name }}"</strong>?
+            <strong>"{{ selectedDepartment?.name }}"</strong>?
           </p>
           <template #footer>
             <div class="flex justify-end gap-2">
