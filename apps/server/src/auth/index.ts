@@ -156,8 +156,6 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           role: user.role,
         })
 
-        console.log(process.env.DOMAIN)
-
         cookie.auth.set({
           value: token,
           httpOnly: true,
@@ -166,7 +164,10 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           secure: true,
           sameSite: "none",
           priority: "high",
-          domain: process.env.DOMAIN,
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.DOMAIN
+              : undefined,
         })
 
         return { message: "Signed in successfully" }
