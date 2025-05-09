@@ -583,6 +583,7 @@ const cancelDelete = () => {
                     ? 'Can only edit entries from today'
                     : 'Save Entry'
                 "
+                @click="saveEntry"
               >
                 {{ editingEntry ? "Update Entry" : "Save Entry" }}
               </UButton>
