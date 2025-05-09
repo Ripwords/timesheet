@@ -24,6 +24,7 @@ const querySchema = t.Object({
 const updateUserBodySchema = t.Object({
   email: t.Optional(t.String({ format: "email" })),
   departmentId: t.Optional(UUID),
+  ratePerHour: t.Optional(t.Number({ minimum: 0 })),
   emailVerified: t.Optional(
     t.Boolean({
       error: {
@@ -69,6 +70,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
                 email: users.email,
                 role: users.role,
                 emailVerified: users.emailVerified,
+                ratePerHour: users.ratePerHour,
                 accountStatus: users.accountStatus,
                 departmentId: users.departmentId,
                 departmentName: departments.name,
@@ -184,16 +186,17 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
         "/:id",
         async ({ db, params, body, error }) => {
           const userId = params.id
-          const { email, departmentId, emailVerified } = body
+          const { email, departmentId, ratePerHour, emailVerified } = body
 
           if (
             email === undefined &&
             departmentId === undefined &&
+            ratePerHour === undefined &&
             emailVerified === undefined
           ) {
             return error(
               400,
-              "No update data provided. Provide email, departmentId, or emailVerified."
+              "No update data provided. Provide email, departmentId, ratePerHour, or emailVerified."
             )
           }
 
@@ -228,6 +231,11 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
           if (departmentId !== undefined) {
             updateData.departmentId = departmentId
           }
+          if (ratePerHour !== undefined && ratePerHour !== null) {
+            updateData.ratePerHour = ratePerHour.toFixed(2)
+          } else if (ratePerHour === null) {
+            updateData.ratePerHour = "0.00"
+          }
           if (emailVerified !== undefined) {
             updateData.emailVerified = emailVerified
           }
@@ -241,6 +249,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
                 id: users.id,
                 email: users.email,
                 departmentId: users.departmentId,
+                ratePerHour: users.ratePerHour,
                 emailVerified: users.emailVerified,
                 updatedAt: users.updatedAt,
               })
@@ -255,6 +264,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
                 email: users.email,
                 departmentId: users.departmentId,
                 departmentName: departments.name,
+                ratePerHour: users.ratePerHour,
                 emailVerified: users.emailVerified,
                 updatedAt: users.updatedAt,
               })

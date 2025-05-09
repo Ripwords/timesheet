@@ -18,9 +18,10 @@ type UsersResponse = Awaited<
 >["data"]
 type User = Omit<
   NonNullable<UsersResponse>["users"][number],
-  "emailVerified"
+  "emailVerified" | "ratePerHour"
 > & {
   emailVerified: boolean | null
+  ratePerHour: number | null
 }
 
 const toast = useToast()
@@ -32,10 +33,12 @@ const editingUser = ref<User | null>(null) // Store the user being edited
 const editedData = reactive<{
   email: string
   departmentId: string | undefined
+  ratePerHour: number | null
   emailVerified: boolean | null
 }>({
   email: "",
   departmentId: undefined,
+  ratePerHour: null,
   emailVerified: null,
 })
 const isSaving = ref(false)
@@ -81,6 +84,16 @@ const {
   },
   {
     watch: [page, departmentId, userStatus],
+    transform: (data) => {
+      return {
+        users:
+          data?.users.map((u) => ({
+            ...u,
+            ratePerHour: Number(u.ratePerHour),
+          })) ?? [],
+        total: data?.total ?? 0,
+      }
+    },
   }
 )
 
@@ -195,6 +208,7 @@ function editUser(user: User) {
   if (editingUser.value) {
     editedData.email = editingUser.value.email ?? ""
     editedData.departmentId = editingUser.value.departmentId ?? undefined
+    editedData.ratePerHour = editingUser.value.ratePerHour ?? null
     isEditModalOpen.value = true
   }
 }
@@ -282,6 +296,7 @@ async function saveUserChanges() {
   const payload: {
     email?: string
     departmentId?: string
+    ratePerHour?: number
   } = {}
 
   if (editedData.email !== editingUser.value.email) {
@@ -289,6 +304,9 @@ async function saveUserChanges() {
   }
   if (editedData.departmentId !== editingUser.value.departmentId) {
     payload.departmentId = editedData.departmentId
+  }
+  if (editedData.ratePerHour !== editingUser.value.ratePerHour) {
+    payload.ratePerHour = editedData.ratePerHour ?? undefined
   }
 
   if (Object.keys(payload).length === 0) {
@@ -518,6 +536,26 @@ function cancelEdit() {
                   >
                 </template>
               </USelectMenu>
+            </UFormField>
+
+            <UFormField
+              label="Rate Per Hour"
+              name="ratePerHour"
+              class="mb-4"
+            >
+              <UInputNumber
+                v-model="editedData.ratePerHour"
+                :format-options="{
+                  currency: 'MYR',
+                  currencyDisplay: 'code',
+                  currencySign: 'accounting',
+                  style: 'currency',
+                  minimumFractionDigits: 2,
+                }"
+                :step="0.1"
+                :min="0"
+                class="w-50"
+              />
             </UFormField>
 
             <UFormField
