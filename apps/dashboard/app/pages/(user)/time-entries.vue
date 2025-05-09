@@ -45,7 +45,11 @@ const modalState = reactive({
   startTime: dayjs().format("YYYY-MM-DDTHH:mm"),
   endTime: dayjs().format("YYYY-MM-DDTHH:mm"),
   description: "",
+  customDescription: "",
 })
+
+// State for default descriptions and threshold
+const selectedDefaultDescription = ref<string | undefined>(undefined)
 
 // --- Data Fetching ---
 const {
@@ -139,6 +143,31 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   }
 )
 
+// Fetch Default Descriptions
+const { data: defaultDescriptions, status: loadingDefaultsStatus } =
+  await useLazyAsyncData("default-descriptions", async () => {
+    const { data: descriptionsData, error } = await $eden.api[
+      "time-entries"
+    ].defaults.get()
+    if (error?.value) {
+      console.error("Error fetching default descriptions:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Could not load default descriptions.",
+        color: "error",
+      })
+      // Return the expected structure even on error
+      return { defaultDescriptions: [], departmentThreshold: undefined }
+    }
+    // Ensure the structure matches expectations, providing defaults if null/undefined
+    return (
+      descriptionsData ?? {
+        defaultDescriptions: [],
+        departmentThreshold: undefined,
+      }
+    )
+  })
+
 // --- Computed ---
 const modalTitle = computed(() =>
   editingEntry.value ? "Edit Time Entry" : "Add New Time Entry"
@@ -183,6 +212,15 @@ const parseDurationString = (durationStr: string): number | null => {
 
   return hours * 3600 + minutes * 60
 }
+
+// Computed property to check if current modal entry duration exceeds threshold
+const exceedsDepartmentThresholdInModal = computed(() => {
+  if (defaultDescriptions.value?.departmentThreshold === undefined) return false // No threshold set
+  const durationSeconds = parseDurationString(modalDurationInput.value)
+  if (durationSeconds === null) return false
+
+  return durationSeconds / 60 >= defaultDescriptions.value?.departmentThreshold
+})
 
 // Helper to format duration in seconds to "HH:mm" string
 const formatDuration = (totalSeconds: number): string => {
@@ -314,14 +352,16 @@ const openModal = (entry: TimeEntry | null = null) => {
       "second"
     )
     modalDurationInput.value = formatDuration(initialDurationSeconds)
-    modalState.description = entry.description || ""
+    modalState.customDescription = entry.description || ""
+    selectedDefaultDescription.value = undefined // Reset selected default
   } else {
     // Add mode: Reset form
     modalState.id = ""
     modalState.startTime = dayjs().format("YYYY-MM-DDTHH:mm")
     modalState.endTime = dayjs().format("YYYY-MM-DDTHH:mm")
-    modalState.description = ""
+    modalState.customDescription = ""
     modalDurationInput.value = "00:00" // Reset duration input
+    selectedDefaultDescription.value = undefined // Reset selected default
   }
   isModalOpen.value = true
 }
@@ -333,7 +373,8 @@ const closeModal = () => {
   modalState.id = ""
   modalState.startTime = ""
   modalState.endTime = ""
-  modalState.description = ""
+  modalState.customDescription = ""
+  selectedDefaultDescription.value = undefined
 }
 
 const saveEntry = async () => {
@@ -372,12 +413,20 @@ const saveEntry = async () => {
   const durationSeconds = end.diff(start, "second")
 
   // 3. Prepare data payload
+  let finalDescription = ""
+  if (exceedsDepartmentThresholdInModal.value) {
+    finalDescription = modalState.customDescription
+  } else {
+    finalDescription =
+      modalState.customDescription || selectedDefaultDescription.value || ""
+  }
+
   const payload = {
     projectId: modalState.id,
     startTime: start.toISOString(), // Send ISO string to backend
     endTime: end.toISOString(), // Send ISO string to backend
     durationSeconds: durationSeconds,
-    description: modalState.description,
+    description: finalDescription,
   }
 
   try {
@@ -560,11 +609,52 @@ const cancelDelete = () => {
               label="Description"
               class="mb-4"
             >
-              <UInput
-                v-model="modalState.description"
-                class="w-full"
-                placeholder="description..."
-              />
+              <template v-if="exceedsDepartmentThresholdInModal">
+                <UInput
+                  v-model="modalState.customDescription"
+                  class="w-full"
+                  placeholder="Enter description (required for long session)..."
+                  required
+                />
+                <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  A custom description is required as the session exceeds the
+                  threshold ({{
+                    defaultDescriptions?.departmentThreshold
+                      ? dayjs
+                          .duration(
+                            defaultDescriptions.departmentThreshold,
+                            "seconds"
+                          )
+                          .humanize()
+                      : "N/A"
+                  }}).
+                </p>
+              </template>
+              <template v-else>
+                <USelectMenu
+                  v-model="selectedDefaultDescription"
+                  :items="
+                    defaultDescriptions?.defaultDescriptions?.map(
+                      (d) => d.description
+                    ) ?? []
+                  "
+                  placeholder="Select common task or type custom..."
+                  creatable
+                  searchable
+                  searchable-placeholder="Search or add description..."
+                  class="mb-2"
+                  :loading="loadingDefaultsStatus === 'pending'"
+                />
+                <UInput
+                  v-model="modalState.customDescription"
+                  class="w-full"
+                  placeholder="Or enter a custom description..."
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Select a common task or type a custom description. Custom
+                  input overrides selection.
+                </p>
+              </template>
             </UFormField>
           </UForm>
 

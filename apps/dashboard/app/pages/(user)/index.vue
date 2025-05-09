@@ -679,7 +679,10 @@ const cancelSession = () => {
     </div>
 
     <!-- Save Session Modal -->
-    <UModal v-model:open="showProjectModal">
+    <UModal
+      v-model:open="showProjectModal"
+      :dismissible="false"
+    >
       <template #content>
         <UCard>
           <template #header>
