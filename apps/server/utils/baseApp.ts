@@ -28,20 +28,26 @@ if (!JWT_SECRET) {
   throw new Error("JWT_SECRET environment variable is not set.")
 }
 
+const DASHBOARD_ORIGIN = process.env.DASHBOARD_URL ?? "http://localhost:5173"
+
 export const baseApp = (name: string) =>
   new Elysia({
     name,
   })
-    .use(
-      logger({
-        level: "debug",
-      })
-    )
+    // .use(
+    //   logger({
+    //     level: "debug",
+    //   })
+    // )
     .use(serverTiming())
     .decorate("db", db)
     .use(
       cors({
-        origin: process.env.DASHBOARD_URL ?? "http://localhost:5173",
+        origin: [
+          DASHBOARD_ORIGIN,
+          DASHBOARD_ORIGIN.replace("http://", ""),
+          DASHBOARD_ORIGIN.replace("https://", ""),
+        ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"],

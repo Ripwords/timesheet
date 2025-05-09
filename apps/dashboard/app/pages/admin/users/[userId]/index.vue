@@ -62,7 +62,7 @@ const {
       .add(7, "days")
       .toISOString()
 
-    const { data } = await $eden.api["time-entries"].index.get({
+    const { data } = await $eden.api["time-entries"].get({
       query: {
         userId,
         startDate: monthStart,

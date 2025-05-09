@@ -8,7 +8,7 @@ const { $eden } = useNuxtApp()
 const { data: departments } = useAsyncData(
   `department-${props.departmentId}`,
   async () => {
-    const { data } = await $eden.api.admin.departments.index.get({
+    const { data } = await $eden.api.admin.departments.get({
       query: {
         departmentIds: [props.departmentId],
       },

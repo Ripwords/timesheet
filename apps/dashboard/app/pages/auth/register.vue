@@ -11,7 +11,7 @@ const disabled = ref(false)
 const { data: departments } = await useLazyAsyncData(
   "departments",
   async () => {
-    const { data } = await $eden.api.departments.index.get()
+    const { data } = await $eden.api.departments.get()
 
     return data ?? []
   }

@@ -207,7 +207,7 @@ const timeEntryDescription = ref("")
 const { data: projectsForSelect } = await useLazyAsyncData(
   "projects-for-select",
   async () => {
-    const { data: projectData } = await $eden.api.projects.index.get({
+    const { data: projectData } = await $eden.api.projects.get({
       query: { limit: 0 },
     })
 
@@ -439,9 +439,9 @@ const saveSession = async () => {
   }
 
   try {
-    const { data: savedEntry, error } = await $eden.api[
-      "time-entries"
-    ].index.post(timeEntryData)
+    const { data: savedEntry, error } = await $eden.api["time-entries"].post(
+      timeEntryData
+    )
 
     if (error?.value) {
       console.error("API Error saving session:", error.value)

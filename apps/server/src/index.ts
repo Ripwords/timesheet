@@ -7,7 +7,10 @@ import { adminUsersRoutes } from "./admin/users"
 import { adminDepartmentsRoutes } from "./admin/departments"
 import { adminFinancials } from "./admin/financials"
 import { publicDepartmentsRoutes } from "./departments"
-const app = baseApp("main")
+import { Elysia } from "elysia"
+
+const app = new Elysia()
+  .use(baseApp("main"))
   .group("/api", (app) =>
     app
       .use(auth)

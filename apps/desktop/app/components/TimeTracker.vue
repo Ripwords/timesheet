@@ -24,7 +24,7 @@ const timeEntryDescription = ref("")
 
 // --- Projects ---
 const { data: projects } = await useLazyAsyncData("projects", async () => {
-  const { data: projectData } = await eden.api.projects.index.get({
+  const { data: projectData } = await eden.api.projects.get({
     query: {},
   })
   return projectData?.projects.map((project) => ({
@@ -36,7 +36,7 @@ const { data: projects } = await useLazyAsyncData("projects", async () => {
 // --- History ---
 const { data: history, refresh: refreshHistory } = await useLazyAsyncData(
   async () => {
-    const { data: timeEntryData } = await eden.api["time-entries"].index.get({
+    const { data: timeEntryData } = await eden.api["time-entries"].get({
       query: {
         startDate: dayjs().subtract(3, "day").toISOString(),
         endDate: dayjs().toISOString(),
@@ -251,9 +251,9 @@ const saveSession = async () => {
 
   try {
     // Call the API endpoint
-    const { data: savedEntry, error } = await eden.api[
-      "time-entries"
-    ].index.post(timeEntryData)
+    const { data: savedEntry, error } = await eden.api["time-entries"].post(
+      timeEntryData
+    )
 
     if (error) {
       toast.add({

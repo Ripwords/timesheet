@@ -14,7 +14,7 @@ useSeoMeta({
 const { $eden } = useNuxtApp()
 
 type UsersResponse = Awaited<
-  ReturnType<typeof $eden.api.admin.users.index.get>
+  ReturnType<typeof $eden.api.admin.users.get>
 >["data"]
 type User = Omit<
   NonNullable<UsersResponse>["users"][number],
@@ -51,7 +51,7 @@ const confirmUser = ref<User | null>(null)
 const { data: departments } = await useLazyAsyncData(
   "departments",
   async () => {
-    const { data } = await $eden.api.admin.departments.index.get({
+    const { data } = await $eden.api.admin.departments.get({
       query: {},
     })
 
@@ -66,7 +66,7 @@ const {
   `users-admin-${userStatus.value ? "active" : "inactive"}`,
   async () => {
     const status = userStatus.value ? "active" : "inactive"
-    const { data } = await $eden.api.admin.users.index.get({
+    const { data } = await $eden.api.admin.users.get({
       query: {
         page: page.value,
         ...(search.value && { search: search.value }),

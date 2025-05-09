@@ -1,13 +1,13 @@
 {
   "name": "timesheet",
-  "type": "module",
-  "private": true,
   "devDependencies": {
-    "@types/bun": "^1.2.11"
+    "@types/bun": "^1.2.12"
   },
   "peerDependencies": {
     "typescript": "^5.8.3"
   },
+  "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*"
   ]

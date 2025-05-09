@@ -50,7 +50,7 @@ const {
   pending,
   refresh: refreshDepartments,
 } = await useAsyncData("admin-departments", async () => {
-  const { data, error } = await $eden.api.admin.departments.index.get({
+  const { data, error } = await $eden.api.admin.departments.get({
     query: {},
   })
   if (error) {
@@ -408,7 +408,7 @@ async function handleAddDepartment(event: FormSubmitEvent<typeof newDeptData>) {
       defaultDescriptions: event.data.defaultDescriptions ?? [],
     }
     // POST endpoint expects simple string array
-    const { error } = await $eden.api.admin.departments.index.post(payload)
+    const { error } = await $eden.api.admin.departments.post(payload)
 
     if (error) {
       console.error("API Error adding department:", error.value)

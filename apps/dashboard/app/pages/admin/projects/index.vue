@@ -13,7 +13,7 @@ useSeoMeta({
 
 // Infer the response type, then extract the non-nullable array item type
 type ProjectsResponse = Awaited<
-  ReturnType<typeof $eden.api.projects.index.get>
+  ReturnType<typeof $eden.api.projects.get>
 >["data"]
 type Project = NonNullable<ProjectsResponse>["projects"][number] // Get the item type from the array
 
@@ -48,7 +48,7 @@ const {
 } = await useLazyAsyncData(
   "projects-admin",
   async () => {
-    const { data } = await $eden.api.projects.index.get({
+    const { data } = await $eden.api.projects.get({
       query: {
         page: page.value,
         search: search.value,
@@ -258,7 +258,7 @@ async function createProject() {
 
   isCreatingProject.value = true
   try {
-    const { data, error } = await $eden.api.projects.index.post({
+    const { data, error } = await $eden.api.projects.post({
       name: newProjectName.value.trim(),
     })
 

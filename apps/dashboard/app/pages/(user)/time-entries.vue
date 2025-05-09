@@ -56,7 +56,7 @@ const {
   `time-entries-${startDate.value}-${endDate.value}`,
   async () => {
     try {
-      const { data, error } = await $eden.api["time-entries"].index.get({
+      const { data, error } = await $eden.api["time-entries"].get({
         query: {
           startDate: startDate.value,
           endDate: endDate.value,
@@ -113,7 +113,7 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   "projects",
   async () => {
     try {
-      const { data, error } = await $eden.api.projects.index.get({
+      const { data, error } = await $eden.api.projects.get({
         query: {
           limit: 0,
         },
@@ -405,7 +405,7 @@ const saveEntry = async () => {
     } else {
       // Add Mode
       // Call POST endpoint
-      result = await $eden.api["time-entries"].index.post({
+      result = await $eden.api["time-entries"].post({
         ...payload,
         startTime: dayjs(payload.startTime).toDate(),
         endTime: dayjs(payload.endTime).toDate(),
