@@ -164,10 +164,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           secure: true,
           sameSite: "none",
           priority: "high",
-          domain:
-            process.env.NODE_ENV === "production"
-              ? process.env.DOMAIN
-              : undefined,
+          domain: process.env.DOMAIN,
         })
 
         return { message: "Signed in successfully" }
