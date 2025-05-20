@@ -12,7 +12,6 @@ const { data: departments } = await useLazyAsyncData(
   "departments",
   async () => {
     const { data } = await $eden.api.departments.get()
-
     return data ?? []
   }
 )
@@ -86,6 +85,7 @@ async function submit() {
           <UInput
             v-model="state.name"
             placeholder="Your Name"
+            class="w-full"
           />
         </UFormField>
 
@@ -96,7 +96,7 @@ async function submit() {
         >
           <USelectMenu
             v-model="state.departmentId"
-            class="w-44"
+            class="w-full"
             :items="departments"
             label-key="departmentName"
             value-key="id"
@@ -112,6 +112,7 @@ async function submit() {
             v-model="state.email"
             type="email"
             placeholder="example@email.com"
+            class="w-full"
           />
         </UFormField>
 
@@ -123,6 +124,7 @@ async function submit() {
           <UInput
             v-model="state.password"
             type="password"
+            class="w-full"
           />
         </UFormField>
 
@@ -134,6 +136,7 @@ async function submit() {
           <UInput
             v-model="state.confirmPassword"
             type="password"
+            class="w-full"
           />
         </UFormField>
 

@@ -68,6 +68,7 @@ async function submit() {
             v-model="state.email"
             type="email"
             placeholder="example@email.com"
+            class="w-full"
           />
         </UFormField>
 
@@ -79,6 +80,7 @@ async function submit() {
           <UInput
             v-model="state.password"
             type="password"
+            class="w-full"
           />
         </UFormField>
 

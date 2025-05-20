@@ -71,6 +71,7 @@ async function submitForgotPassword() {
             type="email"
             placeholder="example@email.com"
             required
+            class="w-full"
           />
         </UFormField>
 
