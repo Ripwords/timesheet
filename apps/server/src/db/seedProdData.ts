@@ -15,11 +15,11 @@ const client = postgres(connectionString)
 const db = drizzle(client, { schema })
 
 const DEPARTMENTS_TO_SEED = [
-  { name: "Frontend Design", maxSessionMinutes: 480, color: "info" },
-  { name: "Frontend JS", maxSessionMinutes: 480, color: "error" },
-  { name: "Backend", maxSessionMinutes: 480, color: "primary" },
-  { name: "UI/UX", maxSessionMinutes: 480, color: "secondary" },
-  { name: "Digital Marketing", maxSessionMinutes: 420, color: "success" },
+  { name: "Frontend Design", maxSessionMinutes: 90, color: "info" },
+  { name: "Frontend JS", maxSessionMinutes: 90, color: "error" },
+  { name: "Backend", maxSessionMinutes: 90, color: "primary" },
+  { name: "UI/UX", maxSessionMinutes: 90, color: "secondary" },
+  { name: "Digital Marketing", maxSessionMinutes: 90, color: "success" },
 ] as (typeof schema.departments.$inferInsert)[]
 
 const seedProdData = async () => {
