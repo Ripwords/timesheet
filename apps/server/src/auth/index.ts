@@ -46,12 +46,12 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     })
     .post(
       "/signup",
-      async ({ db, body, error, set }) => {
+      async ({ db, body, status, set }) => {
         const { email, password } = body
 
         const allowedDomains = process.env.SIGNUP_DOMAINS?.split(",")
         if (!allowedDomains?.includes(email.split("@")[1])) {
-          return error(400, "Invalid email domain.")
+          return status(400, `Invalid email domain: ${email.split("@")[1]}`)
         }
 
         const existingUser = await db.query.users.findFirst({
@@ -60,7 +60,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         })
 
         if (existingUser && existingUser.emailVerified) {
-          return error(409, "User with this email already verified.")
+          return status(409, "User with this email already verified.")
         }
 
         const passwordHash = await bcrypt.hash(password, 10)
@@ -81,7 +81,10 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           const serverUrl = process.env.SERVER_URL
           if (!serverUrl) {
             logError("SERVER_URL environment variable is not set.")
-            return error(500, "Server configuration error: SERVER_URL not set.")
+            return status(
+              500,
+              "Server configuration error: SERVER_URL not set."
+            )
           }
           const baseUrl = serverUrl.startsWith("http")
             ? serverUrl
@@ -106,10 +109,10 @@ export const auth = baseApp("auth").group("/auth", (app) =>
               'duplicate key value violates unique constraint "users_email_key"'
             )
           ) {
-            return error(409, "User with this email already exists.")
+            return status(409, "User with this email already exists.")
           }
           logError(`Signup Error: ${e}`)
-          return error(500, "Failed to create user.")
+          return status(500, "Failed to create user.")
         }
       },
       {
@@ -122,7 +125,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     )
     .post(
       "/signin",
-      async ({ db, jwt, body, error, cookie }) => {
+      async ({ db, jwt, body, status, cookie }) => {
         const { email, password } = body
 
         const user = await db.query.users.findFirst({
@@ -130,15 +133,18 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         })
 
         if (!user) {
-          return error(401, "Invalid email or password.")
+          return status(401, "Invalid email or password.")
         }
 
         if (!user.emailVerified) {
-          return error(403, "Please verify your email before signing in.")
+          return status(403, "Please verify your email before signing in.")
         }
 
         if (user.accountStatus === "inactive") {
-          return error(403, "Your account is inactive. Please contact support.")
+          return status(
+            403,
+            "Your account is inactive. Please contact support."
+          )
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -147,7 +153,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         )
 
         if (!isPasswordValid) {
-          return error(401, "Invalid email or password.")
+          return status(401, "Invalid email or password.")
         }
 
         const token = await jwt.sign({
@@ -181,19 +187,19 @@ export const auth = baseApp("auth").group("/auth", (app) =>
       cookie.auth.domain = process.env.DOMAIN
       return { message: "Signed out successfully" }
     })
-    .get("/profile", async ({ getUser, error }) => {
+    .get("/profile", async ({ getUser, status }) => {
       const userProfile = await getUser()
 
       if (!userProfile) {
         logError("Unauthorized")
-        return error(401, "Unauthorized")
+        return status(401, "Unauthorized")
       }
 
       return userProfile
     })
     .post(
       "/forgot-password",
-      async ({ db, body, error, set }) => {
+      async ({ db, body, status, set }) => {
         const { email } = body
 
         const user = await db.query.users.findFirst({
@@ -232,7 +238,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         } catch (emailError) {
           logError(`Failed to send password reset email: ${emailError}`)
           // Optionally, revert the token saving if email fails, or log for retry
-          return error(500, "Failed to send password reset email.")
+          return status(500, "Failed to send password reset email.")
         }
       },
       {
@@ -243,7 +249,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     )
     .post(
       "/reset-password",
-      async ({ db, body, error }) => {
+      async ({ db, body, status }) => {
         const { token: rawToken, password } = body
 
         const candidateTokens = await db.query.resetPasswordTokens.findMany({
@@ -270,7 +276,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         // 3. Check if a valid token was found
         if (!validTokenRecord) {
           logError("No valid reset token found or token expired/mismatched.")
-          return error(400, "Invalid or expired reset token.")
+          return status(400, "Invalid or expired reset token.")
         }
 
         // Ensure userId is present on the valid token record
@@ -278,7 +284,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           logError(
             `User ID missing from valid reset token record: ${validTokenRecord.id}`
           )
-          return error(500, "Internal server error during password reset.")
+          return status(500, "Internal server error during password reset.")
         }
 
         console.log("Valid token found for user:", validTokenRecord.userId)
@@ -318,7 +324,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
     )
     .get(
       "/verify-email/:token",
-      async ({ db, params, error, set }) => {
+      async ({ db, params, status, set }) => {
         const { token } = params
 
         const usersToCheck = await db.query.users.findMany({
@@ -342,7 +348,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
         }
 
         if (!foundUser || !foundUser.verificationToken) {
-          return error(400, "Verification token is invalid or has expired.")
+          return status(400, "Verification token is invalid or has expired.")
         }
 
         await db

@@ -1,5 +1,5 @@
 import { and, count, desc, eq, ilike, ne, sql } from "drizzle-orm"
-import { error, t } from "elysia"
+import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
@@ -45,7 +45,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       .use(authGuard("admin"))
       .get(
         "/",
-        async ({ db, query }) => {
+        async ({ db, query, status }) => {
           try {
             const { page = 1, limit = 10, search, departmentId, status } = query
             const offset = (page - 1) * limit
@@ -129,7 +129,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
             logError(`Error fetching user list for admin: ${e}`)
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
-            throw error(500, `Failed to fetch user list: ${message}`)
+            return status(500, `Failed to fetch user list: ${message}`)
           }
         },
         {

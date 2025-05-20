@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
 import { asc, eq } from "drizzle-orm"
-import { error, t } from "elysia"
+import { t } from "elysia"
 import { error as logError } from "@rasla/logify"
 import { baseApp } from "../../utils/baseApp"
 import {
@@ -27,7 +27,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
       // GET Project Financial Overview
       .get(
         "/:projectId",
-        async ({ params, db }) => {
+        async ({ params, db, status }) => {
           const { projectId } = params
 
           // 1. Fetch Project Details
@@ -40,7 +40,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           })
 
           if (!projectDetails) {
-            throw error(404, "Project not found")
+            return status(404, "Project not found")
           }
 
           // 2. Fetch Budget Injections
@@ -121,7 +121,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
       // PUT Update Budget Injection
       .put(
         "/budget-injection/:injectionId",
-        async ({ params, body, db }) => {
+        async ({ params, body, db, status }) => {
           const { injectionId } = params
           const { amount, description, date } = body
 
@@ -157,7 +157,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
               }) // Return the updated record
 
             if (updatedInjection.length === 0) {
-              throw error(404, "Budget injection not found.")
+              return status(404, "Budget injection not found.")
             }
 
             // Format the returned budget back to a number for the response
@@ -169,7 +169,10 @@ export const adminFinancials = baseApp("adminFinancials").group(
             // Handle potential database errors or not found errors
             if (e.status === 404) throw e
             logError(`Error updating budget injection: ${e}`)
-            throw error(500, `Failed to update budget injection: ${e.message}`)
+            return status(
+              500,
+              `Failed to update budget injection: ${e.message}`
+            )
           }
         },
         {
@@ -190,7 +193,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
       // DELETE Budget Injection
       .delete(
         "/budget-injection/:injectionId",
-        async ({ params, db }) => {
+        async ({ params, db, status }) => {
           const { injectionId } = params
 
           try {
@@ -200,14 +203,17 @@ export const adminFinancials = baseApp("adminFinancials").group(
               .returning({ id: projectBudgetInjections.id })
 
             if (deletedInjection.length === 0) {
-              throw error(404, "Budget injection not found.")
+              return status(404, "Budget injection not found.")
             }
 
             return { success: true, deletedId: deletedInjection[0].id }
           } catch (e: any) {
             if (e.status === 404) throw e
             logError(`Error deleting budget injection: ${e}`)
-            throw error(500, `Failed to delete budget injection: ${e.message}`)
+            return status(
+              500,
+              `Failed to delete budget injection: ${e.message}`
+            )
           }
         },
         {
@@ -223,7 +229,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
       // POST Create Budget Injection
       .post(
         "/budget-injection/new/:projectId",
-        async ({ params, body, db }) => {
+        async ({ params, body, db, status }) => {
           const { projectId } = params
           const { amount, description, date } = body
 
@@ -233,12 +239,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
             columns: { id: true },
           })
           if (!projectExists) {
-            throw error(404, "Project not found.")
+            return status(404, "Project not found.")
           }
 
           // Validate amount is positive
           if (amount <= 0) {
-            throw error(400, "Budget amount must be positive.")
+            return status(400, "Budget amount must be positive.")
           }
 
           const budgetDecimal = new Decimal(amount)
@@ -262,7 +268,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
 
             if (newInjection.length === 0) {
               // This case is unlikely with insert but good practice
-              throw error(500, "Failed to create budget injection.")
+              return status(500, "Failed to create budget injection.")
             }
 
             // Format the returned budget back to a number for the response
@@ -272,7 +278,10 @@ export const adminFinancials = baseApp("adminFinancials").group(
             }
           } catch (e: any) {
             logError(`Error creating budget injection: ${e}`)
-            throw error(500, `Failed to create budget injection: ${e.message}`)
+            return status(
+              500,
+              `Failed to create budget injection: ${e.message}`
+            )
           }
         },
         {

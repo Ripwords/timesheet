@@ -1,4 +1,4 @@
-import { error, t } from "elysia"
+import { t } from "elysia"
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
@@ -14,7 +14,7 @@ export const adminReportsRoutes = baseApp("reports").group(
   (app) =>
     app.use(authGuard()).get(
       "/aggregate",
-      async ({ query, db, getUser }) => {
+      async ({ query, db, getUser, status }) => {
         const {
           startDate,
           endDate,
@@ -117,7 +117,10 @@ export const adminReportsRoutes = baseApp("reports").group(
           logError(`Error fetching aggregated report: ${e}`)
           const message =
             e instanceof Error ? e.message : "Unknown error occurred"
-          throw error(500, `Failed to fetch aggregated report data: ${message}`)
+          return status(
+            500,
+            `Failed to fetch aggregated report data: ${message}`
+          )
         }
       },
       {

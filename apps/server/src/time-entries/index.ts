@@ -12,10 +12,10 @@ export const timeEntries = baseApp("time-entries").group(
       .use(authGuard())
       .post(
         "/",
-        async ({ db, body, error, getUser }) => {
+        async ({ db, body, status, getUser }) => {
           const user = await getUser()
           if (!user) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           try {
@@ -32,7 +32,7 @@ export const timeEntries = baseApp("time-entries").group(
               .returning() // Return the newly created entry
 
             if (!newTimeEntry || newTimeEntry.length === 0) {
-              return error(500, "Failed to create time entry")
+              return status(500, "Failed to create time entry")
             }
 
             return newTimeEntry[0]
@@ -43,9 +43,9 @@ export const timeEntries = baseApp("time-entries").group(
               e instanceof Error &&
               e.message.includes("violates foreign key constraint")
             ) {
-              return error(400, `Invalid projectId: ${body.projectId}`)
+              return status(400, `Invalid projectId: ${body.projectId}`)
             }
-            return error(500, "Internal Server Error")
+            return status(500, "Internal Server Error")
           }
         },
         {
@@ -64,11 +64,11 @@ export const timeEntries = baseApp("time-entries").group(
       )
       .get(
         "/",
-        async ({ db, getUser, error, query }) => {
+        async ({ db, getUser, status, query }) => {
           const { startDate, endDate } = query
           const user = await getUser()
           if (!user) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           // Base condition: entries must belong to the user if user is not admin
@@ -88,7 +88,7 @@ export const timeEntries = baseApp("time-entries").group(
               conditions.push(gte(schema.timeEntries.startTime, start))
             } catch (e) {
               logError(`Invalid startDate format: ${startDate} ${e}`)
-              return error(400, "Invalid startDate format. Use ISO 8601.")
+              return status(400, "Invalid startDate format. Use ISO 8601.")
             }
           }
 
@@ -106,7 +106,7 @@ export const timeEntries = baseApp("time-entries").group(
               conditions.push(lte(schema.timeEntries.startTime, end))
             } catch (e) {
               logError(`Invalid endDate format: ${endDate} ${e}`)
-              return error(400, "Invalid endDate format. Use ISO 8601.")
+              return status(400, "Invalid endDate format. Use ISO 8601.")
             }
           }
 
@@ -148,11 +148,11 @@ export const timeEntries = baseApp("time-entries").group(
       )
       .get(
         "/project/:id",
-        async ({ db, params, query, error, getUser }) => {
+        async ({ db, params, query, status, getUser }) => {
           const { startDate, endDate } = query
           const user = await getUser()
           if (!user) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           // Base condition: entries must belong to the user if user is not admin
@@ -172,7 +172,7 @@ export const timeEntries = baseApp("time-entries").group(
               conditions.push(gte(schema.timeEntries.startTime, start))
             } catch (e) {
               logError(`Invalid startDate format: ${startDate} ${e}`)
-              return error(400, "Invalid startDate format. Use ISO 8601.")
+              return status(400, "Invalid startDate format. Use ISO 8601.")
             }
           }
 
@@ -190,7 +190,7 @@ export const timeEntries = baseApp("time-entries").group(
               conditions.push(lte(schema.timeEntries.startTime, end))
             } catch (e) {
               logError(`Invalid endDate format: ${endDate} ${e}`)
-              return error(400, "Invalid endDate format. Use ISO 8601.")
+              return status(400, "Invalid endDate format. Use ISO 8601.")
             }
           }
 
@@ -202,7 +202,7 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (!timeEntry) {
-            return error(404, "Time entry not found")
+            return status(404, "Time entry not found")
           }
 
           // Authorization check: User must own the entry OR be an admin
@@ -210,7 +210,7 @@ export const timeEntries = baseApp("time-entries").group(
             timeEntry.some((entry) => entry.userId !== user.userId) &&
             user.role !== "admin"
           ) {
-            return error(403, "Forbidden: You do not own this time entry")
+            return status(403, "Forbidden: You do not own this time entry")
           }
 
           return timeEntry
@@ -244,10 +244,10 @@ export const timeEntries = baseApp("time-entries").group(
       )
       .get(
         "/department-list",
-        async ({ db, getUser, error }) => {
+        async ({ db, getUser, status }) => {
           const userPayload = await getUser()
           if (!userPayload) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           // Fetch the user's department from the database using the userId from the payload
@@ -270,7 +270,7 @@ export const timeEntries = baseApp("time-entries").group(
             console.warn(
               `User ${userPayload.userId} not found or has no department assigned.`
             )
-            return error(400, "User department not set or user not found")
+            return status(400, "User department not set or user not found")
           }
 
           const userDepartment = userRecord.departmentId
@@ -293,7 +293,7 @@ export const timeEntries = baseApp("time-entries").group(
             logError(
               `Failed to fetch default descriptions for department ${userDepartment}: ${e}`
             )
-            return error(500, "Internal Server Error")
+            return status(500, "Internal Server Error")
           }
         },
         {
@@ -306,10 +306,10 @@ export const timeEntries = baseApp("time-entries").group(
       )
       .get(
         "/defaults",
-        async ({ db, getUser, error }) => {
+        async ({ db, getUser, status }) => {
           const userPayload = await getUser()
           if (!userPayload) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           const user = await db.query.users.findFirst({
@@ -317,7 +317,7 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (!user) {
-            return error(400, "User not found")
+            return status(400, "User not found")
           }
 
           // Fetch the user's department from the database using the userId from the payload
@@ -346,7 +346,7 @@ export const timeEntries = baseApp("time-entries").group(
             console.warn(
               `User ${userPayload.userId} not found or has no department assigned.`
             )
-            return error(400, "User department not set or user not found")
+            return status(400, "User department not set or user not found")
           }
 
           return {
@@ -366,10 +366,10 @@ export const timeEntries = baseApp("time-entries").group(
       // UPDATE Time Entry
       .put(
         "/id/:id",
-        async ({ db, params, body, error, getUser }) => {
+        async ({ db, params, body, status, getUser }) => {
           const user = await getUser()
           if (!user) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           // 1. Find the existing entry first to check ownership
@@ -379,14 +379,14 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (!existingEntry) {
-            return error(404, "Time entry not found")
+            return status(404, "Time entry not found")
           }
 
           // 2. Authorization check: Only the owner can update their entry
           if (existingEntry.userId !== user.userId) {
             // Admins typically shouldn't modify others' time entries directly
             // If admin override is needed, add `&& user.role !== "admin"` check here
-            return error(403, "Forbidden: You cannot update this time entry")
+            return status(403, "Forbidden: You cannot update this time entry")
           }
 
           // 3. Perform the update
@@ -416,7 +416,7 @@ export const timeEntries = baseApp("time-entries").group(
             if (!updatedEntry || updatedEntry.length === 0) {
               // This case might be redundant due to the initial findFirst check,
               // but good for robustness.
-              return error(500, "Failed to update time entry")
+              return status(500, "Failed to update time entry")
             }
 
             return updatedEntry[0]
@@ -427,9 +427,9 @@ export const timeEntries = baseApp("time-entries").group(
               e instanceof Error &&
               e.message.includes("violates foreign key constraint")
             ) {
-              return error(400, `Invalid projectId: ${body.projectId}`)
+              return status(400, `Invalid projectId: ${body.projectId}`)
             }
-            return error(500, "Internal Server Error")
+            return status(500, "Internal Server Error")
           }
         },
         {
@@ -454,10 +454,10 @@ export const timeEntries = baseApp("time-entries").group(
       // DELETE Time Entry
       .delete(
         "/id/:id",
-        async ({ db, params, error, getUser }) => {
+        async ({ db, params, status, getUser }) => {
           const user = await getUser()
           if (!user) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           // 1. Find the existing entry first to check ownership
@@ -467,14 +467,14 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (!existingEntry) {
-            return error(404, "Time entry not found")
+            return status(404, "Time entry not found")
           }
 
           // 2. Authorization check: Only the owner can delete their entry
           if (existingEntry.userId !== user.userId) {
             // Admins typically shouldn't delete others' time entries directly
             // If admin override is needed, add `&& user.role !== "admin"` check here
-            return error(403, "Forbidden: You cannot delete this time entry")
+            return status(403, "Forbidden: You cannot delete this time entry")
           }
 
           // 3. Perform the deletion
@@ -485,14 +485,14 @@ export const timeEntries = baseApp("time-entries").group(
               .returning({ id: schema.timeEntries.id }) // Return the id of the deleted item
 
             if (!deletedEntry || deletedEntry.length === 0) {
-              return error(500, "Failed to delete time entry")
+              return status(500, "Failed to delete time entry")
             }
 
             return deletedEntry[0]
           } catch (e) {
             logError(`Failed to delete time entry ${params.id}: ${e}`)
             // Handle potential DB errors if necessary
-            return error(500, "Internal Server Error")
+            return status(500, "Internal Server Error")
           }
         },
         {

@@ -17,9 +17,9 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     .use(authGuard())
     .post(
       "/",
-      async ({ db, body, error, isAdmin }) => {
+      async ({ db, body, status, isAdmin }) => {
         if (!isAdmin) {
-          return error(403, "Forbidden")
+          return status(403, "Forbidden")
         }
 
         try {
@@ -31,13 +31,13 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .returning() // Return the newly created project
 
           if (!newProject || newProject.length === 0) {
-            return error(500, "Failed to create project")
+            return status(500, "Failed to create project")
           }
 
           return newProject[0]
         } catch (e) {
           logError(`Failed to create project: ${e}`)
-          return error(500, "Internal Server Error")
+          return status(500, "Internal Server Error")
         }
       },
       {
@@ -123,9 +123,9 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     // UPDATE Project
     .put(
       "/id/:id",
-      async ({ db, params, body, error, isAdmin }) => {
+      async ({ db, params, body, status, isAdmin }) => {
         if (!isAdmin) {
-          return error(403, "Forbidden")
+          return status(403, "Forbidden")
         }
 
         const projectId = params.id
@@ -137,7 +137,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         })
 
         if (!existingProject) {
-          return error(404, "Project not found")
+          return status(404, "Project not found")
         }
 
         try {
@@ -150,13 +150,13 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .returning() // Return the updated project
 
           if (!updatedProject || updatedProject.length === 0) {
-            return error(500, "Failed to update project")
+            return status(500, "Failed to update project")
           }
 
           return updatedProject[0]
         } catch (e) {
           logError(`Failed to update project ${projectId}: ${e}`)
-          return error(500, "Internal Server Error")
+          return status(500, "Internal Server Error")
         }
       },
       {
@@ -178,9 +178,9 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     // DELETE Project
     .delete(
       "/id/:id",
-      async ({ db, params, error, set, isAdmin }) => {
+      async ({ db, params, status, set, isAdmin }) => {
         if (!isAdmin) {
-          return error(403, "Forbidden")
+          return status(403, "Forbidden")
         }
 
         const projectId = params.id
@@ -193,7 +193,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .where(eq(schema.timeEntries.projectId, projectId))
 
           if (timeEntriesCount[0]?.count > 0) {
-            return error(
+            return status(
               400,
               "Project cannot be deleted because it has associated time entries."
             )
@@ -206,7 +206,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .where(eq(schema.projectBudgetInjections.projectId, projectId))
 
           if (budgetInjectionsCount[0]?.count > 0) {
-            return error(
+            return status(
               400,
               "Project cannot be deleted because it has associated budget injections."
             )
@@ -219,14 +219,14 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             .returning({ id: schema.projects.id }) // Return the id of the deleted item
 
           if (!deletedProject || deletedProject.length === 0) {
-            return error(404, "Project not found")
+            return status(404, "Project not found")
           }
 
           set.status = 200 // Explicitly set 200 OK
           return { message: `Project ${projectId} deleted successfully` }
         } catch (e) {
           logError(`Failed to delete project ${projectId}: ${e}`)
-          return error(500, "Internal Server Error")
+          return status(500, "Internal Server Error")
         }
       },
       {

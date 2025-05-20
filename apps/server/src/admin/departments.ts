@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm"
-import { t, error } from "elysia"
+import { t } from "elysia"
 import { error as logError } from "@rasla/logify"
 
 import { baseApp } from "../../utils/baseApp"
@@ -21,23 +21,8 @@ const allowedColors = [
 ] as const
 
 const departmentIdParamsSchema = t.Object({
-  id: UUID, // Re-use UUID validator for department ID
+  id: UUID,
 })
-
-// OLD Schema (for reference, will be replaced below for PUT)
-// const departmentBodySchema = t.Object({
-//   name: t.String({ minLength: 1, error: "Department name cannot be empty." }),
-//   color: t.UnionEnum([...allowedColors]),
-//   maxSessionMinutes: t.Number({
-//     min: 0,
-//     error: "Max session minutes must be positive.",
-//   }),
-//   defaultDescriptions: t.Optional(
-//     t.Array(t.String({ minLength: 1 }), {
-//       error: "Default descriptions must be a non-empty array of strings.",
-//     })
-//   ),
-// })
 
 // NEW Schema for PUT body - granular description updates
 const departmentUpdateBodySchema = t.Object({
@@ -97,7 +82,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       // === NEW Department CRUD Endpoints ===
       .get(
         "/",
-        async ({ db, query }) => {
+        async ({ db, query, status }) => {
           const { departmentIds } = query
           try {
             const allDepartments = db
@@ -117,7 +102,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             return await allDepartments
           } catch (e) {
             logError(`Error fetching departments: ${e}`)
-            throw error(500, "Failed to fetch departments")
+            return status(500, "Failed to fetch departments")
           }
         },
         {
@@ -133,7 +118,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       // === NEW Endpoint: Get Single Department with Descriptions ===
       .get(
         "/:id",
-        async ({ db, params }) => {
+        async ({ db, params, status }) => {
           try {
             const { id } = params
 
@@ -149,7 +134,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             })
 
             if (!departmentData) {
-              throw error(404, `Department with ID ${id} not found.`)
+              return status(404, `Department with ID ${id} not found.`)
             }
 
             // Fetch associated default descriptions with their IDs
@@ -170,7 +155,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
           } catch (e: any) {
             logError(`Error fetching department ${params.id}: ${e}`)
             if (e.status) throw e // Re-throw Elysia/NotFound errors
-            throw error(500, "Failed to fetch department details")
+            return status(500, "Failed to fetch department details")
           }
         },
         {
@@ -185,7 +170,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       )
       .post(
         "/",
-        async ({ db, body }) => {
+        async ({ db, body, status }) => {
           // Use transaction for atomicity
           return db.transaction(async (tx) => {
             try {
@@ -199,7 +184,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
                 columns: { id: true },
               })
               if (existing) {
-                throw error(
+                return status(
                   409,
                   `Department with name "${name}" already exists.`
                 )
@@ -212,7 +197,10 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
                 .returning()
 
               if (!newDepartmentResult || newDepartmentResult.length === 0) {
-                throw error(500, "Failed to create department after validation")
+                return status(
+                  500,
+                  "Failed to create department after validation"
+                )
               }
 
               const newDepartment = newDepartmentResult[0]
@@ -235,7 +223,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               logError(`Error creating department: ${e}`)
               // tx.rollback(); // Drizzle handles rollback on throw automatically
               if (e.status) throw e // Re-throw Elysia errors
-              throw error(500, "Failed to create department")
+              return status(500, "Failed to create department")
             }
           }) // End transaction
         },
@@ -251,7 +239,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       )
       .put(
         "/:id",
-        async ({ db, params, body }) => {
+        async ({ db, params, body, status }) => {
           // Use transaction for atomicity
           return db.transaction(async (tx) => {
             try {
@@ -284,7 +272,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
                     columns: { id: true },
                   })
                 if (conflictingDepartment) {
-                  throw error(
+                  return status(
                     409,
                     `Another department with name "${name}" already exists.`
                   )
@@ -309,7 +297,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
                     columns: { id: true },
                   })
                   if (!exists) {
-                    throw error(404, `Department with ID ${id} not found.`)
+                    return status(404, `Department with ID ${id} not found.`)
                   }
                   // If it exists but wasn't updated (e.g., no fields changed), it's okay
                 }
@@ -400,7 +388,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               )
               // tx.rollback(); // Drizzle handles rollback on throw automatically
               if (e.status) throw e // Re-throw Elysia errors
-              throw error(500, "Failed to update department")
+              return status(500, "Failed to update department")
             }
           }) // End transaction
         },
@@ -417,7 +405,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       )
       .delete(
         "/:id",
-        async ({ db, params }) => {
+        async ({ db, params, status }) => {
           try {
             const { id } = params
 
@@ -426,7 +414,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               columns: { id: true },
             })
             if (linkedUsers) {
-              throw error(
+              return status(
                 400,
                 "Cannot delete department: It is currently assigned to users."
               )
@@ -438,7 +426,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
                 columns: { id: true },
               })
             if (linkedDescriptions) {
-              throw error(
+              return status(
                 400,
                 "Cannot delete department: It has default descriptions linked."
               )
@@ -450,14 +438,14 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               .returning({ id: departments.id })
 
             if (!deletedDepartment || deletedDepartment.length === 0) {
-              throw error(404, `Department with ID ${id} not found.`)
+              return status(404, `Department with ID ${id} not found.`)
             }
 
             return { success: true, id: deletedDepartment[0].id }
           } catch (e: any) {
             logError(`Error deleting department ${params.id}: ${e}`)
             if (e.status) throw e // Re-throw Elysia errors
-            throw error(500, e || "Failed to delete department")
+            return status(500, e || "Failed to delete department")
           }
         },
         {
@@ -474,7 +462,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
       // === EXISTING Default Description Endpoints (Review/Relocate if needed) ===
       .get(
         "/descriptions", // Changed path slightly to avoid clash with GET /
-        async ({ db, query }) => {
+        async ({ db, query, status }) => {
           try {
             const { departmentIds } = query
 
@@ -502,7 +490,10 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             return departmentsData
           } catch (e) {
             logError(`Error fetching departments for descriptions: ${e}`)
-            throw error(500, "Failed to fetch department data for descriptions")
+            return status(
+              500,
+              "Failed to fetch department data for descriptions"
+            )
           }
         },
         {
