@@ -120,7 +120,7 @@ export const timeEntries = baseApp("time-entries").group(
             )
             .where(and(...conditions))
             .orderBy(desc(schema.timeEntries.startTime))
-          console.log(userTimeEntries)
+
           return userTimeEntries
         },
         {
