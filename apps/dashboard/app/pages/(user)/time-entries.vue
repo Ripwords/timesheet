@@ -607,7 +607,7 @@ const cancelDelete = () => {
 
             <UFormField
               label="Description"
-              class="mb-4"
+              class="mb-4 w-full"
             >
               <template v-if="exceedsDepartmentThresholdInModal">
                 <UInput
@@ -642,7 +642,7 @@ const cancelDelete = () => {
                   creatable
                   searchable
                   searchable-placeholder="Search or add description..."
-                  class="mb-2"
+                  class="mb-2 w-full"
                   :loading="loadingDefaultsStatus === 'pending'"
                 />
                 <UInput

@@ -51,7 +51,7 @@ async function submit() {
   if (error) {
     toast.add({
       title: "Error",
-      description: "Failed to register",
+      description: String(error.value) || "Failed to register",
     })
   }
 

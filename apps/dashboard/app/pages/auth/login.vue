@@ -80,6 +80,7 @@ async function submit() {
           <UInput
             v-model="state.password"
             type="password"
+            placeholder="********"
             class="w-full"
           />
         </UFormField>
