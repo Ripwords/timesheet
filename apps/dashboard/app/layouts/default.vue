@@ -46,6 +46,11 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
         { label: "Overview", icon: "i-lucide-layout-dashboard", to: "/admin" },
         { label: "Users", icon: "i-lucide-users", to: "/admin/users" },
         {
+          label: "Departments",
+          icon: "i-lucide-building",
+          to: "/admin/departments",
+        },
+        {
           label: "Projects",
           icon: "i-lucide-briefcase",
           to: "/admin/projects",

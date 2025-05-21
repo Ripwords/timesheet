@@ -49,7 +49,7 @@ const {
   data: departments,
   pending,
   refresh: refreshDepartments,
-} = await useAsyncData("admin-departments", async () => {
+} = await useLazyAsyncData("admin-settings-departments", async () => {
   const { data, error } = await $eden.api.admin.departments.get({
     query: {},
   })
