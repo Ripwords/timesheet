@@ -38,6 +38,7 @@ const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, en
 const modalDurationInput = ref("") // For the duration input field (e.g., "1h 30m")
 const isDeleteConfirmOpen = ref(false)
 const entryToDeleteId: Ref<string | null> = ref(null)
+const isSubmitting = ref(false)
 
 // Modal form state
 const modalState = reactive({
@@ -378,6 +379,7 @@ const closeModal = () => {
 }
 
 const saveEntry = async () => {
+  isSubmitting.value = true
   // 1. Validate inputs
   if (!modalState.id || !modalState.startTime || !modalState.endTime) {
     toast.add({
@@ -483,6 +485,8 @@ const saveEntry = async () => {
       color: "error",
     })
   }
+
+  isSubmitting.value = false
 }
 
 const deleteEntry = async (id: string) => {
@@ -667,7 +671,9 @@ const cancelDelete = () => {
                 >Cancel</UButton
               >
               <UButton
-                :disabled="Boolean(editingEntry) && !canEditEntry"
+                :disabled="
+                  Boolean(editingEntry) && !canEditEntry && isSubmitting
+                "
                 :title="
                   editingEntry && !canEditEntry
                     ? 'Can only edit entries from today'

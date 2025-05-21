@@ -64,7 +64,7 @@ const {
 
     const { data } = await $eden.api["time-entries"].get({
       query: {
-        userId,
+        userId: [userId],
         startDate: monthStart,
         endDate: monthEnd,
       },

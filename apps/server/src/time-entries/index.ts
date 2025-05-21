@@ -1,4 +1,4 @@
-import { desc, eq, and, gte, lte, SQL } from "drizzle-orm"
+import { desc, eq, and, gte, lte, SQL, inArray } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
@@ -71,12 +71,17 @@ export const timeEntries = baseApp("time-entries").group(
             return status(401, "Unauthorized")
           }
 
+          console.log("query.userId", query.userId)
+          if (typeof query.userId === "string") {
+            query.userId = [query.userId]
+          }
+
           // Base condition: entries must belong to the user if user is not admin
           let conditions: SQL[] = []
           if (user.role !== "admin") {
             conditions.push(eq(schema.timeEntries.userId, user.userId))
           } else if (query.userId) {
-            conditions.push(eq(schema.timeEntries.userId, query.userId))
+            conditions.push(inArray(schema.timeEntries.userId, query.userId))
           }
 
           // Add start date condition if provided
@@ -142,7 +147,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
               })
             ),
-            userId: t.Optional(UUID),
+            userId: t.Optional(t.Array(UUID)),
           }),
         }
       )
