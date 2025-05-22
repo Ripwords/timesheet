@@ -423,6 +423,15 @@ const saveEntry = async () => {
       modalState.customDescription || selectedDefaultDescription.value || ""
   }
 
+  if (finalDescription === "") {
+    toast.add({
+      title: "Validation Error",
+      description: "Description is required.",
+      color: "warning",
+    })
+    return
+  }
+
   const payload = {
     projectId: modalState.id,
     startTime: start.toISOString(), // Send ISO string to backend
