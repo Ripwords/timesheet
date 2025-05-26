@@ -5,6 +5,7 @@ import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
 import { error as logError } from "@rasla/logify"
+import dayjs from "dayjs"
 interface AggregateDataPoint {
   [key: string]: string | number | Date | undefined // More specific index signature
 }
@@ -34,8 +35,13 @@ export const adminReportsRoutes = baseApp("reports").group(
         // but often checks below handle empty cases.
         const filters = []
         if (startDate)
-          filters.push(gte(timeEntries.startTime, new Date(startDate)))
-        if (endDate) filters.push(lte(timeEntries.endTime, new Date(endDate)))
+          filters.push(
+            gte(timeEntries.startTime, dayjs(startDate).startOf("day").toDate())
+          )
+        if (endDate)
+          filters.push(
+            lte(timeEntries.endTime, dayjs(endDate).endOf("day").toDate())
+          )
         // Ensure arrays are not empty before using inArray
         if (userIds && userIds.length > 0)
           filters.push(inArray(timeEntries.userId, userIds))

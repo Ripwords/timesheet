@@ -5,6 +5,7 @@ import * as schema from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
 import { error as logError } from "@rasla/logify"
+import dayjs from "dayjs"
 export const timeEntries = baseApp("time-entries").group(
   "/time-entries",
   (app) =>
@@ -87,7 +88,7 @@ export const timeEntries = baseApp("time-entries").group(
           // Add start date condition if provided
           if (startDate) {
             try {
-              const start = new Date(startDate)
+              const start = dayjs(startDate).startOf("day").toDate()
               // Check if date is valid before pushing condition
               if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
               conditions.push(gte(schema.timeEntries.startTime, start))
@@ -100,7 +101,7 @@ export const timeEntries = baseApp("time-entries").group(
           // Add end date condition if provided
           if (endDate) {
             try {
-              const end = new Date(endDate)
+              const end = dayjs(endDate).endOf("day").toDate()
               // Check if date is valid before pushing condition
               if (isNaN(end.getTime())) throw new Error("Invalid Date Object")
               // Make the end date inclusive by setting time to the end of the day
@@ -171,7 +172,7 @@ export const timeEntries = baseApp("time-entries").group(
           // Add start date condition if provided
           if (startDate) {
             try {
-              const start = new Date(startDate)
+              const start = dayjs(startDate).startOf("day").toDate()
               // Check if date is valid before pushing condition
               if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
               conditions.push(gte(schema.timeEntries.startTime, start))
@@ -184,7 +185,7 @@ export const timeEntries = baseApp("time-entries").group(
           // Add end date condition if provided
           if (endDate) {
             try {
-              const end = new Date(endDate)
+              const end = dayjs(endDate).endOf("day").toDate()
               // Check if date is valid before pushing condition
               if (isNaN(end.getTime())) throw new Error("Invalid Date Object")
               // Make the end date inclusive by setting time to the end of the day

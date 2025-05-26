@@ -155,9 +155,9 @@ const chartOptions = computed((): ChartOptions<"line"> => {
           displayFormats: {
             // Control how labels are displayed on the axis
             day: "MMM d",
-            week: "MMM d yyyy",
-            month: "MMM yyyy",
-            year: "yyyy",
+            week: "MMM YYYY",
+            month: "MMM YYYY",
+            year: "YYYY",
           },
         },
         title: {

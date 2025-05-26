@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import duration from "dayjs/plugin/duration"
+import weekOfYear from "dayjs/plugin/weekOfYear"
 
 useSeoMeta({
   title: "Timesheet | User Dashboard",
@@ -9,6 +10,7 @@ useSeoMeta({
 const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 dayjs.extend(duration)
+dayjs.extend(weekOfYear)
 const toast = useToast() // Added for feedback
 
 // Fetch data for summary widgets
@@ -101,7 +103,7 @@ const projectBarChartData = computed(() => {
     projectTotalsData.value?.map((item) => ({
       id: item.id,
       label: item.name || `Project ${item.id}`, // Use name, fallback to ID
-      value: Math.round(Number(item.totalDuration) / 60), // Convert seconds to minutes
+      value: Math.round(Number(item.totalDuration) / 60),
     })) ?? []
   )
 })
@@ -121,7 +123,7 @@ const dailyLineChartData = computed(() => {
   return Object.entries(aggregated)
     .map(([date, duration]) => ({
       label: date,
-      value: Math.round(duration / 60), // Convert seconds to minutes
+      value: Math.round(duration / 60),
     }))
     .sort((a, b) => a.label.localeCompare(b.label)) // Sort by date
 })
@@ -129,36 +131,30 @@ const dailyLineChartData = computed(() => {
 // Format data for the Line Chart (Weekly)
 const weeklyLineChartData = computed(() => {
   // Aggregate data by week if multiple projects exist for the same week
-  const aggregated: Record<string, number> = {}
+  const aggregated: Map<string, { date: Date; duration: number }> = new Map()
+
   weeklyTotalsData.value?.forEach((item) => {
-    const weekStr = item.timePeriod as string // Assuming DB returns like '2023-W43'
-    if (!weekStr) return // Skip if timePeriod is missing
-    if (!aggregated[weekStr]) {
-      aggregated[weekStr] = 0
+    // Parse the timePeriod as a date (it's already the start of the week from DB)
+    const weekStartDate = dayjs(item.timePeriod).format("MM-YYYY")
+
+    // Use ISO string as key for consistent aggregation (no need for startOf since DB already gives us week start)
+
+    if (!aggregated.has(weekStartDate)) {
+      aggregated.set(weekStartDate, {
+        date: dayjs(item.timePeriod).toDate(),
+        duration: 0,
+      })
     }
-    aggregated[weekStr] += Number(item.totalDuration) || 0
+    const existing = aggregated.get(weekStartDate)!
+    existing.duration += Number(item.totalDuration) || 0
   })
 
-  return (
-    Object.entries(aggregated)
-      .map(([week, duration]) => ({
-        label: week, // Keep the week string like '2023-W43'
-        value: Math.round(duration / 60), // Convert seconds to minutes
-      }))
-      // Sort by year then week number
-      .sort((a, b) => {
-        const [yearA, weekA] = a.label.split("-W").map(Number)
-        const [yearB, weekB] = b.label.split("-W").map(Number)
-        // Add default values (e.g., 0) to handle potential undefined/NaN from split/map
-        const safeYearA = yearA ?? 0
-        const safeWeekA = weekA ?? 0
-        const safeYearB = yearB ?? 0
-        const safeWeekB = weekB ?? 0
-
-        if (safeYearA !== safeYearB) return safeYearA - safeYearB
-        return safeWeekA - safeWeekB
-      })
-  )
+  return Array.from(aggregated.values())
+    .map(({ date, duration }) => ({
+      label: date, // Pass the actual Date object for the chart
+      value: Math.round(duration / 60), // Convert seconds to minutes
+    }))
+    .sort((a, b) => (a.label as Date).getTime() - (b.label as Date).getTime()) // Sort by date
 })
 
 // --- Computed Summary Metrics ---
@@ -516,7 +512,7 @@ const cancelSession = () => {
             label-field="label"
             value-field="value"
             chart-title="Total Hours per Project (All Time)"
-            value-axis-label="Total Duration (Minutes)"
+            value-axis-label="Total Duration (Hours)"
             category-axis-label="Project"
           />
           <p class="text-xs text-gray-500 mt-1">
@@ -625,12 +621,12 @@ const cancelSession = () => {
             label-field="label"
             value-field="value"
             chart-title="Total Hours per Day"
-            value-axis-label="Total Duration (Minutes)"
+            value-axis-label="Total Duration (Hours)"
             category-axis-label="Date"
             time-unit="day"
           />
           <p class="text-xs text-gray-500 mt-1">
-            Note: Duration shown in minutes.
+            Note: Duration shown in hours.
           </p>
         </div>
         <div
@@ -656,12 +652,12 @@ const cancelSession = () => {
             label-field="label"
             value-field="value"
             chart-title="Total Hours per Week"
-            value-axis-label="Total Duration (Minutes)"
+            value-axis-label="Total Duration (Hours)"
             category-axis-label="Week"
             time-unit="week"
           />
           <p class="text-xs text-gray-500 mt-1">
-            Note: Duration shown in minutes.
+            Note: Duration shown in hours.
           </p>
         </div>
         <div
