@@ -19,6 +19,18 @@ export const timeEntries = baseApp("time-entries").group(
             return status(401, "Unauthorized")
           }
 
+          // Validate that time entry is not older than 11:59PM of the previous day
+          const cutoffTime = dayjs().subtract(1, "day").endOf("day").toDate()
+          if (dayjs(body.startTime).isBefore(cutoffTime)) {
+            const cutoffFormatted = dayjs(cutoffTime).format(
+              "YYYY-MM-DD HH:mm:ss"
+            )
+            return status(
+              400,
+              `Time entries cannot be submitted for dates before ${cutoffFormatted}`
+            )
+          }
+
           try {
             const newTimeEntry = await db
               .insert(schema.timeEntries)

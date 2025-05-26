@@ -387,6 +387,7 @@ const saveEntry = async () => {
       description: "Project, Start Time, and End Time are required.",
       color: "warning",
     })
+    isSubmitting.value = false
     return
   }
 
@@ -399,6 +400,7 @@ const saveEntry = async () => {
       description: "Invalid date format.",
       color: "warning",
     })
+    isSubmitting.value = false
     return
   }
 
@@ -408,6 +410,20 @@ const saveEntry = async () => {
       description: "End Time must be after Start Time.",
       color: "warning",
     })
+    isSubmitting.value = false
+    return
+  }
+
+  // Validate that time entry is not older than 11:59PM of the previous day
+  const cutoffTime = dayjs().subtract(1, "day").endOf("day")
+  if (start.isBefore(cutoffTime)) {
+    const cutoffFormatted = cutoffTime.format("YYYY-MM-DD HH:mm:ss")
+    toast.add({
+      title: "Validation Error",
+      description: `Time entries cannot be submitted for dates before ${cutoffFormatted}`,
+      color: "warning",
+    })
+    isSubmitting.value = false
     return
   }
 
@@ -429,6 +445,7 @@ const saveEntry = async () => {
       description: "Description is required.",
       color: "warning",
     })
+    isSubmitting.value = false
     return
   }
 
@@ -450,6 +467,7 @@ const saveEntry = async () => {
           description: "You can only edit entries created today.",
           color: "warning",
         })
+        isSubmitting.value = false
         return
       }
       // Call PUT endpoint
