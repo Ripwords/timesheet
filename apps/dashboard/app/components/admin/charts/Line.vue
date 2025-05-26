@@ -22,7 +22,6 @@ import {
 } from "chart.js"
 import "chartjs-adapter-dayjs-4" // Use dayjs adapter
 import { Line } from "vue-chartjs"
-import { useDayjs } from "#dayjs" // Import dayjs
 
 // Register necessary Chart.js components
 ChartJS.register(
@@ -151,10 +150,10 @@ const chartOptions = computed((): ChartOptions<"line"> => {
         type: "time", // Use time scale
         time: {
           unit: props.timeUnit, // Control display unit based on data granularity
-          tooltipFormat: "PPpp", // Format for tooltips (requires date-fns)
+          tooltipFormat: "PPpp",
           displayFormats: {
             // Control how labels are displayed on the axis
-            day: "MMM d",
+            day: "MMM DD",
             week: "MMM YYYY",
             month: "MMM YYYY",
             year: "YYYY",

@@ -122,10 +122,10 @@ const dailyLineChartData = computed(() => {
 
   return Object.entries(aggregated)
     .map(([date, duration]) => ({
-      label: date,
+      label: new Date(date),
       value: Math.round(duration / 60),
     }))
-    .sort((a, b) => a.label.localeCompare(b.label)) // Sort by date
+    .sort((a, b) => a.label.getTime() - b.label.getTime()) // Sort by date
 })
 
 // Format data for the Line Chart (Weekly)
