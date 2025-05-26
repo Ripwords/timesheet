@@ -7,6 +7,34 @@ useSeoMeta({
   description: "User dashboard for managing the application",
 })
 
+// Prevent accidental tab closure during active timer
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (timerStatus.value === "running" || timerStatus.value === "paused") {
+    event.preventDefault()
+  }
+}
+
+// Add/remove beforeunload listener based on timer status
+const setupBeforeUnloadProtection = () => {
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", handleBeforeUnload)
+  }
+}
+
+const removeBeforeUnloadProtection = () => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("beforeunload", handleBeforeUnload)
+  }
+}
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  removeBeforeUnloadProtection()
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+  }
+})
+
 const { $eden } = useNuxtApp()
 const dayjs = useDayjs()
 dayjs.extend(duration)
@@ -306,6 +334,9 @@ const resetState = () => {
   customDescription.value = ""
   dropdownDescription.value = undefined
 
+  // Remove beforeunload protection when timer is fully stopped
+  removeBeforeUnloadProtection()
+
   // Note: No history refresh here as history table is separate
 }
 
@@ -319,6 +350,8 @@ const startTimer = () => {
     startTime.value = now // Set the overall start time
     totalAccumulatedDuration.value = 0 // Reset accumulated duration
     currentIntervalElapsedTime.value = 0 // Reset current interval time
+    // Set up beforeunload protection when starting from stopped
+    setupBeforeUnloadProtection()
   }
   // If resuming from pause, totalAccumulatedDuration already holds the prior time
 
