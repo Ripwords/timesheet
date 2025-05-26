@@ -66,12 +66,26 @@ const seedProdData = async () => {
       seededDepartments.map((d) => [d.name, d.id])
     )
 
+    const sharedDescriptions = [
+      "Scrum (Tech)",
+      "Daily Huddle (Digital)",
+      "Mid-Management",
+      "Meeting (3rd Party / S20 Internal)",
+      "Interview",
+      "Digital WIP",
+      "Tech WIP",
+      "Off projects work (assessment, SOP creation, etc.)",
+      "Class / Training",
+      "Internal Projects",
+    ]
+
     const descriptionsByDepartmentName: Record<string, string[]> = {
       "Frontend Design": [
         "Implement UI components from Figma",
         "Style application elements",
         "Ensure responsive design",
         "Design system integration",
+        ...sharedDescriptions,
       ],
       "Frontend JS": [
         "Develop interactive features",
@@ -79,6 +93,7 @@ const seedProdData = async () => {
         "Integrate backend APIs",
         "Write unit/integration tests",
         "Optimize frontend performance",
+        ...sharedDescriptions,
       ],
       Backend: [
         "Design and implement API endpoints",
@@ -86,6 +101,7 @@ const seedProdData = async () => {
         "Implement authentication/authorization",
         "Server deployment and maintenance",
         "Write backend tests",
+        ...sharedDescriptions,
       ],
       "UI/UX": [
         "User research and analysis",
@@ -93,6 +109,7 @@ const seedProdData = async () => {
         "Develop user flow diagrams",
         "Conduct usability testing",
         "Prototype interactions",
+        ...sharedDescriptions,
       ],
       "Brand Team": [
         "Braindump",
@@ -126,6 +143,7 @@ const seedProdData = async () => {
         "Brand social audit",
         "Work on Proposal deck ",
         "Research for Proposal",
+        ...sharedDescriptions,
       ],
       Creative: [
         "Content creation (static / video)",
@@ -142,6 +160,7 @@ const seedProdData = async () => {
         "Proposal briefing",
         "Work on Proposal deck",
         "Research for Proposal",
+        ...sharedDescriptions,
       ],
       Copywriter: [
         "Braindump",
@@ -154,6 +173,7 @@ const seedProdData = async () => {
         "Brand social audit",
         "Work on Proposal deck ",
         "Research for Proposal",
+        ...sharedDescriptions,
       ],
       "Tech PM": [
         "Track dev progress",
@@ -162,6 +182,7 @@ const seedProdData = async () => {
         "Administrations (e.g. quotes, invoices etc)",
         "UAT",
         "Documentations (e.g. timelines, user guide etc)",
+        ...sharedDescriptions,
       ],
     }
 
