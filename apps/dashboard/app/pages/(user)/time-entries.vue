@@ -39,6 +39,7 @@ const modalDurationInput = ref("") // For the duration input field (e.g., "1h 30
 const isDeleteConfirmOpen = ref(false)
 const entryToDeleteId: Ref<string | null> = ref(null)
 const isSubmitting = ref(false)
+const isDeleting = ref(false) // Separate state for delete operations
 
 // Modal form state
 const modalState = reactive({
@@ -517,7 +518,7 @@ const deleteEntry = async (id: string) => {
 }
 
 const confirmDelete = async () => {
-  isSubmitting.value = true
+  isDeleting.value = true
   if (!entryToDeleteId.value) return
 
   try {
@@ -545,13 +546,14 @@ const confirmDelete = async () => {
   } finally {
     isDeleteConfirmOpen.value = false
     entryToDeleteId.value = null
-    isSubmitting.value = false
+    isDeleting.value = false
   }
 }
 
 const cancelDelete = () => {
   isDeleteConfirmOpen.value = false
   entryToDeleteId.value = null
+  isDeleting.value = false // Reset delete loading state
 }
 </script>
 
@@ -739,7 +741,7 @@ const cancelDelete = () => {
                 >Cancel</UButton
               >
               <UButton
-                :disabled="isSubmitting"
+                :disabled="isDeleting"
                 color="error"
                 @click="confirmDelete"
                 >Delete Entry</UButton
@@ -780,7 +782,10 @@ const cancelDelete = () => {
               variant="outline"
               color="info"
               title="Edit (only allowed for today's entries)"
-              :disabled="!dayjs(row.original.startTime).isSame(dayjs(), 'day')"
+              :disabled="
+                !dayjs(row.original.startTime).isSame(dayjs(), 'day') ||
+                isDeleting
+              "
               @click="openModal(row.original)"
             />
             <UButton
@@ -789,6 +794,8 @@ const cancelDelete = () => {
               variant="outline"
               color="error"
               title="Delete Entry"
+              :disabled="isDeleting"
+              :loading="isDeleting && entryToDeleteId === row.original.id"
               @click="deleteEntry(row.original.id)"
             />
           </div>
