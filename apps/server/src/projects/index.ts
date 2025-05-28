@@ -56,6 +56,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
       "/",
       async ({ db, query }) => {
         const { page = 1, limit = 10, search, sort, order } = query
+        console.log("query", query)
         const whereList = []
         if (search) {
           whereList.push(ilike(schema.projects.name, `%${search}%`))

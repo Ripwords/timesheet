@@ -51,6 +51,16 @@ const modalState = reactive({
 // State for default descriptions and threshold
 const selectedDefaultDescription = ref<string | undefined>(undefined)
 
+// Projects infinite scroll state
+const projectsData = ref<Array<{ id: string; name: string }>>([])
+const projectsPage = ref(1)
+const projectsLimit = ref(20)
+const projectsSearch = ref("")
+const projectsLoading = ref(false)
+const projectsHasMore = ref(true)
+const projectsTotal = ref(0)
+const projectSelectMenu = useTemplateRef<HTMLElement>("projectSelectMenu")
+
 // --- Data Fetching ---
 const {
   data: timeEntries,
@@ -107,12 +117,15 @@ const {
   }
 )
 
-const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
-  "projects",
-  async () => {
+const { data: initialProjects, status: loadingProjectsStatus } =
+  await useLazyAsyncData("projects-initial", async () => {
     try {
       const { data, error } = await $eden.api.projects.get({
-        query: {},
+        query: {
+          page: 1,
+          limit: 0,
+          // limit: projectsLimit.value,
+        },
       })
 
       if (error) {
@@ -121,10 +134,10 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
           description: String(error.value),
           color: "error",
         })
-        return []
+        return { projects: [], total: 0 }
       }
 
-      return data?.projects || []
+      return data || { projects: [], total: 0 }
     } catch (error) {
       console.error(error)
       toast.add({
@@ -132,10 +145,90 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
         description: "An unexpected error occurred fetching projects.",
         color: "error",
       })
-      return []
+      return { projects: [], total: 0 }
     }
-  }
+  })
+
+// Initialize projectsData when initialProjects loads
+watch(
+  initialProjects,
+  (newData) => {
+    if (newData) {
+      projectsData.value = newData.projects || []
+      projectsTotal.value = newData.total || 0
+      projectsHasMore.value = projectsData.value.length < projectsTotal.value
+      projectsPage.value = 2 // Next page to load
+    }
+  },
+  { immediate: true }
 )
+
+// Load additional projects for infinite scroll
+const loadProjects = async (search = "", reset = false) => {
+  if (projectsLoading.value) return
+
+  projectsLoading.value = true
+
+  try {
+    const page = reset ? 1 : projectsPage.value
+    const { data, error } = await $eden.api.projects.get({
+      query: {
+        page,
+        limit: projectsLimit.value,
+        search: search || undefined,
+      },
+    })
+
+    if (error) {
+      toast.add({
+        title: "Error fetching projects",
+        description: String(error.value),
+        color: "error",
+      })
+      return
+    }
+
+    const newProjects = data?.projects || []
+    projectsTotal.value = data?.total || 0
+
+    if (reset) {
+      projectsData.value = newProjects
+      projectsPage.value = 2
+    } else {
+      projectsData.value.push(...newProjects)
+      projectsPage.value++
+    }
+
+    projectsHasMore.value = projectsData.value.length < projectsTotal.value
+  } catch (error) {
+    console.error(error)
+    toast.add({
+      title: "Error fetching projects",
+      description: "An unexpected error occurred fetching projects.",
+      color: "error",
+    })
+  } finally {
+    projectsLoading.value = false
+  }
+}
+
+// Handle search in projects
+const handleProjectsSearch = async (query: string) => {
+  projectsSearch.value = query
+  await loadProjects(query, true)
+}
+
+// Load more projects for infinite scroll
+// const loadMoreProjects = async () => {
+//   if (projectsHasMore.value && !projectsLoading.value) {
+//     await loadProjects(projectsSearch.value)
+//   }
+// }
+
+// const { isLoading } = useInfiniteScroll(projectSelectMenu, loadMoreProjects, {
+//   distance: 200,
+//   canLoadMore: () => projectsHasMore.value && !projectsLoading.value,
+// })
 
 // Fetch Default Descriptions
 const { data: defaultDescriptions, status: loadingDefaultsStatus } =
@@ -529,13 +622,15 @@ watch([startDate, endDate], async () => {
               class="mb-4"
             >
               <USelectMenu
+                ref="projectSelectMenu"
                 v-model="modalState.id"
                 class="w-full"
-                :items="projects"
                 value-key="id"
                 label-key="name"
                 placeholder="Select project"
+                :items="projectsData || []"
                 :loading="loadingProjectsStatus === 'pending'"
+                @update:search-term="handleProjectsSearch"
               />
             </UFormField>
 
