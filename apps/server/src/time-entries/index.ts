@@ -84,7 +84,6 @@ export const timeEntries = baseApp("time-entries").group(
             return status(401, "Unauthorized")
           }
 
-          console.log("query.userId", query.userId)
           if (typeof query.userId === "string") {
             query.userId = [query.userId]
           }
