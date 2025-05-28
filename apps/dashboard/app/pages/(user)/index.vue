@@ -436,13 +436,13 @@ const endTimer = () => {
 const saveSession = async () => {
   const projectIdToSave = selectedProjectId.value
   const descriptionToSave = timeEntryDescription.value
-  const startTimeForApi = startTime.value
-    ? dayjs(startTime.value).toDate()
+  const dateForApi = startTime.value
+    ? dayjs(startTime.value).format("YYYY-MM-DD")
     : null
   const finalDurationToSave = finalSessionDuration.value
 
   // Double check required fields before proceeding
-  if (!projectIdToSave || !startTimeForApi || finalDurationToSave <= 0) {
+  if (!projectIdToSave || !dateForApi || finalDurationToSave <= 0) {
     toast.add({
       title: "Error",
       description: "Missing required data to save session.",
@@ -454,15 +454,10 @@ const saveSession = async () => {
     return
   }
 
-  const endTimeForApi = dayjs(startTimeForApi)
-    .add(finalDurationToSave, "second")
-    .toDate() // Calculate end time based on start + duration
-
-  // Prepare data for API
+  // Prepare data for API - now using date instead of startTime/endTime
   const timeEntryData = {
-    projectId: projectIdToSave, // Ensure this is the correct type expected by API (e.g., string or number)
-    startTime: startTimeForApi,
-    endTime: endTimeForApi,
+    projectId: projectIdToSave,
+    date: dateForApi,
     durationSeconds: finalDurationToSave,
     ...(descriptionToSave && { description: descriptionToSave }),
   }

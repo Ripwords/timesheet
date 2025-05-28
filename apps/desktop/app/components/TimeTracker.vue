@@ -38,15 +38,14 @@ const { data: history, refresh: refreshHistory } = await useLazyAsyncData(
   async () => {
     const { data: timeEntryData } = await eden.api["time-entries"].get({
       query: {
-        startDate: dayjs().subtract(3, "day").toISOString(),
-        endDate: dayjs().toISOString(),
+        startDate: dayjs().subtract(3, "day").format("YYYY-MM-DD"),
+        endDate: dayjs().format("YYYY-MM-DD"),
       },
     })
 
     return timeEntryData?.map((entry) => ({
       project: entry.projects.name,
-      startTimeFormatted: dayjs(entry.time_entries.startTime).format("LL"),
-      endTimeFormatted: dayjs(entry.time_entries.endTime).format("LL"),
+      date: dayjs(entry.time_entries.date).format("YYYY-MM-DD"),
       durationFormatted:
         dayjs
           .duration(entry.time_entries.durationSeconds, "seconds")
@@ -121,13 +120,11 @@ watch(
 // Define columns using accessorKey and header, explicitly typed
 const historyColumns: TableColumn<{
   project: string
-  startTimeFormatted: string
-  endTimeFormatted: string
+  date: string
   durationFormatted: string
 }>[] = [
   { accessorKey: "project", header: "Project" },
-  { accessorKey: "startTimeFormatted", header: "Start Time" },
-  { accessorKey: "endTimeFormatted", header: "End Time" },
+  { accessorKey: "date", header: "Date" },
   { accessorKey: "durationFormatted", header: "Duration" },
 ]
 
@@ -236,15 +233,10 @@ const saveSession = async () => {
     return
   }
 
-  const endTime = dayjs().toDate() // End time is when saved
-  const startTimeForApi = dayjs(startTime.value).toDate()
-  const endTimeForApi = dayjs(endTime).toDate()
-
-  // Prepare data for API
+  // Prepare data for API - now using date instead of startTime/endTime
   const timeEntryData = {
     projectId: selectedProjectId.value,
-    startTime: startTimeForApi,
-    endTime: endTimeForApi,
+    date: dayjs(startTime.value).format("YYYY-MM-DD"), // Use the date when the session started
     durationSeconds: finalSessionDuration.value,
     description: timeEntryDescription.value || undefined,
   }

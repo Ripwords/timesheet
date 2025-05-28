@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { ColumnDef, CellContext } from "@tanstack/vue-table"
+import type { ColumnDef } from "@tanstack/vue-table"
 import { UButton } from "#components"
 import duration from "dayjs/plugin/duration"
+import TimeInput from "~/components/TimeInput.vue"
 
 useSeoMeta({
   title: "Timesheet | Time Entries",
@@ -19,23 +20,21 @@ interface TimeEntry {
   id: string
   projectId: string
   projectName?: string // Added for display
-  startTime: string | Date // ISO string from API, Date object in form
-  endTime: string | Date // ISO string from API, Date object in form
+  date: string // Date in YYYY-MM-DD format
   durationSeconds: number
-  startTimeFormatted?: string
-  endTimeFormatted?: string
+  dateFormatted?: string
   durationFormatted?: string
   description?: string
 }
 
 // --- State ---
 const startDate = useState("startDate", () =>
-  dayjs().subtract(30, "day").toISOString()
+  dayjs().subtract(30, "day").format("YYYY-MM-DD")
 )
-const endDate = useState("endDate", () => dayjs().endOf("day").toISOString())
+const endDate = useState("endDate", () => dayjs().format("YYYY-MM-DD"))
 const isModalOpen = ref(false)
 const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, entry object for 'Edit' mode
-const modalDurationInput = ref("") // For the duration input field (e.g., "1h 30m")
+const modalTimeInput = ref<string | undefined>(undefined) // For TimeInput component
 const isDeleteConfirmOpen = ref(false)
 const entryToDeleteId: Ref<string | null> = ref(null)
 const isSubmitting = ref(false)
@@ -44,8 +43,7 @@ const isDeleting = ref(false) // Separate state for delete operations
 // Modal form state
 const modalState = reactive({
   id: "",
-  startTime: dayjs().format("YYYY-MM-DDTHH:mm"),
-  endTime: dayjs().format("YYYY-MM-DDTHH:mm"),
+  date: dayjs().format("YYYY-MM-DD"),
   description: "",
   customDescription: "",
 })
@@ -97,14 +95,8 @@ const {
           description: entry.time_entries.description || "",
           projectId: entry.time_entries.projectId,
           projectName: entry.projects.name || "Unknown Project",
-          startTime: entry.time_entries.startTime,
-          startTimeFormatted: dayjs(entry.time_entries.startTime).format(
-            "YYYY-MM-DD HH:mm"
-          ),
-          endTime: entry.time_entries.endTime,
-          endTimeFormatted: dayjs(entry.time_entries.endTime).format(
-            "YYYY-MM-DD HH:mm"
-          ),
+          date: entry.time_entries.date,
+          dateFormatted: dayjs(entry.time_entries.date).format("YYYY-MM-DD"),
           durationSeconds: entry.time_entries.durationSeconds,
           durationFormatted: dayjs
             .duration(entry.time_entries.durationSeconds, "seconds")
@@ -120,10 +112,9 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
   async () => {
     try {
       const { data, error } = await $eden.api.projects.get({
-        query: {
-          limit: 0,
-        },
+        query: {},
       })
+
       if (error) {
         toast.add({
           title: "Error fetching projects",
@@ -133,10 +124,11 @@ const { data: projects, status: loadingProjectsStatus } = await useAsyncData(
         return []
       }
 
-      return data?.projects.map((p) => ({ id: p.id, name: p.name })) || []
-    } catch {
+      return data?.projects || []
+    } catch (error) {
+      console.error(error)
       toast.add({
-        title: "Error",
+        title: "Error fetching projects",
         description: "An unexpected error occurred fetching projects.",
         color: "error",
       })
@@ -172,59 +164,55 @@ const { data: defaultDescriptions, status: loadingDefaultsStatus } =
 
 // --- Computed ---
 const modalTitle = computed(() =>
-  editingEntry.value ? "Edit Time Entry" : "Add New Time Entry"
+  editingEntry.value ? "Edit Time Entry" : "Add Time Entry"
 )
 
 const modalDurationFormatted = computed(() => {
-  if (modalState.startTime && modalState.endTime) {
-    const start = dayjs(modalState.startTime)
-    const end = dayjs(modalState.endTime)
-    if (start.isValid() && end.isValid() && end.isAfter(start)) {
-      const duration = dayjs.duration(end.diff(start))
-      return duration.format("HH:mm")
-    }
-  }
-  return "00:00"
+  if (!modalTimeInput.value) return "00:00"
+
+  // Parse HH:mm format from TimeInput
+  const parts = modalTimeInput.value.split(":")
+  if (parts.length !== 2) return "00:00"
+
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+  if (isNaN(hours) || isNaN(minutes)) return "00:00"
+
+  const totalSeconds = hours * 3600 + minutes * 60
+  return formatDuration(totalSeconds)
 })
 
-// Helper to parse duration strings "HH:mm" into seconds
-const parseDurationString = (durationStr: string): number | null => {
-  if (!durationStr || typeof durationStr !== "string") return null
+const exceedsDepartmentThresholdInModal = computed(() => {
+  if (!modalTimeInput.value) return false
 
-  const parts = durationStr.split(":")
-  if (parts.length !== 2) return null // Expecting HH:mm
+  const parts = modalTimeInput.value.split(":")
+  if (parts.length !== 2) return false
 
-  const hourPart = parts[0]
-  const minutePart = parts[1]
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+  if (isNaN(hours) || isNaN(minutes)) return false
 
-  if (hourPart === undefined || minutePart === undefined) return null
+  const durationMinutes = hours * 60 + minutes
+  const thresholdMinutes = defaultDescriptions.value?.departmentThreshold || 0
+  return durationMinutes > thresholdMinutes
+})
 
-  const hours = parseInt(hourPart, 10)
-  const minutes = parseInt(minutePart, 10)
+// --- Helper Functions ---
+const parseDurationFromTimeInput = (
+  timeStr: string | undefined
+): number | null => {
+  if (!timeStr) return null
 
-  if (
-    isNaN(hours) ||
-    isNaN(minutes) ||
-    hours < 0 ||
-    minutes < 0 ||
-    minutes >= 60
-  ) {
-    return null // Invalid numbers or minutes out of range
-  }
+  const parts = timeStr.split(":")
+  if (parts.length !== 2) return null
+
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+  if (isNaN(hours) || isNaN(minutes)) return null
 
   return hours * 3600 + minutes * 60
 }
 
-// Computed property to check if current modal entry duration exceeds threshold
-const exceedsDepartmentThresholdInModal = computed(() => {
-  if (defaultDescriptions.value?.departmentThreshold === undefined) return false // No threshold set
-  const durationSeconds = parseDurationString(modalDurationInput.value)
-  if (durationSeconds === null) return false
-
-  return durationSeconds / 60 >= defaultDescriptions.value?.departmentThreshold
-})
-
-// Helper to format duration in seconds to "HH:mm" string
 const formatDuration = (totalSeconds: number): string => {
   if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0)
     return "00:00"
@@ -243,95 +231,50 @@ const formatDuration = (totalSeconds: number): string => {
   return `${hoursStr}:${minutesStr}`
 }
 
-// Watch the duration input field
-watch(modalDurationInput, (newDurationStr) => {
-  if (!modalState.startTime) return // Need start time to calculate end time
-
-  const start = dayjs(modalState.startTime)
-  if (!start.isValid()) return
-
-  const durationSeconds = parseDurationString(newDurationStr)
-
-  if (durationSeconds !== null && durationSeconds >= 0) {
-    const newEndTime = start.add(durationSeconds, "second")
-    // Update endTime only if it's different to avoid loops
-    const currentEndTimeFormatted = dayjs(modalState.endTime).format(
-      "YYYY-MM-DDTHH:mm:ss"
-    ) // Use seconds for precision
-    const newEndTimeFormatted = newEndTime.format("YYYY-MM-DDTHH:mm:ss")
-
-    if (newEndTimeFormatted !== currentEndTimeFormatted) {
-      modalState.endTime = newEndTime.format("YYYY-MM-DDTHH:mm") // Update the model for the input
-    }
-  }
-})
-
-// Watch startTime and endTime to update the duration input
-watch(
-  [() => modalState.startTime, () => modalState.endTime],
-  ([newStartTime, newEndTime]) => {
-    if (newStartTime && newEndTime) {
-      const start = dayjs(newStartTime)
-      const end = dayjs(newEndTime)
-
-      if (start.isValid() && end.isValid() && end.isAfter(start)) {
-        const durationSeconds = end.diff(start, "second")
-        const formattedDuration = formatDuration(durationSeconds)
-
-        // Update duration input only if it's different to avoid loops
-        const currentInputDurationSeconds = parseDurationString(
-          modalDurationInput.value
-        )
-        if (durationSeconds !== currentInputDurationSeconds) {
-          modalDurationInput.value = formattedDuration
-        }
-      } else {
-        // Reset duration input if dates are invalid or end is not after start
-        modalDurationInput.value = ""
-      }
-    } else {
-      modalDurationInput.value = ""
-    }
-  },
-  { deep: true } // Necessary because we are watching properties of a reactive object
-)
-
 // Determines if the 'Save' button in the modal should be enabled for editing
 const canEditEntry = computed(() => {
   if (!editingEntry.value) return true // Always allow saving for new entries
 
-  const entryDate = dayjs(editingEntry.value.startTime)
+  const entryDate = dayjs(editingEntry.value.date)
   const today = dayjs()
   return entryDate.isSame(today, "day")
 })
 
 // Table Columns Definition
-const columns: ColumnDef<TimeEntry, unknown>[] = [
-  { accessorKey: "projectName", header: "Project" },
-  { accessorKey: "startTimeFormatted", header: "Start Time" },
-  { accessorKey: "endTimeFormatted", header: "End Time" },
-  { accessorKey: "durationFormatted", header: "Duration" },
+const columns: ColumnDef<TimeEntry>[] = [
+  {
+    accessorKey: "projectName",
+    header: "Project",
+  },
+  {
+    accessorKey: "dateFormatted",
+    header: "Date",
+  },
+  {
+    accessorKey: "durationFormatted",
+    header: "Duration",
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+  },
   {
     id: "actions",
     header: "Actions",
-    cell: (context: CellContext<TimeEntry, unknown>) => {
-      const entry = context.row.original as TimeEntry
-      return h("div", { class: "space-x-2" }, [
+    cell: ({ row }) => {
+      return h("div", { class: "flex gap-2" }, [
         h(UButton, {
           icon: "i-heroicons-pencil-square",
           size: "xl",
           variant: "outline",
-          color: "info",
-          title: "Edit",
-          onClick: () => openModal(entry),
+          onClick: () => openModal(row.original),
         }),
         h(UButton, {
           icon: "i-heroicons-trash",
           size: "xl",
-          variant: "outline",
           color: "error",
-          title: "Delete",
-          onClick: () => deleteEntry(entry.id),
+          variant: "outline",
+          onClick: () => deleteEntry(row.original.id),
         }),
       ])
     },
@@ -345,24 +288,21 @@ const openModal = (entry: TimeEntry | null = null) => {
   if (entry) {
     // Edit mode: Pre-fill form
     modalState.id = entry.projectId
-    // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
-    modalState.startTime = dayjs(entry.startTime).format("YYYY-MM-DDTHH:mm")
-    modalState.endTime = dayjs(entry.endTime).format("YYYY-MM-DDTHH:mm")
-    // Calculate and format initial duration for the input field
-    const initialDurationSeconds = dayjs(entry.endTime).diff(
-      dayjs(entry.startTime),
-      "second"
-    )
-    modalDurationInput.value = formatDuration(initialDurationSeconds)
+    modalState.date = entry.date
+    // Convert duration seconds to HH:mm format for TimeInput
+    const hours = Math.floor(entry.durationSeconds / 3600)
+    const minutes = Math.floor((entry.durationSeconds % 3600) / 60)
+    modalTimeInput.value = `${String(hours).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")}`
     modalState.customDescription = entry.description || ""
     selectedDefaultDescription.value = undefined // Reset selected default
   } else {
     // Add mode: Reset form
     modalState.id = ""
-    modalState.startTime = dayjs().format("YYYY-MM-DDTHH:mm")
-    modalState.endTime = dayjs().format("YYYY-MM-DDTHH:mm")
+    modalState.date = dayjs().format("YYYY-MM-DD")
     modalState.customDescription = ""
-    modalDurationInput.value = "00:00" // Reset duration input
+    modalTimeInput.value = undefined // Reset time input
     selectedDefaultDescription.value = undefined // Reset selected default
   }
   isModalOpen.value = true
@@ -373,9 +313,9 @@ const closeModal = () => {
   // Reset potentially dirty form state after modal closes
   editingEntry.value = null
   modalState.id = ""
-  modalState.startTime = ""
-  modalState.endTime = ""
+  modalState.date = ""
   modalState.customDescription = ""
+  modalTimeInput.value = undefined
   selectedDefaultDescription.value = undefined
 }
 
@@ -384,19 +324,18 @@ const saveEntry = async () => {
 
   try {
     // 1. Validate inputs
-    if (!modalState.id || !modalState.startTime || !modalState.endTime) {
+    if (!modalState.id || !modalState.date || !modalTimeInput.value) {
       toast.add({
         title: "Validation Error",
-        description: "Project, Start Time, and End Time are required.",
+        description: "Project, Date, and Duration are required.",
         color: "warning",
       })
       return
     }
 
-    const start = dayjs(modalState.startTime)
-    const end = dayjs(modalState.endTime)
+    const date = dayjs(modalState.date)
 
-    if (!start.isValid() || !end.isValid()) {
+    if (!date.isValid()) {
       toast.add({
         title: "Validation Error",
         description: "Invalid date format.",
@@ -405,19 +344,10 @@ const saveEntry = async () => {
       return
     }
 
-    if (end.isBefore(start)) {
-      toast.add({
-        title: "Validation Error",
-        description: "End Time must be after Start Time.",
-        color: "warning",
-      })
-      return
-    }
-
-    // Validate that time entry is not older than 11:59PM of the previous day
-    const cutoffTime = dayjs().subtract(1, "day").endOf("day")
-    if (start.isBefore(cutoffTime)) {
-      const cutoffFormatted = cutoffTime.format("YYYY-MM-DD HH:mm:ss")
+    // Validate that time entry is not older than yesterday
+    const cutoffDate = dayjs().subtract(1, "day")
+    if (date.isBefore(cutoffDate, "day")) {
+      const cutoffFormatted = cutoffDate.format("YYYY-MM-DD")
       toast.add({
         title: "Validation Error",
         description: `Time entries cannot be submitted for dates before ${cutoffFormatted}`,
@@ -426,31 +356,55 @@ const saveEntry = async () => {
       return
     }
 
-    // 2. Calculate duration
-    const durationSeconds = end.diff(start, "second")
-
-    // 3. Prepare data payload
-    let finalDescription = ""
-    if (exceedsDepartmentThresholdInModal.value) {
-      finalDescription = modalState.customDescription
-    } else {
-      finalDescription =
-        modalState.customDescription || selectedDefaultDescription.value || ""
-    }
-
-    if (finalDescription === "") {
+    // 2. Parse duration from TimeInput
+    const durationSeconds = parseDurationFromTimeInput(modalTimeInput.value)
+    if (durationSeconds === null || durationSeconds <= 0) {
       toast.add({
         title: "Validation Error",
-        description: "Description is required.",
+        description: "Please enter a valid duration.",
         color: "warning",
       })
       return
     }
 
+    // 3. Validate description based on department threshold
+    let finalDescription = ""
+    if (exceedsDepartmentThresholdInModal.value) {
+      // If exceeds threshold, custom description is required
+      if (
+        !modalState.customDescription ||
+        modalState.customDescription.trim() === ""
+      ) {
+        toast.add({
+          title: "Validation Error",
+          description:
+            "A detailed description is required for sessions exceeding your department's threshold.",
+          color: "warning",
+        })
+        return
+      }
+      finalDescription = modalState.customDescription.trim()
+    } else {
+      // If doesn't exceed threshold, use custom description or selected default
+      finalDescription =
+        modalState.customDescription.trim() ||
+        selectedDefaultDescription.value ||
+        ""
+
+      if (finalDescription === "") {
+        toast.add({
+          title: "Validation Error",
+          description:
+            "Description is required. Please select a default description or enter a custom one.",
+          color: "warning",
+        })
+        return
+      }
+    }
+
     const payload = {
       projectId: modalState.id,
-      startTime: start.toISOString(), // Send ISO string to backend
-      endTime: end.toISOString(), // Send ISO string to backend
+      date: date.format("YYYY-MM-DD"),
       durationSeconds: durationSeconds,
       description: finalDescription,
     }
@@ -471,19 +425,11 @@ const saveEntry = async () => {
         .id({
           id: editingEntry.value.id,
         })
-        .put({
-          startTime: dayjs(payload.startTime).toDate(),
-          endTime: dayjs(payload.endTime).toDate(),
-          durationSeconds: payload.durationSeconds,
-        })
+        .put(payload)
     } else {
       // Add Mode
       // Call POST endpoint
-      result = await $eden.api["time-entries"].post({
-        ...payload,
-        startTime: dayjs(payload.startTime).toDate(),
-        endTime: dayjs(payload.endTime).toDate(),
-      })
+      result = await $eden.api["time-entries"].post(payload)
     }
 
     // 4. Handle response
@@ -518,23 +464,25 @@ const deleteEntry = async (id: string) => {
 }
 
 const confirmDelete = async () => {
-  isDeleting.value = true
   if (!entryToDeleteId.value) return
 
+  isDeleting.value = true
   try {
-    const { error } = await $eden.api["time-entries"]
-      .id({
-        id: entryToDeleteId.value,
-      })
+    const result = await $eden.api["time-entries"]
+      .id({ id: entryToDeleteId.value })
       .delete()
-    if (error) {
+
+    if (result?.error) {
       toast.add({
-        title: "Error Deleting Entry",
-        description: String(error.value),
+        title: "Error deleting entry",
+        description: String(result.error.value),
         color: "error",
       })
     } else {
-      toast.add({ title: "Entry Deleted Successfully", color: "success" })
+      toast.add({
+        title: "Entry Deleted Successfully",
+        color: "success",
+      })
       await refreshEntries() // Refresh the table data
     }
   } catch (e) {
@@ -544,17 +492,16 @@ const confirmDelete = async () => {
       color: "error",
     })
   } finally {
+    isDeleting.value = false
     isDeleteConfirmOpen.value = false
     entryToDeleteId.value = null
-    isDeleting.value = false
   }
 }
 
-const cancelDelete = () => {
-  isDeleteConfirmOpen.value = false
-  entryToDeleteId.value = null
-  isDeleting.value = false // Reset delete loading state
-}
+// Watch for date range changes to refresh data
+watch([startDate, endDate], async () => {
+  await refreshEntries()
+})
 </script>
 
 <template>
@@ -588,234 +535,217 @@ const cancelDelete = () => {
                 value-key="id"
                 label-key="name"
                 placeholder="Select project"
-                searchable
-                searchable-placeholder="Search projects..."
                 :loading="loadingProjectsStatus === 'pending'"
               />
             </UFormField>
 
             <UFormField
-              label="Start Time"
-              name="startTime"
+              label="Date"
+              name="date"
               required
               class="mb-4"
             >
               <UInput
-                v-model="modalState.startTime"
-                type="datetime-local"
+                v-model="modalState.date"
+                type="date"
               />
             </UFormField>
 
             <UFormField
-              label="End Time"
-              name="endTime"
+              label="Duration"
+              name="duration"
               required
               class="mb-4"
             >
-              <UInput
-                v-model="modalState.endTime"
-                type="datetime-local"
-              />
+              <TimeInput v-model="modalTimeInput" />
+              <template #help>
+                <span class="text-sm text-gray-500">
+                  Formatted: {{ modalDurationFormatted }}
+                </span>
+              </template>
             </UFormField>
 
-            <div
-              label="Duration (Calculated)"
-              class="mb-4"
-            >
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ modalDurationFormatted }} (calculated from start/end time)
+            <!-- Description Section -->
+            <div class="mb-4">
+              <UFormField
+                v-if="!exceedsDepartmentThresholdInModal"
+                label="Description (Select Default)"
+                name="defaultDescription"
+                class="mb-2"
+              >
+                <USelectMenu
+                  v-model="selectedDefaultDescription"
+                  class="w-full"
+                  :items="defaultDescriptions?.defaultDescriptions || []"
+                  value-key="description"
+                  label-key="description"
+                  placeholder="Select a default description"
+                  :loading="loadingDefaultsStatus === 'pending'"
+                />
+              </UFormField>
+
+              <UFormField
+                :label="
+                  exceedsDepartmentThresholdInModal
+                    ? 'Description (Required)'
+                    : 'Custom Description (Optional)'
+                "
+                name="customDescription"
+              >
+                <UTextarea
+                  v-model="modalState.customDescription"
+                  class="w-full"
+                  :placeholder="
+                    exceedsDepartmentThresholdInModal
+                      ? 'Please provide a detailed description for this extended session'
+                      : 'Enter custom description or leave blank to use selected default'
+                  "
+                  :required="exceedsDepartmentThresholdInModal"
+                />
+              </UFormField>
+
+              <p
+                v-if="exceedsDepartmentThresholdInModal"
+                class="text-sm text-orange-600 dark:text-orange-400 mt-1"
+              >
+                ⚠️ This session exceeds your department's threshold. A detailed
+                description is required.
               </p>
             </div>
 
-            <UFormField
-              label="Set Duration"
-              name="durationInput"
-              class="mb-4"
-            >
-              <TimeInput v-model="modalDurationInput" />
-            </UFormField>
-
-            <UFormField
-              label="Description"
-              class="mb-4 w-full"
-            >
-              <template v-if="exceedsDepartmentThresholdInModal">
-                <UInput
-                  v-model="modalState.customDescription"
-                  class="w-full"
-                  placeholder="Enter description (required for long session)..."
-                  required
-                />
-                <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  A custom description is required as the session exceeds the
-                  threshold ({{
-                    defaultDescriptions?.departmentThreshold
-                      ? dayjs
-                          .duration(
-                            defaultDescriptions.departmentThreshold,
-                            "seconds"
-                          )
-                          .humanize()
-                      : "N/A"
-                  }}).
-                </p>
-              </template>
-              <template v-else>
-                <USelectMenu
-                  v-model="selectedDefaultDescription"
-                  :items="
-                    defaultDescriptions?.defaultDescriptions?.map(
-                      (d) => d.description
-                    ) ?? []
-                  "
-                  placeholder="Select common task or type custom..."
-                  creatable
-                  searchable
-                  searchable-placeholder="Search or add description..."
-                  class="mb-2 w-full"
-                  :loading="loadingDefaultsStatus === 'pending'"
-                />
-                <UInput
-                  v-model="modalState.customDescription"
-                  class="w-full"
-                  placeholder="Or enter a custom description..."
-                />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Select a common task or type a custom description. Custom
-                  input overrides selection.
-                </p>
-              </template>
-            </UFormField>
-          </UForm>
-
-          <template #footer>
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-2">
               <UButton
-                color="neutral"
-                variant="ghost"
+                type="button"
+                variant="outline"
                 @click="closeModal"
-                >Cancel</UButton
               >
+                Cancel
+              </UButton>
               <UButton
-                :disabled="
-                  (Boolean(editingEntry) && !canEditEntry) || isSubmitting
-                "
-                :title="
-                  editingEntry && !canEditEntry
-                    ? 'Can only edit entries from today'
-                    : 'Save Entry'
-                "
-                @click="saveEntry"
+                type="submit"
+                :loading="isSubmitting"
+                :disabled="!canEditEntry"
               >
-                {{ editingEntry ? "Update Entry" : "Save Entry" }}
+                {{ editingEntry ? "Update" : "Add" }} Entry
               </UButton>
             </div>
-          </template>
+          </UForm>
         </UCard>
       </template>
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal
-      v-model:open="isDeleteConfirmOpen"
-      prevent-close
-      @close="cancelDelete"
-    >
-      <template #content>
-        <UCard>
-          <template #header>
-            <h2 class="text-lg font-semibold">Confirm Deletion</h2>
-          </template>
+    <UModal v-model:open="isDeleteConfirmOpen">
+      <template #header>
+        <h2 class="text-lg font-semibold">Confirm Delete</h2>
+      </template>
 
+      <template #body>
+        <UCard>
           <p class="mb-4">
             Are you sure you want to delete this time entry? This action cannot
             be undone.
           </p>
-
-          <template #footer>
-            <div class="flex justify-end gap-3">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                @click="cancelDelete"
-                >Cancel</UButton
-              >
-              <UButton
-                :disabled="isDeleting"
-                color="error"
-                @click="confirmDelete"
-                >Delete Entry</UButton
-              >
-            </div>
-          </template>
+          <div class="flex justify-end gap-2">
+            <UButton
+              variant="outline"
+              @click="isDeleteConfirmOpen = false"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              color="error"
+              :loading="isDeleting"
+              @click="confirmDelete"
+            >
+              Delete
+            </UButton>
+          </div>
         </UCard>
       </template>
     </UModal>
 
-    <UCard>
-      <template #header>
-        <div class="flex justify-between items-center">
-          <h1 class="text-xl font-semibold">Time Entries</h1>
-          <UButton
-            icon="i-heroicons-plus-circle"
-            size="sm"
-            @click="openModal(null)"
-            >Add Entry</UButton
-          >
+    <!-- Main Content -->
+    <div class="space-y-6">
+      <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Time Entries</h1>
+        <UButton
+          icon="i-heroicons-plus"
+          @click="openModal()"
+        >
+          Add Entry
+        </UButton>
+      </div>
+
+      <!-- Date Range Filter -->
+      <UCard>
+        <template #header>
+          <h3 class="text-lg font-semibold">Filter by Date Range</h3>
+        </template>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <UFormField label="Start Date">
+            <UInput
+              v-model="startDate"
+              type="date"
+            />
+          </UFormField>
+          <UFormField label="End Date">
+            <UInput
+              v-model="endDate"
+              type="date"
+            />
+          </UFormField>
         </div>
-      </template>
+      </UCard>
 
-      <UTable
-        :columns
-        :data="timeEntries"
-        :loading="loadingEntriesStatus === 'pending'"
-        :empty-state="{
-          icon: 'i-heroicons-clock',
-          label: 'No time entries found.',
-        }"
-      >
-        <template #actions-data="{ row }">
-          <div class="flex gap-2">
-            <UButton
-              icon="i-heroicons-pencil-square"
-              size="xs"
-              variant="outline"
-              color="info"
-              title="Edit (only allowed for today's entries)"
-              :disabled="
-                !dayjs(row.original.startTime).isSame(dayjs(), 'day') ||
-                isDeleting
-              "
-              @click="openModal(row.original)"
-            />
-            <UButton
-              icon="i-heroicons-trash"
-              size="xs"
-              variant="outline"
-              color="error"
-              title="Delete Entry"
-              :disabled="isDeleting"
-              :loading="isDeleting && entryToDeleteId === row.original.id"
-              @click="deleteEntry(row.original.id)"
-            />
-          </div>
+      <!-- Time Entries Table -->
+      <UCard>
+        <template #header>
+          <h3 class="text-lg font-semibold">Your Time Entries</h3>
         </template>
 
-        <!-- Formatting for specific columns if needed -->
-        <template #startTimeFormatted-data="{ row }">
-          {{ dayjs(row.original.startTime).format("YYYY-MM-DD HH:mm") }}
-        </template>
-        <template #endTimeFormatted-data="{ row }">
-          {{ dayjs(row.original.endTime).format("YYYY-MM-DD HH:mm") }}
-        </template>
-        <template #durationFormatted-data="{ row }">
-          {{
-            dayjs
-              .duration(row.original.durationSeconds, "seconds")
-              .format("HH:mm:ss")
-          }}
-        </template>
-      </UTable>
-    </UCard>
+        <UTable
+          :data="timeEntries || []"
+          :columns
+          :loading="loadingEntriesStatus === 'pending'"
+          :empty-state="{
+            icon: 'i-heroicons-clock',
+            label: 'No time entries found',
+            description: 'Add your first time entry to get started.',
+          }"
+        >
+          <template #dateFormatted-data="{ row }">
+            {{ dayjs(row.original.date).format("YYYY-MM-DD") }}
+          </template>
+
+          <template #actions-data="{ row }">
+            <div class="flex gap-2">
+              <UButton
+                icon="i-heroicons-pencil-square"
+                size="sm"
+                variant="outline"
+                :disabled="
+                  !dayjs(row.original.date).isSame(dayjs(), 'day') ||
+                  loadingEntriesStatus === 'pending'
+                "
+                @click="openModal(row.original)"
+              >
+                Edit
+              </UButton>
+              <UButton
+                icon="i-heroicons-trash"
+                size="sm"
+                color="error"
+                variant="outline"
+                :disabled="loadingEntriesStatus === 'pending'"
+                @click="deleteEntry(row.original.id)"
+              >
+                Delete
+              </UButton>
+            </div>
+          </template>
+        </UTable>
+      </UCard>
+    </div>
   </div>
 </template>

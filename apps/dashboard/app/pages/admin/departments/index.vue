@@ -138,8 +138,7 @@ interface TimeEntry {
     id: string
     userId: string
     projectId: string
-    startTime: Date
-    endTime: Date
+    date: string
     description: string | null
     durationSeconds: number
     createdAt: Date
@@ -194,7 +193,7 @@ const userBreakdowns = computed(() => {
       const entry = responseItem.time_entries
       const project = responseItem.projects
       if (!entry || !project) return
-      const entryStart = dayjs(entry.startTime)
+      const entryStart = dayjs(entry.date)
       const durationSeconds = entry.durationSeconds
       const projectId = entry.projectId
       if (entryStart.isBefore(startOfMonth) || entryStart.isAfter(endOfMonth))

@@ -69,7 +69,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           // 3. Fetch Time Entries with User Rate
           const entriesWithRate = await db
             .select({
-              startTime: timeEntries.startTime,
+              date: timeEntries.date,
               durationSeconds: timeEntries.durationSeconds,
               ratePerHour: users.ratePerHour, // numeric type
             })
@@ -81,7 +81,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           const monthlyCosts: Record<string, Decimal> = {} // Use Decimal for aggregation
 
           for (const entry of entriesWithRate) {
-            const month = formatToYearMonth(entry.startTime)
+            const month = formatToYearMonth(new Date(entry.date))
             const rate = new Decimal(entry.ratePerHour)
             const durationHours = new Decimal(entry.durationSeconds).div(3600)
             const cost = rate.mul(durationHours)

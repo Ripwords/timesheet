@@ -36,11 +36,11 @@ export const adminReportsRoutes = baseApp("reports").group(
         const filters = []
         if (startDate)
           filters.push(
-            gte(timeEntries.startTime, dayjs(startDate).startOf("day").toDate())
+            gte(timeEntries.date, dayjs(startDate).format("YYYY-MM-DD"))
           )
         if (endDate)
           filters.push(
-            lte(timeEntries.endTime, dayjs(endDate).endOf("day").toDate())
+            lte(timeEntries.date, dayjs(endDate).format("YYYY-MM-DD"))
           )
         // Ensure arrays are not empty before using inArray
         if (userIds && userIds.length > 0)
@@ -52,8 +52,8 @@ export const adminReportsRoutes = baseApp("reports").group(
         const whereCondition = filters.length > 0 ? and(...filters) : undefined
 
         const dateTrunc = sql<string>`date_trunc(${sql.raw(`'${timeUnit}'`)}, ${
-          timeEntries.startTime
-        } AT TIME ZONE 'UTC')`
+          timeEntries.date
+        })`
 
         let queryBuilder
 
@@ -133,13 +133,13 @@ export const adminReportsRoutes = baseApp("reports").group(
         query: t.Object({
           startDate: t.Optional(
             t.String({
-              format: "date-time",
+              format: "date",
               error: "Invalid start date format",
             })
           ),
           endDate: t.Optional(
             t.String({
-              format: "date-time",
+              format: "date",
               error: "Invalid end date format",
             })
           ),

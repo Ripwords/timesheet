@@ -164,15 +164,13 @@ const seedTestData = async () => {
   const timeEntriesToInsert: (typeof schema.timeEntries.$inferInsert)[] = []
   for (let i = 0; i < SEED_TIME_ENTRIES_COUNT; i++) {
     const durationSeconds = faker.number.int({ min: 300, max: 28800 })
-    const endTime = faker.date.recent({ days: 90 })
-    const startTime = new Date(endTime.getTime() - durationSeconds * 1000)
+    const date = faker.date.recent({ days: 90 })
 
     timeEntriesToInsert.push({
       userId: faker.helpers.arrayElement(allUserIds),
       projectId: faker.helpers.arrayElement(allProjectIds),
       description: faker.lorem.sentence(),
-      startTime: startTime,
-      endTime: endTime,
+      date: date.toISOString().split("T")[0], // Convert to YYYY-MM-DD format
       durationSeconds: durationSeconds,
     })
   }

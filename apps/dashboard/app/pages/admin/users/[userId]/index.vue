@@ -118,7 +118,7 @@ const processedData = computed(() => {
     // Add checks for null/undefined entry or project
     if (!entry || !project) return
 
-    const entryStart = dayjs(entry.startTime)
+    const entryStart = dayjs(entry.date)
     const durationSeconds = entry.durationSeconds
     const projectId = entry.projectId
 

@@ -79,8 +79,8 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
                   SELECT coalesce(sum(${timeEntries.durationSeconds}), 0)
                   FROM ${timeEntries}
                   WHERE ${timeEntries.userId} = ${users.id}
-                  AND ${timeEntries.startTime} >= ${startOfWeek}
-                  AND ${timeEntries.startTime} < ${endOfWeek}
+                  AND ${timeEntries.date} >= ${startOfWeek}
+                  AND ${timeEntries.date} < ${endOfWeek}
                 )`,
               })
               .from(users)

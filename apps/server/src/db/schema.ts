@@ -8,6 +8,7 @@ import {
   timestamp,
   uuid,
   type AnyPgColumn,
+  date,
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
@@ -86,8 +87,7 @@ export const timeEntries = pgTable("time_entries", {
   projectId: uuid("project_id")
     .notNull()
     .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
-  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
-  endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+  date: date("date").notNull(),
   description: text("description"),
   durationSeconds: integer("duration_seconds").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

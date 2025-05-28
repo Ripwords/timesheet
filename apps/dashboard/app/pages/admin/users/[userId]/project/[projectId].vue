@@ -121,10 +121,10 @@ const accordionItems = computed(() => {
 
     const entriesInWeek =
       userTimeEntries.value?.filter((entry) => {
-        const entryStart = dayjs(entry.startTime)
+        const entryDate = dayjs(entry.date)
         return (
-          entryStart.isSameOrAfter(weekStart, "day") &&
-          entryStart.isSameOrBefore(weekEnd, "day")
+          entryDate.isSameOrAfter(weekStart, "day") &&
+          entryDate.isSameOrBefore(weekEnd, "day")
         )
       }) ?? []
 
@@ -139,7 +139,7 @@ const accordionItems = computed(() => {
 
         return {
           id: timeEntry.id,
-          date: dayjs(timeEntry.startTime).format("YYYY-MM-DD"),
+          date: dayjs(timeEntry.date).format("YYYY-MM-DD"),
           description: timeEntry.description || "-",
           duration: `${hours.toString().padStart(2, "0")}:${minutes
             .toString()

@@ -19,15 +19,12 @@ export const timeEntries = baseApp("time-entries").group(
             return status(401, "Unauthorized")
           }
 
-          // Validate that time entry is not older than 11:59PM of the previous day
-          const cutoffTime = dayjs().subtract(1, "day").endOf("day").toDate()
-          if (dayjs(body.startTime).isBefore(cutoffTime)) {
-            const cutoffFormatted = dayjs(cutoffTime).format(
-              "YYYY-MM-DD HH:mm:ss"
-            )
+          // Validate that time entry is not older than yesterday
+          const cutoffDate = dayjs().subtract(1, "day").format("YYYY-MM-DD")
+          if (dayjs(body.date).isBefore(cutoffDate)) {
             return status(
               400,
-              `Time entries cannot be submitted for dates before ${cutoffFormatted}`
+              `Time entries cannot be submitted for dates before ${cutoffDate}`
             )
           }
 
@@ -38,8 +35,7 @@ export const timeEntries = baseApp("time-entries").group(
                 userId: user.userId,
                 projectId: body.projectId,
                 description: body.description,
-                startTime: body.startTime, // Drizzle expects Date objects
-                endTime: body.endTime, // Drizzle expects Date objects
+                date: body.date,
                 durationSeconds: body.durationSeconds,
               })
               .returning() // Return the newly created entry
@@ -64,8 +60,7 @@ export const timeEntries = baseApp("time-entries").group(
         {
           body: t.Object({
             projectId: UUID,
-            startTime: t.Date(),
-            endTime: t.Date(),
+            date: t.String({ format: "date" }),
             durationSeconds: t.Integer(),
             description: t.Optional(t.String()),
           }),
@@ -99,31 +94,22 @@ export const timeEntries = baseApp("time-entries").group(
           // Add start date condition if provided
           if (startDate) {
             try {
-              const start = dayjs(startDate).startOf("day").toDate()
-              // Check if date is valid before pushing condition
-              if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
-              conditions.push(gte(schema.timeEntries.startTime, start))
+              const start = dayjs(startDate).format("YYYY-MM-DD")
+              conditions.push(gte(schema.timeEntries.date, start))
             } catch (e) {
               logError(`Invalid startDate format: ${startDate} ${e}`)
-              return status(400, "Invalid startDate format. Use ISO 8601.")
+              return status(400, "Invalid startDate format. Use YYYY-MM-DD.")
             }
           }
 
           // Add end date condition if provided
           if (endDate) {
             try {
-              const end = dayjs(endDate).endOf("day").toDate()
-              // Check if date is valid before pushing condition
-              if (isNaN(end.getTime())) throw new Error("Invalid Date Object")
-              // Make the end date inclusive by setting time to the end of the day
-              // or adding one day and using less than (depends on preference)
-              // Here, we add 1 day and use less than the *start* of the next day (UTC)
-              end.setUTCHours(0, 0, 0, 0)
-              end.setUTCDate(end.getUTCDate() + 1)
-              conditions.push(lte(schema.timeEntries.startTime, end))
+              const end = dayjs(endDate).format("YYYY-MM-DD")
+              conditions.push(lte(schema.timeEntries.date, end))
             } catch (e) {
               logError(`Invalid endDate format: ${endDate} ${e}`)
-              return status(400, "Invalid endDate format. Use ISO 8601.")
+              return status(400, "Invalid endDate format. Use YYYY-MM-DD.")
             }
           }
 
@@ -136,7 +122,7 @@ export const timeEntries = baseApp("time-entries").group(
               eq(schema.timeEntries.projectId, schema.projects.id)
             )
             .where(and(...conditions))
-            .orderBy(desc(schema.timeEntries.startTime))
+            .orderBy(desc(schema.timeEntries.date))
 
           return userTimeEntries
         },
@@ -149,14 +135,14 @@ export const timeEntries = baseApp("time-entries").group(
           query: t.Object({
             startDate: t.Optional(
               t.String({
-                format: "date-time",
-                description: "ISO 8601 format e.g., 2024-01-01T00:00:00Z",
+                format: "date",
+                description: "Date format e.g., 2024-01-01",
               })
             ),
             endDate: t.Optional(
               t.String({
-                format: "date-time",
-                description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
+                format: "date",
+                description: "Date format e.g., 2024-01-31",
               })
             ),
             userId: t.Optional(t.Array(UUID)),
@@ -183,31 +169,22 @@ export const timeEntries = baseApp("time-entries").group(
           // Add start date condition if provided
           if (startDate) {
             try {
-              const start = dayjs(startDate).startOf("day").toDate()
-              // Check if date is valid before pushing condition
-              if (isNaN(start.getTime())) throw new Error("Invalid Date Object")
-              conditions.push(gte(schema.timeEntries.startTime, start))
+              const start = dayjs(startDate).format("YYYY-MM-DD")
+              conditions.push(gte(schema.timeEntries.date, start))
             } catch (e) {
               logError(`Invalid startDate format: ${startDate} ${e}`)
-              return status(400, "Invalid startDate format. Use ISO 8601.")
+              return status(400, "Invalid startDate format. Use YYYY-MM-DD.")
             }
           }
 
           // Add end date condition if provided
           if (endDate) {
             try {
-              const end = dayjs(endDate).endOf("day").toDate()
-              // Check if date is valid before pushing condition
-              if (isNaN(end.getTime())) throw new Error("Invalid Date Object")
-              // Make the end date inclusive by setting time to the end of the day
-              // or adding one day and using less than (depends on preference)
-              // Here, we add 1 day and use less than the *start* of the next day (UTC)
-              end.setUTCHours(0, 0, 0, 0)
-              end.setUTCDate(end.getUTCDate() + 1)
-              conditions.push(lte(schema.timeEntries.startTime, end))
+              const end = dayjs(endDate).format("YYYY-MM-DD")
+              conditions.push(lte(schema.timeEntries.date, end))
             } catch (e) {
               logError(`Invalid endDate format: ${endDate} ${e}`)
-              return status(400, "Invalid endDate format. Use ISO 8601.")
+              return status(400, "Invalid endDate format. Use YYYY-MM-DD.")
             }
           }
 
@@ -241,14 +218,14 @@ export const timeEntries = baseApp("time-entries").group(
           query: t.Object({
             startDate: t.Optional(
               t.String({
-                format: "date-time",
-                description: "ISO 8601 format e.g., 2024-01-01T00:00:00Z",
+                format: "date",
+                description: "Date format e.g., 2024-01-01",
               })
             ),
             endDate: t.Optional(
               t.String({
-                format: "date-time",
-                description: "ISO 8601 format e.g., 2024-01-31T23:59:59Z",
+                format: "date",
+                description: "Date format e.g., 2024-01-31",
               })
             ),
             userId: t.Optional(UUID),
@@ -415,10 +392,9 @@ export const timeEntries = baseApp("time-entries").group(
                 ...(body.projectId !== undefined && {
                   projectId: body.projectId,
                 }),
-                ...(body.startTime !== undefined && {
-                  startTime: body.startTime,
+                ...(body.date !== undefined && {
+                  date: body.date,
                 }),
-                ...(body.endTime !== undefined && { endTime: body.endTime }),
                 ...(body.durationSeconds !== undefined && {
                   durationSeconds: body.durationSeconds,
                 }),
@@ -457,8 +433,7 @@ export const timeEntries = baseApp("time-entries").group(
           }),
           body: t.Object({
             projectId: t.Optional(UUID),
-            startTime: t.Optional(t.Date()),
-            endTime: t.Optional(t.Date()),
+            date: t.Optional(t.String({ format: "date" })),
             durationSeconds: t.Optional(t.Integer()),
             description: t.Optional(t.String()),
           }),
