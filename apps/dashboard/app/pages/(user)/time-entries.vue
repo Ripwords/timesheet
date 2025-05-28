@@ -380,84 +380,80 @@ const closeModal = () => {
 
 const saveEntry = async () => {
   isSubmitting.value = true
-  // 1. Validate inputs
-  if (!modalState.id || !modalState.startTime || !modalState.endTime) {
-    toast.add({
-      title: "Validation Error",
-      description: "Project, Start Time, and End Time are required.",
-      color: "warning",
-    })
-    isSubmitting.value = false
-    return
-  }
-
-  const start = dayjs(modalState.startTime)
-  const end = dayjs(modalState.endTime)
-
-  if (!start.isValid() || !end.isValid()) {
-    toast.add({
-      title: "Validation Error",
-      description: "Invalid date format.",
-      color: "warning",
-    })
-    isSubmitting.value = false
-    return
-  }
-
-  if (end.isBefore(start)) {
-    toast.add({
-      title: "Validation Error",
-      description: "End Time must be after Start Time.",
-      color: "warning",
-    })
-    isSubmitting.value = false
-    return
-  }
-
-  // Validate that time entry is not older than 11:59PM of the previous day
-  const cutoffTime = dayjs().subtract(1, "day").endOf("day")
-  if (start.isBefore(cutoffTime)) {
-    const cutoffFormatted = cutoffTime.format("YYYY-MM-DD HH:mm:ss")
-    toast.add({
-      title: "Validation Error",
-      description: `Time entries cannot be submitted for dates before ${cutoffFormatted}`,
-      color: "warning",
-    })
-    isSubmitting.value = false
-    return
-  }
-
-  // 2. Calculate duration
-  const durationSeconds = end.diff(start, "second")
-
-  // 3. Prepare data payload
-  let finalDescription = ""
-  if (exceedsDepartmentThresholdInModal.value) {
-    finalDescription = modalState.customDescription
-  } else {
-    finalDescription =
-      modalState.customDescription || selectedDefaultDescription.value || ""
-  }
-
-  if (finalDescription === "") {
-    toast.add({
-      title: "Validation Error",
-      description: "Description is required.",
-      color: "warning",
-    })
-    isSubmitting.value = false
-    return
-  }
-
-  const payload = {
-    projectId: modalState.id,
-    startTime: start.toISOString(), // Send ISO string to backend
-    endTime: end.toISOString(), // Send ISO string to backend
-    durationSeconds: durationSeconds,
-    description: finalDescription,
-  }
 
   try {
+    // 1. Validate inputs
+    if (!modalState.id || !modalState.startTime || !modalState.endTime) {
+      toast.add({
+        title: "Validation Error",
+        description: "Project, Start Time, and End Time are required.",
+        color: "warning",
+      })
+      return
+    }
+
+    const start = dayjs(modalState.startTime)
+    const end = dayjs(modalState.endTime)
+
+    if (!start.isValid() || !end.isValid()) {
+      toast.add({
+        title: "Validation Error",
+        description: "Invalid date format.",
+        color: "warning",
+      })
+      return
+    }
+
+    if (end.isBefore(start)) {
+      toast.add({
+        title: "Validation Error",
+        description: "End Time must be after Start Time.",
+        color: "warning",
+      })
+      return
+    }
+
+    // Validate that time entry is not older than 11:59PM of the previous day
+    const cutoffTime = dayjs().subtract(1, "day").endOf("day")
+    if (start.isBefore(cutoffTime)) {
+      const cutoffFormatted = cutoffTime.format("YYYY-MM-DD HH:mm:ss")
+      toast.add({
+        title: "Validation Error",
+        description: `Time entries cannot be submitted for dates before ${cutoffFormatted}`,
+        color: "warning",
+      })
+      return
+    }
+
+    // 2. Calculate duration
+    const durationSeconds = end.diff(start, "second")
+
+    // 3. Prepare data payload
+    let finalDescription = ""
+    if (exceedsDepartmentThresholdInModal.value) {
+      finalDescription = modalState.customDescription
+    } else {
+      finalDescription =
+        modalState.customDescription || selectedDefaultDescription.value || ""
+    }
+
+    if (finalDescription === "") {
+      toast.add({
+        title: "Validation Error",
+        description: "Description is required.",
+        color: "warning",
+      })
+      return
+    }
+
+    const payload = {
+      projectId: modalState.id,
+      startTime: start.toISOString(), // Send ISO string to backend
+      endTime: end.toISOString(), // Send ISO string to backend
+      durationSeconds: durationSeconds,
+      description: finalDescription,
+    }
+
     let result
     if (editingEntry.value) {
       // Edit Mode - Check if editing is allowed
@@ -467,7 +463,6 @@ const saveEntry = async () => {
           description: "You can only edit entries created today.",
           color: "warning",
         })
-        isSubmitting.value = false
         return
       }
       // Call PUT endpoint
@@ -511,9 +506,9 @@ const saveEntry = async () => {
       description: `An unexpected error occurred. ${e}`,
       color: "error",
     })
+  } finally {
+    isSubmitting.value = false
   }
-
-  isSubmitting.value = false
 }
 
 const deleteEntry = async (id: string) => {
@@ -522,6 +517,7 @@ const deleteEntry = async (id: string) => {
 }
 
 const confirmDelete = async () => {
+  isSubmitting.value = true
   if (!entryToDeleteId.value) return
 
   try {
@@ -549,6 +545,7 @@ const confirmDelete = async () => {
   } finally {
     isDeleteConfirmOpen.value = false
     entryToDeleteId.value = null
+    isSubmitting.value = false
   }
 }
 
@@ -699,7 +696,7 @@ const cancelDelete = () => {
               >
               <UButton
                 :disabled="
-                  Boolean(editingEntry) && !canEditEntry && isSubmitting
+                  (Boolean(editingEntry) && !canEditEntry) || isSubmitting
                 "
                 :title="
                   editingEntry && !canEditEntry
@@ -742,6 +739,7 @@ const cancelDelete = () => {
                 >Cancel</UButton
               >
               <UButton
+                :disabled="isSubmitting"
                 color="error"
                 @click="confirmDelete"
                 >Delete Entry</UButton

@@ -183,8 +183,9 @@ async function handleAddInjection(event: FormSubmitEvent<InjectionSchema>) {
       description: "Could not add injection.",
       color: "error",
     })
+  } finally {
+    isSaving.value = false
   }
-  isSaving.value = false
 }
 
 async function handleUpdateInjection(event: FormSubmitEvent<InjectionSchema>) {
@@ -223,8 +224,9 @@ async function handleUpdateInjection(event: FormSubmitEvent<InjectionSchema>) {
       description: "Could not update injection.",
       color: "error",
     })
+  } finally {
+    isSaving.value = false
   }
-  isSaving.value = false
 }
 
 async function handleDeleteInjection() {
@@ -258,8 +260,9 @@ async function handleDeleteInjection() {
       description: "Could not delete injection.",
       color: "error",
     })
+  } finally {
+    isDeleting.value = false
   }
-  isDeleting.value = false
 }
 
 // Define table columns using ColumnDef

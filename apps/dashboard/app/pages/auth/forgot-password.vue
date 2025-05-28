@@ -14,38 +14,47 @@ const disabled = ref(false)
 
 async function submitForgotPassword() {
   disabled.value = true
-  if (!state.email) {
-    toast.add({
-      title: "Error",
-      description: "Please enter an email",
-    })
-    return
-  }
 
-  const { data, error } = await $eden.api.auth["forgot-password"].post({
-    email: state.email,
-  })
+  try {
+    if (!state.email) {
+      toast.add({
+        title: "Error",
+        description: "Please enter an email",
+      })
+      return
+    }
 
-  if (error) {
-    toast.add({
-      title: "Error",
-      description:
-        typeof error.value === "object" && error.value?.message
-          ? error.value.message
-          : "Failed to send reset password email",
+    const { data, error } = await $eden.api.auth["forgot-password"].post({
+      email: state.email,
     })
-  }
 
-  if (data) {
-    toast.add({
-      title: "Success",
-      description:
-        "If an account exists with this email, a reset password link has been sent.",
-    })
-    // Optionally navigate the user away or clear the form
-    state.email = ""
+    if (error) {
+      toast.add({
+        title: "Error",
+        description:
+          typeof error.value === "object" && error.value?.message
+            ? error.value.message
+            : "Failed to send reset password email",
+      })
+    }
+
+    if (data) {
+      toast.add({
+        title: "Success",
+        description:
+          "If an account exists with this email, a reset password link has been sent.",
+      })
+      // Optionally navigate the user away or clear the form
+      state.email = ""
+    }
+  } catch (error: unknown) {
+    console.error("Failed to submit forgot password:", error)
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred."
+    toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    disabled.value = false
   }
-  disabled.value = false
 }
 </script>
 

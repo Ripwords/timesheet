@@ -428,8 +428,9 @@ async function handleAddDepartment(event: FormSubmitEvent<typeof newDeptData>) {
     const message =
       error instanceof Error ? error.message : "Could not add department."
     toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    isSaving.value = false
   }
-  isSaving.value = false
 }
 
 // No longer uses FormSubmitEvent directly due to complex state
@@ -561,35 +562,44 @@ async function handleUpdateDepartment() {
     const message =
       error instanceof Error ? error.message : "Could not update department."
     toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    isSaving.value = false
   }
-
-  isSaving.value = false
 }
 
 async function handleDeleteDepartment() {
   if (!selectedDepartment.value?.id) return
   isDeleting.value = true
   const deptId = selectedDepartment.value.id
-  const { error } = await $eden.api.admin.departments({ id: deptId }).delete()
 
-  if (error) {
-    toast.add({
-      title: "Error",
-      description: String(error.value) || "Failed to delete department.",
-      color: "error",
-    })
-  } else {
-    toast.add({
-      title: "Success",
-      description: "Department deleted.",
-      color: "success",
-    })
+  try {
+    const { error } = await $eden.api.admin.departments({ id: deptId }).delete()
+
+    if (error) {
+      toast.add({
+        title: "Error",
+        description: String(error.value) || "Failed to delete department.",
+        color: "error",
+      })
+    } else {
+      toast.add({
+        title: "Success",
+        description: "Department deleted.",
+        color: "success",
+      })
+    }
+
+    await refreshDepartments()
+  } catch (error: unknown) {
+    console.error("Failed to delete department:", error)
+    const message =
+      error instanceof Error ? error.message : "Could not delete department."
+    toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    isDeleteDeptModalOpen.value = false
+    selectedDepartment.value = null
+    isDeleting.value = false
   }
-
-  isDeleteDeptModalOpen.value = false
-  selectedDepartment.value = null
-  isDeleting.value = false
-  await refreshDepartments()
 }
 
 // --- Table Columns --- //

@@ -26,43 +26,52 @@ const state = reactive({
 
 async function submit() {
   disabled.value = true
-  if (state.password !== state.confirmPassword) {
-    toast.add({
-      title: "Error",
-      description: "Passwords do not match",
-    })
-    return
-  }
 
-  if (!state.departmentId) {
-    toast.add({
-      title: "Error",
-      description: "Please select a department",
-    })
-    return
-  }
+  try {
+    if (state.password !== state.confirmPassword) {
+      toast.add({
+        title: "Error",
+        description: "Passwords do not match",
+      })
+      return
+    }
 
-  const { data, error } = await $eden.api.auth.signup.post({
-    email: state.email,
-    password: state.password,
-    departmentId: state.departmentId,
-  })
+    if (!state.departmentId) {
+      toast.add({
+        title: "Error",
+        description: "Please select a department",
+      })
+      return
+    }
 
-  if (error) {
-    toast.add({
-      title: "Error",
-      description: String(error.value) || "Failed to register",
+    const { data, error } = await $eden.api.auth.signup.post({
+      email: state.email,
+      password: state.password,
+      departmentId: state.departmentId,
     })
-  }
 
-  if (data) {
-    toast.add({
-      title: "Success",
-      description: "Registered successfully, please verify your email",
-    })
-    navigateTo("/auth/login")
+    if (error) {
+      toast.add({
+        title: "Error",
+        description: String(error.value) || "Failed to register",
+      })
+    }
+
+    if (data) {
+      toast.add({
+        title: "Success",
+        description: "Registered successfully, please verify your email",
+      })
+      navigateTo("/auth/login")
+    }
+  } catch (error: unknown) {
+    console.error("Failed to submit registration:", error)
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred."
+    toast.add({ title: "Error", description: message, color: "error" })
+  } finally {
+    disabled.value = false
   }
-  disabled.value = false
 }
 </script>
 

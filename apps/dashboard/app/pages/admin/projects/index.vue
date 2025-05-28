@@ -181,11 +181,11 @@ async function confirmDeleteProject() {
         err instanceof Error ? err.message : "An unexpected error occurred.",
       color: "error",
     })
+  } finally {
+    isDeletingProject.value = false
+    isDeleteConfirmModalOpen.value = false
+    projectToDelete.value = null
   }
-
-  isDeletingProject.value = false
-  isDeleteConfirmModalOpen.value = false
-  projectToDelete.value = null
 }
 
 // Function to handle updating a project name

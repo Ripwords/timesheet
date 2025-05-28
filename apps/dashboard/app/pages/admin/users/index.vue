@@ -351,26 +351,49 @@ async function saveUserChanges() {
 async function verifyUserEmail() {
   if (!editingUser.value) return
   isVerifying.value = true
-  const result = await $eden.api.admin
-    .users({ id: editingUser.value.id })
-    .patch({ emailVerified: true })
-  isVerifying.value = false
-  if (result.data) {
-    editingUser.value.emailVerified = result.data.emailVerified
-    toast.add({
-      title: "Email Verified",
-      description: `Email for ${editingUser.value.email} verified successfully.`,
-      color: "success",
-    })
-  } else {
+
+  try {
+    const result = await $eden.api.admin
+      .users({ id: editingUser.value.id })
+      .patch({ emailVerified: true })
+
+    if (result.data) {
+      editingUser.value.emailVerified = result.data.emailVerified
+      toast.add({
+        title: "Email Verified",
+        description: `Email for ${editingUser.value.email} verified successfully.`,
+        color: "success",
+      })
+    } else {
+      toast.add({
+        title: "Email Verification Failed",
+        description: `Failed to verify email for ${editingUser.value.email}.`,
+        color: "error",
+      })
+    }
+
+    await refresh()
+  } catch (error: unknown) {
+    console.error("Failed to verify user email:", error)
+    let message = `Failed to verify email for ${editingUser.value?.email}.`
+    if (
+      error &&
+      typeof error === "object" &&
+      "value" in error &&
+      error.value &&
+      typeof error.value === "object" &&
+      "message" in error.value
+    ) {
+      message = String(error.value.message) || message
+    }
     toast.add({
       title: "Email Verification Failed",
-      description: `Failed to verify email for ${editingUser.value.email}.`,
+      description: message,
       color: "error",
     })
+  } finally {
+    isVerifying.value = false
   }
-
-  await refresh()
 }
 
 function cancelEdit() {
