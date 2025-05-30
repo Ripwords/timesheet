@@ -72,6 +72,7 @@ export const resetPasswordTokens = pgTable("reset_password_tokens", {
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
