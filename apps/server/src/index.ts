@@ -8,6 +8,7 @@ import { adminDepartmentsRoutes } from "./admin/departments"
 import { adminFinancials } from "./admin/financials"
 import { publicDepartmentsRoutes } from "./departments"
 import { Elysia } from "elysia"
+import { timeTracker } from "./time-tracker"
 
 const app = new Elysia()
   .use(baseApp("main"))
@@ -21,6 +22,7 @@ const app = new Elysia()
       .use(adminDepartmentsRoutes)
       .use(publicDepartmentsRoutes)
       .use(adminFinancials)
+      .use(timeTracker)
   )
   .get("/", () => "Hello Elysia - Timesheet Backend")
   .listen(process.env.SERVER_PORT || 3100)

@@ -123,3 +123,27 @@ export const projectBudgetInjections = pgTable("project_budget_injections", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+
+export const timerStatusEnum = pgEnum("timer_status", ["running", "paused"])
+
+export const activeTimerSessions = pgTable("active_timer_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" })
+    .unique(), // Only one active session per user
+  status: timerStatusEnum("status").notNull(),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+  totalAccumulatedDuration: integer("total_accumulated_duration")
+    .default(0)
+    .notNull(),
+  lastIntervalStartTime: timestamp("last_interval_start_time", {
+    withTimezone: true,
+  }), // null when paused, set when running
+  description: text("description"), // can be updated during session
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})

@@ -22,6 +22,70 @@ const finalSessionDuration = ref(0) // Store final duration when stopping
 const selectedProjectId = ref<string>()
 const timeEntryDescription = ref("")
 
+// --- Load Initial Timer State ---
+await useLazyAsyncData("timer-initial-state", async () => {
+  const { data: timerData, error } = await eden.api["time-tracker"].active.get()
+
+  if (error?.value) {
+    console.error("Error loading timer state:", error.value)
+    return null
+  }
+
+  if (timerData?.hasActiveSession && timerData.session) {
+    const session = timerData.session
+
+    // Restore timer state from server
+    timerStatus.value = session.status
+    startTime.value = new Date(session.startTime).getTime()
+    totalAccumulatedDuration.value = session.totalAccumulatedDuration
+
+    if (session.status === "running" && session.lastIntervalStartTime) {
+      intervalStartTime.value = new Date(
+        session.lastIntervalStartTime
+      ).getTime()
+      // Start the display timer to show real-time updates
+      nextTick(() => {
+        startDisplayTimer()
+      })
+    } else {
+      // Paused state
+      currentIntervalElapsedTime.value = 0
+      intervalStartTime.value = null
+    }
+
+    // Restore description if it exists
+    if (session.description) {
+      timeEntryDescription.value = session.description
+    }
+
+    toast.add({
+      title: "Timer Restored",
+      description: `Found active ${session.status} timer session`,
+      color: "info",
+    })
+
+    return session
+  }
+
+  return null
+})
+
+// Separate function for just the display timer (UI updates)
+const startDisplayTimer = () => {
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+  }
+
+  timerInterval.value = setInterval(() => {
+    if (intervalStartTime.value && timerStatus.value === "running") {
+      currentIntervalElapsedTime.value = dayjs().diff(
+        dayjs(intervalStartTime.value),
+        "second"
+      )
+    }
+  }, 1000)
+}
+
 // --- Projects ---
 const { data: projects } = await useLazyAsyncData("projects", async () => {
   const { data: projectData } = await eden.api.projects.get({
@@ -138,90 +202,178 @@ const resetState = () => {
   currentIntervalElapsedTime.value = 0
   selectedProjectId.value = undefined
   timeEntryDescription.value = ""
-  refreshHistory()
-}
+  finalSessionDuration.value = 0
 
-const startTimer = () => {
-  if (timerStatus.value === "running") return
-
-  const now = Date.now()
-  intervalStartTime.value = now // Mark the start of this interval
-
-  if (timerStatus.value === "stopped") {
-    startTime.value = now // Set the overall start time
-    totalAccumulatedDuration.value = 0 // Reset accumulated duration
-    currentIntervalElapsedTime.value = 0 // Reset current interval time
-  }
-  // If resuming from pause, totalAccumulatedDuration already holds the prior time
-
-  timerStatus.value = "running"
-  timerInterval.value = setInterval(() => {
-    if (intervalStartTime.value) {
-      // Calculate elapsed time for *this* interval
-      currentIntervalElapsedTime.value = dayjs().diff(
-        dayjs(intervalStartTime.value),
-        "second"
-      )
-    }
-  }, 1000)
-}
-
-const pauseTimer = () => {
-  if (
-    timerStatus.value !== "running" ||
-    !timerInterval.value ||
-    !intervalStartTime.value
-  )
-    return
-
-  clearInterval(timerInterval.value)
-  timerInterval.value = null
-
-  // Calculate duration of the interval that just ended and add it to the total
-  const durationThisInterval = dayjs().diff(
-    dayjs(intervalStartTime.value),
-    "second"
-  )
-  totalAccumulatedDuration.value += durationThisInterval
-
-  currentIntervalElapsedTime.value = 0 // Reset current interval timer
-  intervalStartTime.value = null // Clear interval start time
-  timerStatus.value = "paused"
-}
-
-const endTimer = () => {
-  if (timerStatus.value === "stopped") return
-
-  const endTime = Date.now()
-  const originalStartTimeForSave = startTime.value // Keep for saving
-  const statusBeforeStop = timerStatus.value
-
+  // Clear display timer
   if (timerInterval.value) {
     clearInterval(timerInterval.value)
     timerInterval.value = null
   }
 
-  // Calculate final duration
-  let finalDuration = totalAccumulatedDuration.value
-  if (statusBeforeStop === "running" && intervalStartTime.value) {
-    // If it was running, add the elapsed time from the final interval
-    finalDuration += dayjs(endTime).diff(
-      dayjs(intervalStartTime.value),
-      "second"
-    )
+  refreshHistory()
+}
+
+const startTimer = async () => {
+  if (timerStatus.value === "running") return
+
+  try {
+    const { data: response, error } = await eden.api[
+      "time-tracker"
+    ].start.post()
+
+    if (error?.value) {
+      console.error("Error starting timer:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Failed to start timer session",
+        color: "error",
+      })
+      return
+    }
+
+    if (response) {
+      const session = response.session
+
+      // Update local state based on server response
+      timerStatus.value = session.status
+      startTime.value = new Date(session.startTime).getTime()
+      totalAccumulatedDuration.value = session.totalAccumulatedDuration
+
+      if (session.lastIntervalStartTime) {
+        intervalStartTime.value = new Date(
+          session.lastIntervalStartTime
+        ).getTime()
+      }
+
+      // Start display timer
+      startDisplayTimer()
+
+      if (response.action === "resumed") {
+        toast.add({
+          title: "Timer Resumed",
+          description: "Continuing your previous session",
+          color: "success",
+        })
+      } else if (response.action === "started") {
+        toast.add({
+          title: "Timer Started",
+          description: "New timer session begun",
+          color: "success",
+        })
+      }
+    }
+  } catch (e) {
+    console.error("Failed to start timer:", e)
+    toast.add({
+      title: "Error",
+      description: "An unexpected error occurred",
+      color: "error",
+    })
   }
-  // If it was paused, totalAccumulatedDuration already has the correct total
+}
 
-  finalSessionDuration.value = finalDuration
-  resetState()
+const pauseTimer = async () => {
+  if (timerStatus.value !== "running") return
 
-  // Show modal only if time elapsed
-  if (finalSessionDuration.value > 0) {
-    // Restore original overall start time *only* for the save function's context
-    startTime.value = originalStartTimeForSave
-    showProjectModal.value = true
-  } else {
-    startTime.value = null // Ensure it stays null if modal not shown
+  try {
+    const { data: response, error } = await eden.api[
+      "time-tracker"
+    ].pause.post()
+
+    if (error?.value) {
+      console.error("Error pausing timer:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Failed to pause timer session",
+        color: "error",
+      })
+      return
+    }
+
+    if (response) {
+      // Update local state based on server response
+      timerStatus.value = "paused"
+      totalAccumulatedDuration.value = response.totalElapsed
+      currentIntervalElapsedTime.value = 0
+      intervalStartTime.value = null
+
+      // Stop display timer
+      if (timerInterval.value) {
+        clearInterval(timerInterval.value)
+        timerInterval.value = null
+      }
+
+      toast.add({
+        title: "Timer Paused",
+        description: `Total time: ${dayjs
+          .duration(response.totalElapsed, "seconds")
+          .humanize()}`,
+        color: "info",
+      })
+    }
+  } catch (e) {
+    console.error("Failed to pause timer:", e)
+    toast.add({
+      title: "Error",
+      description: "An unexpected error occurred",
+      color: "error",
+    })
+  }
+}
+
+const endTimer = async () => {
+  if (timerStatus.value === "stopped") return
+
+  try {
+    const { data: response, error } = await eden.api[
+      "time-tracker"
+    ].active.delete()
+
+    if (error?.value) {
+      console.error("Error ending timer:", error.value)
+      toast.add({
+        title: "Error",
+        description: "Failed to end timer session",
+        color: "error",
+      })
+      return
+    }
+
+    if (response && response.finalDuration > 0) {
+      // Store final duration for the modal
+      finalSessionDuration.value = response.finalDuration
+      startTime.value = new Date(response.startTime).getTime() // Keep for modal save logic
+
+      // Reset display state but keep final data for modal
+      timerStatus.value = "stopped"
+      intervalStartTime.value = null
+      totalAccumulatedDuration.value = 0
+      currentIntervalElapsedTime.value = 0
+
+      // Stop display timer
+      if (timerInterval.value) {
+        clearInterval(timerInterval.value)
+        timerInterval.value = null
+      }
+
+      // Show project selection modal
+      showProjectModal.value = true
+    } else {
+      // No time elapsed, fully reset
+      resetState()
+      toast.add({
+        title: "Timer Ended",
+        description: "No time was recorded",
+        color: "info",
+      })
+    }
+  } catch (e) {
+    console.error("Failed to end timer:", e)
+    toast.add({
+      title: "Error",
+      description: "An unexpected error occurred",
+      color: "error",
+    })
   }
 }
 
