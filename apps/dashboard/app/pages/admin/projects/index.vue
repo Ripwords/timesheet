@@ -24,6 +24,7 @@ const search = ref("")
 const sort = ref<"createdAt" | "name">("createdAt")
 const order = ref<"asc" | "desc">("desc")
 const toast = useToast()
+const projectStatus = ref(true) // true for active, false for inactive
 
 // State for the new project modal
 const isNewProjectModalOpen = ref(false)
@@ -46,7 +47,7 @@ const {
   status,
   refresh,
 } = await useLazyAsyncData(
-  "projects-admin",
+  `projects-admin-${projectStatus.value ? "active" : "inactive"}`,
   async () => {
     const { data } = await $eden.api.projects.get({
       query: {
@@ -54,6 +55,7 @@ const {
         search: search.value,
         sort: sort.value,
         order: order.value,
+        isActive: projectStatus.value,
       },
     })
     return {
@@ -62,7 +64,7 @@ const {
     }
   },
   {
-    watch: [page, sort, order],
+    watch: [page, sort, order, projectStatus],
   }
 )
 
@@ -116,12 +118,17 @@ const columns: ColumnDef<Project, unknown>[] = [
           onClick: () => editProject(project),
         }),
         h(UButton, {
-          icon: "i-heroicons-trash",
+          icon: projectStatus.value ? "i-heroicons-trash" : "i-heroicons-check",
           size: "xl",
           variant: "outline",
-          color: "error",
-          ariaLabel: "Delete",
-          onClick: () => deleteProject(project),
+          color: projectStatus.value ? "error" : "success",
+          ariaLabel: projectStatus.value ? "Deactivate" : "Activate",
+          loading:
+            isDeletingProject.value && projectToDelete.value?.id === project.id,
+          onClick: () =>
+            projectStatus.value
+              ? deleteProject(project)
+              : activateProject(project),
         }),
       ])
     },
@@ -143,36 +150,71 @@ function deleteProject(project: Project) {
   isDeleteConfirmModalOpen.value = true
 }
 
-// Function to handle the actual deletion after confirmation
-async function confirmDeleteProject() {
+function activateProject(project: Project) {
+  projectToDelete.value = project
+  isDeleteConfirmModalOpen.value = true
+}
+
+// Function to handle the actual action after confirmation
+async function confirmProjectAction() {
   if (!projectToDelete.value) return
 
   isDeletingProject.value = true
   try {
-    const { error } = await $eden.api.projects
-      .id({ id: projectToDelete.value.id })
-      .delete()
+    if (projectStatus.value) {
+      // Deactivate project
+      const { error } = await $eden.api.projects
+        .id({ id: projectToDelete.value.id })
+        .delete()
 
-    if (error) {
-      const errorMessage =
-        typeof error.value === "object" &&
-        error.value !== null &&
-        "message" in error.value
-          ? String(error.value.message)
-          : String(error.value) || "Failed to delete project."
+      if (error) {
+        const errorMessage =
+          typeof error.value === "object" &&
+          error.value !== null &&
+          "message" in error.value
+            ? String(error.value.message)
+            : String(error.value) || "Failed to deactivate project."
 
-      toast.add({
-        title: `Error (${error.status})`,
-        description: errorMessage,
-        color: "error",
-      })
+        toast.add({
+          title: `Error (${error.status})`,
+          description: errorMessage,
+          color: "error",
+        })
+      } else {
+        toast.add({
+          title: "Success",
+          description: `Project "${projectToDelete.value.name}" deactivated successfully.`,
+          color: "success",
+        })
+        await refresh()
+      }
     } else {
-      toast.add({
-        title: "Success",
-        description: `Project "${projectToDelete.value.name}" deleted successfully.`,
-        color: "success",
-      })
-      await refresh()
+      // Activate project
+      const { error } = await $eden.api.projects
+        .id({ id: projectToDelete.value.id })
+        .activate.patch()
+
+      if (error) {
+        const errorMessage =
+          typeof error.value === "object" &&
+          error.value !== null &&
+          "message" in error.value
+            ? String(error.value.message)
+            : String(error.value) || "Failed to activate project."
+
+        toast.add({
+          title: `Error (${error.status})`,
+          description: errorMessage,
+          color: "error",
+        })
+      } else {
+        toast.add({
+          title: "Success",
+          description: `Project "${projectToDelete.value.name}" activated successfully.`,
+          color: "success",
+        })
+        await refresh()
+      }
     }
   } catch (err: unknown) {
     toast.add({
@@ -234,9 +276,12 @@ async function updateProject() {
       await refresh() // Refresh the project list
     }
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "An unexpected error occurred."
-    toast.add({ title: "Error", description: message, color: "error" })
+    toast.add({
+      title: "Error",
+      description:
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      color: "error",
+    })
   } finally {
     isUpdatingProject.value = false
     isEditModalOpen.value = false
@@ -281,9 +326,12 @@ async function createProject() {
     refresh()
   } catch (err: unknown) {
     console.error("Error creating project:", err)
-    const message =
-      err instanceof Error ? err.message : "An unexpected error occurred."
-    toast.add({ title: "Error", description: message, color: "error" })
+    toast.add({
+      title: "Error",
+      description:
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      color: "error",
+    })
   } finally {
     isCreatingProject.value = false
   }
@@ -293,7 +341,9 @@ async function createProject() {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-semibold">Manage Projects</h1>
+      <h1 class="text-2xl font-semibold">
+        Manage Projects - {{ projectStatus ? "Active" : "Inactive" }}
+      </h1>
       <UButton
         icon="i-heroicons-plus-circle"
         label="New Project"
@@ -303,11 +353,17 @@ async function createProject() {
 
     <UCard>
       <template #header>
-        <div class="flex gap-3">
+        <div class="flex justify-between items-center gap-3">
           <UInput
             v-model="search"
             class="w-[30vw]"
             placeholder="Search..."
+          />
+          <USwitch
+            v-model="projectStatus"
+            :default-value="true"
+            :loading="status === 'pending'"
+            label="Active"
           />
         </div>
       </template>
@@ -356,19 +412,24 @@ async function createProject() {
             <h3
               class="text-lg font-semibold text-error-500 dark:text-error-400"
             >
-              Confirm Deletion
+              Confirm Action
             </h3>
           </template>
 
           <p class="mb-4">
-            Are you sure you want to delete the project
+            Are you sure you want to
+            {{ projectStatus ? "deactivate" : "activate" }} the project
             <strong class="font-semibold"
               >"{{ projectToDelete?.name ?? "..." }}"</strong
             >?
             <br />
             <span class="text-sm text-warning-500 dark:text-warning-400"
-              >This action cannot be undone. Associated time entries or budget
-              injections must be removed first if they exist.</span
+              >This action
+              {{
+                projectStatus
+                  ? "will deactivate the project and hide it from active project lists"
+                  : "will reactivate the project and make it available again"
+              }}.</span
             >
           </p>
 
@@ -381,11 +442,13 @@ async function createProject() {
                 @click="isDeleteConfirmModalOpen = false"
               />
               <UButton
-                label="Delete"
-                color="error"
-                icon="i-heroicons-trash"
+                label="Confirm"
+                :color="projectStatus ? 'error' : 'success'"
+                :icon="
+                  projectStatus ? 'i-heroicons-trash' : 'i-heroicons-check'
+                "
                 :loading="isDeletingProject"
-                @click="confirmDeleteProject"
+                @click="confirmProjectAction"
               />
             </div>
           </template>

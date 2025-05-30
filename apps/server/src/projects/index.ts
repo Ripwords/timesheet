@@ -10,6 +10,7 @@ const querySchema = t.Object({
   search: t.Optional(t.String()),
   sort: t.Optional(t.UnionEnum(["createdAt", "name", "id"])),
   order: t.Optional(t.UnionEnum(["asc", "desc"])),
+  isActive: t.Optional(t.Boolean({ default: true })),
 })
 
 export const projects = baseApp("projects").group("/projects", (app) =>
@@ -55,12 +56,21 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     .get(
       "/",
       async ({ db, query }) => {
-        const { page = 1, limit = 10, search, sort, order } = query
+        const {
+          page = 1,
+          limit = 10,
+          search,
+          sort,
+          order,
+          isActive = true,
+        } = query
         console.log("query", query)
         const whereList = []
         if (search) {
           whereList.push(ilike(schema.projects.name, `%${search}%`))
         }
+        // Filter by isActive status
+        whereList.push(eq(schema.projects.isActive, isActive))
 
         const allProjects = await db.query.projects.findMany({
           orderBy: (projects, { desc, asc }) => {
@@ -102,8 +112,11 @@ export const projects = baseApp("projects").group("/projects", (app) =>
       async ({ db, params, error }) => {
         const projectId = params.id
         const project = await db.query.projects.findFirst({
-          where: eq(schema.projects.id, projectId),
-          columns: { id: true, name: true },
+          where: and(
+            eq(schema.projects.id, projectId),
+            eq(schema.projects.isActive, true)
+          ),
+          columns: { id: true, name: true, isActive: true },
         })
 
         if (!project) {
@@ -176,7 +189,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         adminOnly: true,
       }
     )
-    // DELETE Project
+    // DELETE Project (Soft Delete)
     .delete(
       "/id/:id",
       async ({ db, params, status, set, isAdmin }) => {
@@ -187,46 +200,41 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         const projectId = params.id
 
         try {
-          // Check for associated time entries
-          const timeEntriesCount = await db
-            .select({ count: count() })
-            .from(schema.timeEntries)
-            .where(eq(schema.timeEntries.projectId, projectId))
+          // Check if project exists and is currently active
+          const existingProject = await db.query.projects.findFirst({
+            where: eq(schema.projects.id, projectId),
+            columns: { id: true, isActive: true },
+          })
 
-          if (timeEntriesCount[0]?.count > 0) {
-            return status(
-              400,
-              "Project cannot be deleted because it has associated time entries."
-            )
-          }
-
-          // Check for associated budget injections
-          const budgetInjectionsCount = await db
-            .select({ count: count() })
-            .from(schema.projectBudgetInjections)
-            .where(eq(schema.projectBudgetInjections.projectId, projectId))
-
-          if (budgetInjectionsCount[0]?.count > 0) {
-            return status(
-              400,
-              "Project cannot be deleted because it has associated budget injections."
-            )
-          }
-
-          // Proceed with deletion if no associated data found
-          const deletedProject = await db
-            .delete(schema.projects)
-            .where(eq(schema.projects.id, projectId))
-            .returning({ id: schema.projects.id }) // Return the id of the deleted item
-
-          if (!deletedProject || deletedProject.length === 0) {
+          if (!existingProject) {
             return status(404, "Project not found")
           }
 
-          set.status = 200 // Explicitly set 200 OK
-          return { message: `Project ${projectId} deleted successfully` }
+          if (!existingProject.isActive) {
+            return status(400, "Project is already inactive")
+          }
+
+          // Soft delete: set isActive to false
+          const updatedProject = await db
+            .update(schema.projects)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.projects.id, projectId))
+            .returning({
+              id: schema.projects.id,
+              isActive: schema.projects.isActive,
+            })
+
+          if (!updatedProject || updatedProject.length === 0) {
+            return status(500, "Failed to deactivate project")
+          }
+
+          set.status = 200
+          return { message: `Project ${projectId} deactivated successfully` }
         } catch (e) {
-          logError(`Failed to delete project ${projectId}: ${e}`)
+          logError(`Failed to deactivate project ${projectId}: ${e}`)
           return status(500, "Internal Server Error")
         }
       },
@@ -238,6 +246,70 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         }),
         detail: {
           summary: "Delete a project by ID",
+          tags: ["Projects"],
+        },
+        adminOnly: true,
+      }
+    )
+    // ACTIVATE Project
+    .patch(
+      "/id/:id/activate",
+      async ({ db, params, status, isAdmin }) => {
+        if (!isAdmin) {
+          return status(403, "Forbidden")
+        }
+
+        const projectId = params.id
+
+        try {
+          // Check if project exists
+          const existingProject = await db.query.projects.findFirst({
+            where: eq(schema.projects.id, projectId),
+            columns: { id: true, isActive: true },
+          })
+
+          if (!existingProject) {
+            return status(404, "Project not found")
+          }
+
+          if (existingProject.isActive) {
+            return status(400, "Project is already active")
+          }
+
+          // Reactivate: set isActive to true
+          const updatedProject = await db
+            .update(schema.projects)
+            .set({
+              isActive: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.projects.id, projectId))
+            .returning({
+              id: schema.projects.id,
+              isActive: schema.projects.isActive,
+            })
+
+          if (!updatedProject || updatedProject.length === 0) {
+            return status(500, "Failed to activate project")
+          }
+
+          return {
+            message: `Project ${projectId} activated successfully`,
+            project: updatedProject[0],
+          }
+        } catch (e) {
+          logError(`Failed to activate project ${projectId}: ${e}`)
+          return status(500, "Internal Server Error")
+        }
+      },
+      {
+        params: t.Object({
+          id: t.String({
+            format: "uuid",
+          }),
+        }),
+        detail: {
+          summary: "Activate a project by ID",
           tags: ["Projects"],
         },
         adminOnly: true,

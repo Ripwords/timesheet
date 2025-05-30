@@ -390,6 +390,18 @@ const openModal = (entry: TimeEntry | null = null) => {
     ).padStart(2, "0")}`
     modalState.customDescription = entry.description || ""
     selectedDefaultDescription.value = undefined // Reset selected default
+
+    // Ensure the current project is available in the dropdown even if it's inactive
+    const currentProjectExists = projectsData.value.some(
+      (p) => p.id === entry.projectId
+    )
+    if (!currentProjectExists && entry.projectName) {
+      // Add the current project to the dropdown options temporarily
+      projectsData.value = [
+        { id: entry.projectId, name: entry.projectName },
+        ...projectsData.value,
+      ]
+    }
   } else {
     // Add mode: Reset form
     modalState.id = ""
@@ -397,6 +409,11 @@ const openModal = (entry: TimeEntry | null = null) => {
     modalState.customDescription = ""
     modalTimeInput.value = undefined // Reset time input
     selectedDefaultDescription.value = undefined // Reset selected default
+
+    // For new entries, reload projects to ensure we only have active projects
+    if (initialProjects.value) {
+      projectsData.value = initialProjects.value.projects || []
+    }
   }
   isModalOpen.value = true
 }
