@@ -112,6 +112,7 @@ const error = computed(() => {
             chart-title="Total Hours per Project (All Time)"
             value-axis-label="Total Duration (Minutes)"
             category-axis-label="Project"
+            project-status-field="isActive"
           />
           <p class="text-xs text-gray-500 mt-1">
             Note: Duration shown in minutes.

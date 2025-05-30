@@ -132,6 +132,7 @@ const projectBarChartData = computed(() => {
       id: item.id,
       label: item.name || `Project ${item.id}`, // Use name, fallback to ID
       value: Math.round(Number(item.totalDuration) / 60),
+      isActive: item.isActive, // Include the isActive status
     })) ?? []
   )
 })
@@ -542,6 +543,7 @@ const cancelSession = () => {
             chart-title="Total Hours per Project (All Time)"
             value-axis-label="Total Duration (Hours)"
             category-axis-label="Project"
+            project-status-field="isActive"
           />
           <p class="text-xs text-gray-500 mt-1">
             Note: Duration shown in minutes.

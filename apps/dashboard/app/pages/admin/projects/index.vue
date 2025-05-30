@@ -341,9 +341,7 @@ async function createProject() {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-semibold">
-        Manage Projects - {{ projectStatus ? "Active" : "Inactive" }}
-      </h1>
+      <h1 class="text-2xl font-semibold">Manage Projects</h1>
       <UButton
         icon="i-heroicons-plus-circle"
         label="New Project"

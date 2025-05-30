@@ -17,7 +17,7 @@ ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 // Basic expected structure for data items
 interface ChartDataItem {
-  [key: string]: string | number | Date | null | undefined
+  [key: string]: string | number | Date | null | undefined | boolean
 }
 
 interface Props {
@@ -27,11 +27,13 @@ interface Props {
   chartTitle: string
   valueAxisLabel?: string
   categoryAxisLabel?: string
+  projectStatusField?: string // Optional field name that contains project isActive status
 }
 
 const props = withDefaults(defineProps<Props>(), {
   valueAxisLabel: "Value",
   categoryAxisLabel: "Category",
+  projectStatusField: undefined,
 })
 
 const chartData = computed((): ChartData<"bar"> => {
@@ -53,12 +55,21 @@ const chartData = computed((): ChartData<"bar"> => {
     return seconds / 60 // Convert to minutes
   })
 
+  // Determine background colors based on project status if provided
+  const backgroundColors = props.data.map((item) => {
+    if (props.projectStatusField && props.projectStatusField in item) {
+      const isActive = item[props.projectStatusField]
+      return isActive === false ? "#ef4444" : "#4ade80" // red-500 for inactive, green-500 for active
+    }
+    return "#4ade80" // Default green for all bars if no status field
+  })
+
   return {
     labels: labels,
     datasets: [
       {
         label: props.chartTitle,
-        backgroundColor: "#4ade80", // Tailwind green-500
+        backgroundColor: backgroundColors,
         data: dataValues,
       },
     ],

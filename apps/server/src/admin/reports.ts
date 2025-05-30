@@ -68,6 +68,7 @@ export const adminReportsRoutes = baseApp("reports").group(
             .select({
               id: projects.id,
               name: projects.name,
+              isActive: projects.isActive,
               totalDuration: totalDurationSeconds,
               ...(includeTimeGrouping && { timePeriod: dateTrunc }), // Conditionally add timePeriod
             })
@@ -77,6 +78,7 @@ export const adminReportsRoutes = baseApp("reports").group(
             .groupBy(
               projects.id,
               projects.name,
+              projects.isActive,
               ...(includeTimeGrouping ? [dateTrunc] : [])
             ) // Conditionally group by time
             .orderBy(desc(totalDurationSeconds))
