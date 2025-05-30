@@ -252,7 +252,7 @@ seedTestData()
     console.error("❌ Test data seeding failed:", error)
     process.exit(1)
   })
-  .finally(async () => {
+  .finally(() => {
     console.log("🔌 Closing database connection after test data seed.")
-    await client.end()
+    client.end()
   })
