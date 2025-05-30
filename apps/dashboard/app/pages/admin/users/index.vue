@@ -548,15 +548,15 @@ function cancelEdit() {
                   <Department :department-id="item.id" />
                 </template>
                 <template #default="{ modelValue }">
-                  <Department
-                    v-if="modelValue"
-                    :department-id="modelValue"
-                  />
+                  <span v-if="modelValue">
+                    <Department :department-id="modelValue" />
+                  </span>
                   <span
                     v-else
                     class="text-gray-500 dark:text-gray-400"
-                    >Select Department</span
                   >
+                    Select Department
+                  </span>
                 </template>
               </USelectMenu>
             </UFormField>

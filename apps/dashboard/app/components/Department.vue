@@ -5,29 +5,23 @@ const props = defineProps<{
 
 const { $eden } = useNuxtApp()
 
-const { data: departments } = useAsyncData(
-  `department-${props.departmentId}`,
-  async () => {
-    const { data } = await $eden.api.admin.departments.get({
-      query: {
-        departmentIds: [props.departmentId],
-      },
-    })
-    return data?.[0]
-  },
-  {
-    watch: [() => props.departmentId],
-  }
-)
+const { data: departments } = useAsyncData(`departments`, async () => {
+  const { data } = await $eden.api.admin.departments.get({
+    query: {},
+  })
+  return data
+})
 
 const departmentLabel = computed(() => {
-  return departments.value?.name
+  return departments.value?.find((d) => d.id === props.departmentId)?.name
 })
 </script>
 
 <template>
   <UBadge
-    :color="departments?.color ?? 'neutral'"
+    :color="
+      departments?.find((d) => d.id === props.departmentId)?.color ?? 'neutral'
+    "
     variant="subtle"
     >{{ departmentLabel }}</UBadge
   >
