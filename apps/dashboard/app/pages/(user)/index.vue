@@ -530,41 +530,30 @@ const endTimer = async () => {
   if (timerStatus.value === "stopped") return
 
   try {
-    const { data: response, error } = await $eden.api[
-      "time-tracker"
-    ].active.delete()
+    // First pause the timer to stop it running
+    await pauseTimer()
 
-    if (error?.value) {
-      console.error("Error ending timer:", error.value)
-      toast.add({
-        title: "Error",
-        description: "Failed to end timer session",
-        color: "error",
-      })
-      return
-    }
+    // Calculate final duration from current state
+    const totalSeconds =
+      totalAccumulatedDuration.value + currentIntervalElapsedTime.value
 
-    if (response && response.finalDuration > 0) {
+    if (totalSeconds > 0) {
       // Store final duration for the modal
-      finalSessionDuration.value = response.finalDuration
-      startTime.value = new Date(response.startTime).getTime() // Keep for modal save logic
+      finalSessionDuration.value = totalSeconds / 60
 
-      // Reset display state but keep final data for modal
-      timerStatus.value = "stopped"
-      intervalStartTime.value = null
-      totalAccumulatedDuration.value = 0
-      currentIntervalElapsedTime.value = 0
-
-      // Stop display timer and remove protection
-      if (timerInterval.value) {
-        clearInterval(timerInterval.value)
-        timerInterval.value = null
-      }
-
-      // Show project selection modal
+      // Show project selection modal without deleting the session yet
       showProjectModal.value = true
+
+      toast.add({
+        title: "Timer Stopped",
+        description: `Session ready to save: ${dayjs
+          .duration(totalSeconds, "seconds")
+          .humanize()}`,
+        color: "info",
+      })
     } else {
-      // No time elapsed, fully reset
+      // No time elapsed, delete session and fully reset
+      await deleteTimeTrackerSession()
       resetState()
       toast.add({
         title: "Timer Ended",
@@ -579,6 +568,19 @@ const endTimer = async () => {
       description: "An unexpected error occurred",
       color: "error",
     })
+  }
+}
+
+// Helper function to delete the time-tracker session
+const deleteTimeTrackerSession = async () => {
+  try {
+    const { error } = await $eden.api["time-tracker"].active.delete()
+    if (error?.value) {
+      console.error("Error deleting time-tracker session:", error.value)
+      // Don't show toast for this as it's an internal operation
+    }
+  } catch (e) {
+    console.error("Failed to delete time-tracker session:", e)
   }
 }
 
@@ -603,11 +605,11 @@ const saveSession = async () => {
     return
   }
 
-  // Prepare data for API - now using date instead of startTime/endTime
+  // Prepare data for API - convert minutes back to seconds for durationSeconds
   const timeEntryData = {
     projectId: projectIdToSave,
     date: dateForApi,
-    durationSeconds: finalDurationToSave,
+    durationSeconds: Math.round(finalDurationToSave * 60), // Convert minutes to seconds
     ...(descriptionToSave && { description: descriptionToSave }),
   }
 
@@ -624,6 +626,9 @@ const saveSession = async () => {
         color: "error",
       })
     } else if (savedEntry) {
+      // Successfully saved time entry, now delete the time-tracker session
+      await deleteTimeTrackerSession()
+
       toast.add({
         title: "Session Saved!",
         description: `Duration: ${dayjs
@@ -631,6 +636,9 @@ const saveSession = async () => {
           .humanize()}`,
         color: "success",
       })
+
+      // Refresh dashboard data
+      await refreshAllData()
     }
   } catch (e) {
     console.error("Catch block error saving session:", e)
@@ -646,9 +654,16 @@ const saveSession = async () => {
   }
 }
 
-const cancelSession = () => {
+const closeSaveSessionModal = () => {
   showProjectModal.value = false
-  resetState() // Ensure state is fully reset on cancel
+  // resetState() // Ensure state is fully reset on cancel // Removed this line
+}
+
+const resetDataAndCloseModal = async () => {
+  // Delete the time-tracker session when resetting
+  await deleteTimeTrackerSession()
+  resetState()
+  showProjectModal.value = false
 }
 
 onMounted(() => {
@@ -886,7 +901,7 @@ onMounted(() => {
                 variant="ghost"
                 icon="i-heroicons-x-mark-20-solid"
                 class="-my-1"
-                @click="cancelSession"
+                @click="closeSaveSessionModal"
               />
             </div>
           </template>
@@ -967,10 +982,16 @@ onMounted(() => {
               <UButton
                 color="neutral"
                 variant="ghost"
-                @click="cancelSession"
+                @click="closeSaveSessionModal"
               >
                 Cancel
               </UButton>
+              <UButton
+                label="Reset & Close"
+                color="warning"
+                variant="outline"
+                @click="resetDataAndCloseModal"
+              />
               <UButton
                 label="Save Session"
                 color="primary"
