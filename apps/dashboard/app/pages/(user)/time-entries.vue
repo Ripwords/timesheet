@@ -454,13 +454,13 @@ const saveEntry = async () => {
       return
     }
 
-    // Validate that time entry is not older than yesterday
-    const cutoffDate = dayjs().subtract(1, "day")
-    if (date.isBefore(cutoffDate, "day")) {
-      const cutoffFormatted = cutoffDate.format("YYYY-MM-DD")
+    // Validate that time entry is only for today
+    const today = dayjs()
+    if (!date.isSame(today, "day")) {
+      const todayFormatted = today.format("YYYY-MM-DD")
       toast.add({
         title: "Validation Error",
-        description: `Time entries cannot be submitted for dates before ${cutoffFormatted}`,
+        description: `Time entries can only be submitted for today (${todayFormatted})`,
         color: "warning",
       })
       return
@@ -660,7 +660,18 @@ watch([startDate, endDate], async () => {
               <UInput
                 v-model="modalState.date"
                 type="date"
+                :readonly="!editingEntry"
+                :disabled="!editingEntry"
               />
+              <template #help>
+                <span class="text-sm text-gray-500">
+                  {{
+                    editingEntry
+                      ? "You can only edit entries from today"
+                      : "New entries can only be created for today"
+                  }}
+                </span>
+              </template>
             </UFormField>
 
             <UFormField

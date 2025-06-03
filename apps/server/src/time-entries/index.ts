@@ -19,12 +19,12 @@ export const timeEntries = baseApp("time-entries").group(
             return status(401, "Unauthorized")
           }
 
-          // Validate that time entry is not older than yesterday
-          const cutoffDate = dayjs().subtract(1, "day").format("YYYY-MM-DD")
-          if (dayjs(body.date).isBefore(cutoffDate)) {
+          // Validate that time entry is only for today
+          const today = dayjs().format("YYYY-MM-DD")
+          if (!dayjs(body.date).isSame(today, "day")) {
             return status(
               400,
-              `Time entries cannot be submitted for dates before ${cutoffDate}`
+              `Time entries can only be submitted for today (${today})`
             )
           }
 
@@ -383,7 +383,31 @@ export const timeEntries = baseApp("time-entries").group(
             return status(403, "Forbidden: You cannot update this time entry")
           }
 
-          // 3. Perform the update
+          // 3. Validate that the existing entry is from today (can only edit today's entries)
+          const existingEntryDate = await db.query.timeEntries.findFirst({
+            where: eq(schema.timeEntries.id, params.id),
+            columns: { date: true },
+          })
+
+          if (existingEntryDate) {
+            const today = dayjs().format("YYYY-MM-DD")
+            if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
+              return status(400, "You can only edit time entries created today")
+            }
+          }
+
+          // 4. If updating the date, validate it's for today
+          if (body.date !== undefined) {
+            const today = dayjs().format("YYYY-MM-DD")
+            if (!dayjs(body.date).isSame(today, "day")) {
+              return status(
+                400,
+                `Time entries can only be updated to today's date (${today})`
+              )
+            }
+          }
+
+          // 5. Perform the update
           try {
             const updatedEntry = await db
               .update(schema.timeEntries)
@@ -469,7 +493,23 @@ export const timeEntries = baseApp("time-entries").group(
             return status(403, "Forbidden: You cannot delete this time entry")
           }
 
-          // 3. Perform the deletion
+          // 3. Validate that the existing entry is from today (can only delete today's entries)
+          const existingEntryDate = await db.query.timeEntries.findFirst({
+            where: eq(schema.timeEntries.id, params.id),
+            columns: { date: true },
+          })
+
+          if (existingEntryDate) {
+            const today = dayjs().format("YYYY-MM-DD")
+            if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
+              return status(
+                400,
+                "You can only delete time entries created today"
+              )
+            }
+          }
+
+          // 4. Perform the deletion
           try {
             const deletedEntry = await db
               .delete(schema.timeEntries)
