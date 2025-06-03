@@ -8,7 +8,7 @@ export DATABASE_URL
 
 # Run database migrations
 echo "Running database migrations..."
-bun run db:migrate
+bun run db:push
 
 # Now execute the command provided as arguments to this script (e.g., the CMD from Dockerfile)
 echo "Starting server..."
