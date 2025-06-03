@@ -217,74 +217,6 @@ const selectedProjectId = useState<string | undefined>(
 ) // Changed type to allow undefined initially
 const timeEntryDescription = useState<string>("timeEntryDescription", () => "")
 
-// --- Load Initial Timer State ---
-await useLazyAsyncData(`timer-initial-state`, async () => {
-  const { data: timerData, error } = await $eden.api[
-    "time-tracker"
-  ].active.get()
-
-  if (error?.value) {
-    console.error("Error loading timer state:", error.value)
-    return null
-  }
-
-  if (timerData?.hasActiveSession && timerData.session) {
-    const session = timerData.session
-
-    // Restore timer state from server
-    timerStatus.value = session.status
-
-    // Fix: Handle startTime properly, don't default to 0
-    if (session.startTime) {
-      startTime.value = new Date(session.startTime).getTime()
-    }
-
-    totalAccumulatedDuration.value = session.totalAccumulatedDuration
-
-    if (session.status === "running" && session.lastIntervalStartTime) {
-      intervalStartTime.value = new Date(
-        session.lastIntervalStartTime
-      ).getTime()
-
-      // Calculate the current interval elapsed time for running sessions
-      const now = Date.now()
-      const intervalStart = new Date(session.lastIntervalStartTime).getTime()
-      currentIntervalElapsedTime.value = Math.floor(
-        (now - intervalStart) / 1000
-      )
-
-      startDisplayTimer()
-    } else if (session.status === "paused") {
-      // Paused state - no current interval running
-      currentIntervalElapsedTime.value = 0
-      intervalStartTime.value = null
-    }
-
-    // Restore description if it exists
-    if (session.description) {
-      timeEntryDescription.value = session.description
-    }
-
-    toast.add({
-      title: "Timer Restored",
-      description: `Found active ${session.status} timer session (${dayjs
-        .duration(
-          session.totalAccumulatedDuration +
-            (session.status === "running"
-              ? currentIntervalElapsedTime.value
-              : 0),
-          "seconds"
-        )
-        .humanize()})`,
-      color: "info",
-    })
-
-    return session
-  }
-
-  return null
-})
-
 // Separate function for just the display timer (UI updates)
 const startDisplayTimer = () => {
   if (import.meta.client) {
@@ -347,19 +279,6 @@ const { data: defaultDescriptions } = await useLazyAsyncData(
   }
 )
 
-// --- Timer Computed Properties ---
-const formattedElapsedTime = computed(() => {
-  const totalSeconds =
-    totalAccumulatedDuration.value + currentIntervalElapsedTime.value
-
-  const duration = dayjs.duration(totalSeconds, "seconds")
-  // Ensure leading zeros
-  const hours = String(Math.floor(duration.asHours())).padStart(2, "0")
-  const minutes = String(duration.minutes()).padStart(2, "0")
-  const seconds = String(duration.seconds()).padStart(2, "0")
-  return `${hours}:${minutes}:${seconds}`
-})
-
 // Use optional chaining and provide a default threshold if data is loading/missing
 const exceedsDepartmentThreshold = computed(() => {
   const threshold = defaultDescriptions?.value?.departmentThreshold
@@ -415,159 +334,6 @@ const resetState = () => {
   if (timerInterval.value) {
     clearInterval(timerInterval.value)
     timerInterval.value = null
-  }
-}
-
-const startTimer = async () => {
-  if (timerStatus.value === "running") return
-
-  try {
-    const { data: response, error } = await $eden.api[
-      "time-tracker"
-    ].start.post()
-
-    if (error?.value) {
-      console.error("Error starting timer:", error.value)
-      toast.add({
-        title: "Error",
-        description: "Failed to start timer session",
-        color: "error",
-      })
-      return
-    }
-
-    if (response) {
-      const session = response.session
-
-      // Update local state based on server response
-      timerStatus.value = session?.status ?? "stopped"
-      startTime.value = new Date(session?.startTime ?? 0).getTime()
-      totalAccumulatedDuration.value = session?.totalAccumulatedDuration ?? 0
-
-      if (session?.lastIntervalStartTime) {
-        intervalStartTime.value = new Date(
-          session?.lastIntervalStartTime
-        ).getTime()
-      }
-
-      // Start display timer and setup protection
-      startDisplayTimer()
-
-      if (response.action === "resumed") {
-        toast.add({
-          title: "Timer Resumed",
-          description: "Continuing your previous session",
-          color: "success",
-        })
-      } else if (response.action === "started") {
-        toast.add({
-          title: "Timer Started",
-          description: "New timer session begun",
-          color: "success",
-        })
-      }
-    }
-  } catch (e) {
-    console.error("Failed to start timer:", e)
-    toast.add({
-      title: "Error",
-      description: "An unexpected error occurred",
-      color: "error",
-    })
-  }
-}
-
-const pauseTimer = async () => {
-  if (timerStatus.value !== "running") return
-
-  try {
-    const { data: response, error } = await $eden.api[
-      "time-tracker"
-    ].pause.post()
-
-    if (error?.value) {
-      console.error("Error pausing timer:", error.value)
-      toast.add({
-        title: "Error",
-        description: "Failed to pause timer session",
-        color: "error",
-      })
-      return
-    }
-
-    if (response) {
-      // Update local state based on server response
-      timerStatus.value = "paused"
-      totalAccumulatedDuration.value = response.totalElapsed
-      currentIntervalElapsedTime.value = 0
-      intervalStartTime.value = null
-
-      // Stop display timer but keep beforeunload protection
-      if (timerInterval.value) {
-        clearInterval(timerInterval.value)
-        timerInterval.value = null
-      }
-
-      toast.add({
-        title: "Timer Paused",
-        description: `Total time: ${dayjs
-          .duration(response.totalElapsed, "seconds")
-          .humanize()}`,
-        color: "info",
-      })
-    }
-  } catch (e) {
-    console.error("Failed to pause timer:", e)
-    toast.add({
-      title: "Error",
-      description: "An unexpected error occurred",
-      color: "error",
-    })
-  }
-}
-
-const endTimer = async () => {
-  if (timerStatus.value === "stopped") return
-
-  try {
-    // First pause the timer to stop it running
-    await pauseTimer()
-
-    // Calculate final duration from current state
-    const totalSeconds =
-      totalAccumulatedDuration.value + currentIntervalElapsedTime.value
-
-    if (totalSeconds > 0) {
-      // Store final duration for the modal
-      finalSessionDuration.value = totalSeconds / 60
-
-      // Show project selection modal without deleting the session yet
-      showProjectModal.value = true
-
-      toast.add({
-        title: "Timer Stopped",
-        description: `Session ready to save: ${dayjs
-          .duration(totalSeconds, "seconds")
-          .humanize()}`,
-        color: "info",
-      })
-    } else {
-      // No time elapsed, delete session and fully reset
-      await deleteTimeTrackerSession()
-      resetState()
-      toast.add({
-        title: "Timer Ended",
-        description: "No time was recorded",
-        color: "info",
-      })
-    }
-  } catch (e) {
-    console.error("Failed to end timer:", e)
-    toast.add({
-      title: "Error",
-      description: "An unexpected error occurred",
-      color: "error",
-    })
   }
 }
 
@@ -748,58 +514,14 @@ onMounted(() => {
               uniqueProjectsLast7Days
             }}</span>
           </div>
-
-          <!-- Time Tracker Card -->
-          <UCard>
-            <template #header>
-              <h2 class="text-lg font-medium">Time Tracker</h2>
-            </template>
-            <div
-              class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"
-            >
-              <div class="text-2xl font-mono">
-                {{ formattedElapsedTime }}
-              </div>
-              <div class="flex gap-2">
-                <UButton
-                  icon="i-heroicons-play"
-                  size="sm"
-                  variant="solid"
-                  aria-label="Start or Resume Timer"
-                  :disabled="timerStatus === 'running'"
-                  @click="startTimer"
-                >
-                  {{ timerStatus === "paused" ? "Resume" : "Start" }}
-                </UButton>
-                <UButton
-                  icon="i-heroicons-pause"
-                  size="sm"
-                  color="warning"
-                  variant="solid"
-                  aria-label="Pause Timer"
-                  :disabled="timerStatus !== 'running'"
-                  @click="pauseTimer"
-                >
-                  Pause
-                </UButton>
-                <UButton
-                  icon="i-heroicons-stop-circle"
-                  size="sm"
-                  color="error"
-                  variant="solid"
-                  aria-label="End Timer Session"
-                  :disabled="timerStatus === 'stopped'"
-                  @click="endTimer"
-                >
-                  End
-                </UButton>
-              </div>
-            </div>
-            <div class="p-4 text-sm text-gray-500 dark:text-gray-400">
-              Use the controls above to track your time. Click 'End' to save the
-              session.
-            </div>
-          </UCard>
+          <hr />
+          <!-- Active Timer Sessions - New Multiple Session Manager -->
+          <div
+            v-if="!loading && !error && currentUserId"
+            class="mb-8"
+          >
+            <ActiveTimerSessions />
+          </div>
         </div>
       </UCard>
 

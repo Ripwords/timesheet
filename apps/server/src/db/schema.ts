@@ -130,8 +130,7 @@ export const activeTimerSessions = pgTable("active_timer_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .references((): AnyPgColumn => users.id, { onDelete: "cascade" })
-    .unique(), // Only one active session per user
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
   status: timerStatusEnum("status").notNull(),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   totalAccumulatedDuration: integer("total_accumulated_duration")
