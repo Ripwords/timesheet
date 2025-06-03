@@ -746,12 +746,13 @@ watch(
             >
               <USelectMenu
                 v-model="selectedProjectId"
-                class="w-full"
+                class="w-full [&>[role='listbox']]:z-[60]"
                 value-key="id"
                 label-key="name"
                 placeholder="Choose a project to save this session to"
                 :items="projects || []"
                 searchable
+                to="body"
               />
             </UFormField>
 
@@ -765,11 +766,12 @@ watch(
               >
                 <USelectMenu
                   v-model="selectedDefaultDescription"
-                  class="w-full"
+                  class="w-full [&>[role='listbox']]:z-[60]"
                   :items="defaultDescriptions?.defaultDescriptions || []"
                   value-key="description"
                   label-key="description"
                   placeholder="Select a default description"
+                  to="body"
                 />
               </UFormField>
 

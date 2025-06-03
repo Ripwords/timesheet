@@ -631,10 +631,11 @@ watch([startDate, endDate], async () => {
             >
               <USelectMenu
                 v-model="modalState.id"
-                class="w-full"
+                class="w-full [&>[role='listbox']]:z-[60]"
                 value-key="id"
                 label-key="name"
                 placeholder="Select project"
+                to="body"
                 :items="projectsData || []"
                 :loading="loadingProjectsStatus === 'pending'"
                 @update:search-term="handleProjectsSearch"
