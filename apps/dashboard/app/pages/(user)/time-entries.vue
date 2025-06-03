@@ -59,7 +59,6 @@ const projectsSearch = ref("")
 const projectsLoading = ref(false)
 const projectsHasMore = ref(true)
 const projectsTotal = ref(0)
-const projectSelectMenu = useTemplateRef<HTMLElement>("projectSelectMenu")
 
 // --- Data Fetching ---
 const {
@@ -188,7 +187,11 @@ const loadProjects = async (search = "", reset = false) => {
       return
     }
 
-    const newProjects = data?.projects || []
+    const newProjects =
+      data?.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+      })) || []
     projectsTotal.value = data?.total || 0
 
     if (reset) {
@@ -217,18 +220,6 @@ const handleProjectsSearch = async (query: string) => {
   projectsSearch.value = query
   await loadProjects(query, true)
 }
-
-// Load more projects for infinite scroll
-// const loadMoreProjects = async () => {
-//   if (projectsHasMore.value && !projectsLoading.value) {
-//     await loadProjects(projectsSearch.value)
-//   }
-// }
-
-// const { isLoading } = useInfiniteScroll(projectSelectMenu, loadMoreProjects, {
-//   distance: 200,
-//   canLoadMore: () => projectsHasMore.value && !projectsLoading.value,
-// })
 
 // Fetch Default Descriptions
 const { data: defaultDescriptions, status: loadingDefaultsStatus } =
@@ -639,7 +630,6 @@ watch([startDate, endDate], async () => {
               class="mb-4"
             >
               <USelectMenu
-                ref="projectSelectMenu"
                 v-model="modalState.id"
                 class="w-full"
                 value-key="id"
