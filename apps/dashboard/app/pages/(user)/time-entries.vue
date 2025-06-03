@@ -40,9 +40,9 @@ const entryToDeleteId: Ref<string | null> = ref(null)
 const isSubmitting = ref(false)
 const isDeleting = ref(false) // Separate state for delete operations
 
-// Modal form state
+const selectedProjectId = useState<string | undefined>("selectedProjectId")
+
 const modalState = reactive({
-  id: "",
   date: dayjs().format("YYYY-MM-DD"),
   description: "",
   customDescription: "",
@@ -371,7 +371,7 @@ const openModal = (entry: TimeEntry | null = null) => {
   editingEntry.value = entry
   if (entry) {
     // Edit mode: Pre-fill form
-    modalState.id = entry.projectId
+    selectedProjectId.value = entry.projectId
     modalState.date = entry.date
     // Convert duration seconds to HH:mm format for TimeInput
     const hours = Math.floor(entry.durationSeconds / 3600)
@@ -395,7 +395,7 @@ const openModal = (entry: TimeEntry | null = null) => {
     }
   } else {
     // Add mode: Reset form
-    modalState.id = ""
+    selectedProjectId.value = undefined
     modalState.date = dayjs().format("YYYY-MM-DD")
     modalState.customDescription = ""
     modalTimeInput.value = undefined // Reset time input
@@ -413,7 +413,7 @@ const closeModal = () => {
   isModalOpen.value = false
   // Reset potentially dirty form state after modal closes
   editingEntry.value = null
-  modalState.id = ""
+  selectedProjectId.value = undefined
   modalState.date = ""
   modalState.customDescription = ""
   modalTimeInput.value = undefined
@@ -425,7 +425,7 @@ const saveEntry = async () => {
 
   try {
     // 1. Validate inputs
-    if (!modalState.id || !modalState.date || !modalTimeInput.value) {
+    if (!selectedProjectId.value || !modalState.date || !modalTimeInput.value) {
       toast.add({
         title: "Validation Error",
         description: "Project, Date, and Duration are required.",
@@ -504,7 +504,7 @@ const saveEntry = async () => {
     }
 
     const payload = {
-      projectId: modalState.id,
+      projectId: selectedProjectId.value,
       date: date.format("YYYY-MM-DD"),
       durationSeconds: durationSeconds,
       description: finalDescription,
@@ -630,7 +630,7 @@ watch([startDate, endDate], async () => {
               class="mb-4"
             >
               <USelectMenu
-                v-model="modalState.id"
+                v-model="selectedProjectId"
                 class="w-full [&>[role='listbox']]:z-[60]"
                 value-key="id"
                 label-key="name"
