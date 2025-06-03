@@ -40,9 +40,8 @@ const entryToDeleteId: Ref<string | null> = ref(null)
 const isSubmitting = ref(false)
 const isDeleting = ref(false) // Separate state for delete operations
 
-const selectedProjectId = useState<string | undefined>("selectedProjectId")
-
 const modalState = reactive({
+  id: "",
   date: dayjs().format("YYYY-MM-DD"),
   description: "",
   customDescription: "",
@@ -53,12 +52,6 @@ const selectedDefaultDescription = ref<string | undefined>(undefined)
 
 // Projects infinite scroll state
 const projectsData = ref<Array<{ id: string; name: string }>>([])
-const projectsPage = ref(1)
-const projectsLimit = ref(20)
-const projectsSearch = ref("")
-const projectsLoading = ref(false)
-const projectsHasMore = ref(true)
-const projectsTotal = ref(0)
 
 // --- Data Fetching ---
 const {
@@ -117,26 +110,18 @@ const {
 )
 
 const { data: initialProjects, status: loadingProjectsStatus } =
-  await useLazyAsyncData("projects-initial", async () => {
+  await useLazyAsyncData("projects-for-select", async () => {
     try {
-      const { data, error } = await $eden.api.projects.get({
-        query: {
-          page: 1,
-          limit: 0,
-          // limit: projectsLimit.value,
-        },
+      const { data: projectData } = await $eden.api.projects.get({
+        query: { limit: 0 },
       })
 
-      if (error) {
-        toast.add({
-          title: "Error fetching projects",
-          description: String(error.value),
-          color: "error",
-        })
-        return { projects: [], total: 0 }
-      }
+      if (!projectData) return []
 
-      return data || { projects: [], total: 0 }
+      return projectData.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+      }))
     } catch (error) {
       console.error(error)
       toast.add({
@@ -144,82 +129,9 @@ const { data: initialProjects, status: loadingProjectsStatus } =
         description: "An unexpected error occurred fetching projects.",
         color: "error",
       })
-      return { projects: [], total: 0 }
+      return []
     }
   })
-
-// Initialize projectsData when initialProjects loads
-watch(
-  initialProjects,
-  (newData) => {
-    if (newData) {
-      projectsData.value = newData.projects || []
-      projectsTotal.value = newData.total || 0
-      projectsHasMore.value = projectsData.value.length < projectsTotal.value
-      projectsPage.value = 2 // Next page to load
-    }
-  },
-  { immediate: true }
-)
-
-// Load additional projects for infinite scroll
-const loadProjects = async (search = "", reset = false) => {
-  if (projectsLoading.value) return
-
-  projectsLoading.value = true
-
-  try {
-    const page = reset ? 1 : projectsPage.value
-    const { data, error } = await $eden.api.projects.get({
-      query: {
-        page,
-        limit: projectsLimit.value,
-        search: search || undefined,
-      },
-    })
-
-    if (error) {
-      toast.add({
-        title: "Error fetching projects",
-        description: String(error.value),
-        color: "error",
-      })
-      return
-    }
-
-    const newProjects =
-      data?.projects.map((project) => ({
-        id: project.id,
-        name: project.name,
-      })) || []
-    projectsTotal.value = data?.total || 0
-
-    if (reset) {
-      projectsData.value = newProjects
-      projectsPage.value = 2
-    } else {
-      projectsData.value.push(...newProjects)
-      projectsPage.value++
-    }
-
-    projectsHasMore.value = projectsData.value.length < projectsTotal.value
-  } catch (error) {
-    console.error(error)
-    toast.add({
-      title: "Error fetching projects",
-      description: "An unexpected error occurred fetching projects.",
-      color: "error",
-    })
-  } finally {
-    projectsLoading.value = false
-  }
-}
-
-// Handle search in projects
-const handleProjectsSearch = async (query: string) => {
-  projectsSearch.value = query
-  await loadProjects(query, true)
-}
 
 // Fetch Default Descriptions
 const { data: defaultDescriptions, status: loadingDefaultsStatus } =
@@ -371,7 +283,7 @@ const openModal = (entry: TimeEntry | null = null) => {
   editingEntry.value = entry
   if (entry) {
     // Edit mode: Pre-fill form
-    selectedProjectId.value = entry.projectId
+    modalState.id = entry.id
     modalState.date = entry.date
     // Convert duration seconds to HH:mm format for TimeInput
     const hours = Math.floor(entry.durationSeconds / 3600)
@@ -395,7 +307,7 @@ const openModal = (entry: TimeEntry | null = null) => {
     }
   } else {
     // Add mode: Reset form
-    selectedProjectId.value = undefined
+    modalState.id = ""
     modalState.date = dayjs().format("YYYY-MM-DD")
     modalState.customDescription = ""
     modalTimeInput.value = undefined // Reset time input
@@ -403,7 +315,7 @@ const openModal = (entry: TimeEntry | null = null) => {
 
     // For new entries, reload projects to ensure we only have active projects
     if (initialProjects.value) {
-      projectsData.value = initialProjects.value.projects || []
+      projectsData.value = initialProjects.value || []
     }
   }
   isModalOpen.value = true
@@ -413,7 +325,7 @@ const closeModal = () => {
   isModalOpen.value = false
   // Reset potentially dirty form state after modal closes
   editingEntry.value = null
-  selectedProjectId.value = undefined
+  modalState.id = ""
   modalState.date = ""
   modalState.customDescription = ""
   modalTimeInput.value = undefined
@@ -425,7 +337,7 @@ const saveEntry = async () => {
 
   try {
     // 1. Validate inputs
-    if (!selectedProjectId.value || !modalState.date || !modalTimeInput.value) {
+    if (!modalState.id || !modalState.date || !modalTimeInput.value) {
       toast.add({
         title: "Validation Error",
         description: "Project, Date, and Duration are required.",
@@ -504,7 +416,7 @@ const saveEntry = async () => {
     }
 
     const payload = {
-      projectId: selectedProjectId.value,
+      projectId: modalState.id,
       date: date.format("YYYY-MM-DD"),
       durationSeconds: durationSeconds,
       description: finalDescription,
@@ -630,15 +542,14 @@ watch([startDate, endDate], async () => {
               class="mb-4"
             >
               <USelectMenu
-                v-model="selectedProjectId"
+                v-model="modalState.id"
+                :items="projectsData || []"
                 class="w-full [&>[role='listbox']]:z-[60]"
                 value-key="id"
                 label-key="name"
                 placeholder="Select project"
                 to="body"
-                :items="projectsData || []"
                 :loading="loadingProjectsStatus === 'pending'"
-                @update:search-term="handleProjectsSearch"
               />
             </UFormField>
 
