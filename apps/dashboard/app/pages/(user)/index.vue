@@ -188,16 +188,34 @@ const uniqueProjectsLast7Days = computed(() => {
 })
 
 // --- Time Tracker State ---
-const timerInterval = useState<NodeJS.Timeout | null>('timerInterval', () => null)
-const timerStatus = useState<"stopped" | "running" | "paused">('timerStatus', () => "stopped")
-const startTime = useState<number | null>('startTime', () => null) // Timestamp of the *very first* start after stopped
-const intervalStartTime = useState<number | null>('intervalStartTime', () => null) // Timestamp of the start of the current running interval (start or resume)
-const totalAccumulatedDuration = useState<number>('totalAccumulatedDuration', () => 0) // Seconds accumulated before the current running interval
-const currentIntervalElapsedTime = useState<number>('currentIntervalElapsedTime', () => 0) // Seconds elapsed in the current running interval
-const showProjectModal = useState<boolean>('showProjectModal', () => false)
-const finalSessionDuration = useState<number>('finalSessionDuration', () => 0) // Store final duration when stopping
-const selectedProjectId = useState<string | undefined>('selectedProjectId', () => undefined) // Changed type to allow undefined initially
-const timeEntryDescription = useState<string>('timeEntryDescription', () => "")
+const timerInterval = useState<NodeJS.Timeout | null>(
+  "timerInterval",
+  () => null
+)
+const timerStatus = useState<"stopped" | "running" | "paused">(
+  "timerStatus",
+  () => "stopped"
+)
+const startTime = useState<number | null>("startTime", () => null) // Timestamp of the *very first* start after stopped
+const intervalStartTime = useState<number | null>(
+  "intervalStartTime",
+  () => null
+) // Timestamp of the start of the current running interval (start or resume)
+const totalAccumulatedDuration = useState<number>(
+  "totalAccumulatedDuration",
+  () => 0
+) // Seconds accumulated before the current running interval
+const currentIntervalElapsedTime = useState<number>(
+  "currentIntervalElapsedTime",
+  () => 0
+) // Seconds elapsed in the current running interval
+const showProjectModal = useState<boolean>("showProjectModal", () => false)
+const finalSessionDuration = useState<number>("finalSessionDuration", () => 0) // Store final duration when stopping
+const selectedProjectId = useState<string | undefined>(
+  "selectedProjectId",
+  () => undefined
+) // Changed type to allow undefined initially
+const timeEntryDescription = useState<string>("timeEntryDescription", () => "")
 
 // --- Load Initial Timer State ---
 await useLazyAsyncData(`timer-initial-state`, async () => {
@@ -908,7 +926,7 @@ onMounted(() => {
                       ? dayjs
                           .duration(
                             defaultDescriptions.departmentThreshold,
-                            "seconds"
+                            "minutes"
                           )
                           .humanize()
                       : "N/A"
