@@ -145,6 +145,20 @@ const exceedsDepartmentThresholdInModal = computed(() => {
   return durationMinutes > thresholdMinutes
 })
 
+// Sort sessions to keep running timers at the top
+const sortedActiveSessions = computed(() => {
+  if (!activeSessions.value) return []
+
+  return [...activeSessions.value].sort((a, b) => {
+    // Running sessions come first
+    if (a.status === "running" && b.status !== "running") return -1
+    if (a.status !== "running" && b.status === "running") return 1
+
+    // For non-running sessions, sort by start time (oldest first)
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  })
+})
+
 // Methods
 const formatElapsedTime = (totalSeconds: number): string => {
   const d = dayjs.duration(totalSeconds, "seconds")
@@ -166,9 +180,60 @@ const getActionState = (sessionId: string): boolean => {
   return actionStates.value[sessionId] || false
 }
 
+// Helper method to pause all running sessions except optionally one specific session
+const pauseAllRunningSessionsExcept = async (exceptSessionId?: string) => {
+  if (!activeSessions.value) return
+
+  const runningSessions = activeSessions.value.filter(
+    (session) => session.status === "running" && session.id !== exceptSessionId
+  )
+
+  if (runningSessions.length === 0) return
+
+  // Pause all running sessions in parallel
+  const pausePromises = runningSessions.map(async (session) => {
+    try {
+      setActionState(session.id, true)
+      const { error } = await $eden.api["time-tracker"]
+        .pause({ sessionId: session.id })
+        .post()
+
+      if (error) {
+        console.error(`Error pausing session ${session.id}:`, error.value)
+        toast.add({
+          title: "Error pausing session",
+          description: `Failed to pause session: ${
+            session.description || session.id
+          }`,
+          color: "warning",
+        })
+      }
+    } catch (error) {
+      console.error(`Error pausing session ${session.id}:`, error)
+    } finally {
+      setActionState(session.id, false)
+    }
+  })
+
+  await Promise.allSettled(pausePromises)
+
+  if (runningSessions.length > 0) {
+    toast.add({
+      title: "Other sessions paused",
+      description: `${runningSessions.length} running session${
+        runningSessions.length > 1 ? "s" : ""
+      } paused automatically`,
+      color: "info",
+    })
+  }
+}
+
 const startNewSession = async () => {
   isStarting.value = true
   try {
+    // First, pause all currently running sessions
+    await pauseAllRunningSessionsExcept()
+
     const { error } = await $eden.api["time-tracker"].start.post({
       description: newSessionDescription.value || undefined,
     })
@@ -240,6 +305,9 @@ const pauseSession = async (sessionId: string) => {
 const resumeSession = async (sessionId: string) => {
   setActionState(sessionId, true)
   try {
+    // First, pause all other running sessions
+    await pauseAllRunningSessionsExcept(sessionId)
+
     const { error } = await $eden.api["time-tracker"]
       .resume({ sessionId })
       .post()
@@ -795,7 +863,7 @@ watch(
       class="grid gap-4"
     >
       <UCard
-        v-for="session in activeSessions"
+        v-for="session in sortedActiveSessions"
         :key="session.id"
         :class="
           session.status === 'running'
