@@ -10,6 +10,11 @@ useSeoMeta({
 
 const { $eden } = useNuxtApp()
 
+// Calculate date ranges for time series data
+const dayjs = useDayjs()
+const today = dayjs().format("YYYY-MM-DD")
+const thirtyDaysAgo = dayjs().subtract(29, "day").format("YYYY-MM-DD") // Include today
+
 // State for chart data
 const { data: projectTotalsData, status: projectTotalsStatus } =
   await useLazyAsyncData("projects-total", async () => {
@@ -39,6 +44,8 @@ const { data: projectTimeSeriesData, status: projectTimeSeriesStatus } =
       query: {
         groupBy: "project",
         timeUnit: "day",
+        startDate: thirtyDaysAgo,
+        endDate: today,
       },
     })
     return data ?? []
@@ -50,6 +57,8 @@ const { data: userTimeSeriesData, status: userTimeSeriesStatus } =
       query: {
         groupBy: "user",
         timeUnit: "day",
+        startDate: thirtyDaysAgo,
+        endDate: today,
       },
     })
     return data ?? []
