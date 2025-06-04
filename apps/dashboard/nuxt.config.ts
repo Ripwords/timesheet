@@ -14,6 +14,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       serverUrl: "http://localhost:3100",
+      umamiUrl: "",
+      umamiId: "",
     },
   },
   pwa: {
@@ -60,5 +62,6 @@ export default defineNuxtConfig({
     "dayjs-nuxt",
     "@vueuse/nuxt",
     "@vite-pwa/nuxt",
+    "@nuxt/scripts",
   ],
 })
