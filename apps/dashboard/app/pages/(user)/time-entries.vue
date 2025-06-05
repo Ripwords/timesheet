@@ -2,6 +2,7 @@
 import type { ColumnDef } from "@tanstack/vue-table"
 import { UButton } from "#components"
 import duration from "dayjs/plugin/duration"
+import type { TimeEntry } from "~/utils/timeInput"
 
 useSeoMeta({
   title: "Timesheet | Time Entries",
@@ -15,42 +16,16 @@ dayjs.extend(duration)
 const toast = useToast()
 const { $eden } = useNuxtApp()
 
-interface TimeEntry {
-  id: string
-  projectId: string
-  projectName?: string // Added for display
-  date: string // Date in YYYY-MM-DD format
-  durationSeconds: number
-  dateFormatted?: string
-  durationFormatted?: string
-  description?: string
-}
-
 // --- State ---
 const startDate = useState("startDate", () =>
   dayjs().subtract(30, "day").format("YYYY-MM-DD")
 )
 const endDate = useState("endDate", () => dayjs().format("YYYY-MM-DD"))
 const isModalOpen = ref(false)
-const editingEntry: Ref<TimeEntry | null> = ref(null) // null for 'Add' mode, entry object for 'Edit' mode
-const modalTimeInput = ref<string | undefined>(undefined) // For TimeInput component
+const editingEntry: Ref<TimeEntry | null> = ref(null)
 const isDeleteConfirmOpen = ref(false)
 const entryToDeleteId: Ref<string | null> = ref(null)
-const isSubmitting = ref(false)
-const isDeleting = ref(false) // Separate state for delete operations
-
-const modalState = reactive({
-  id: "",
-  date: dayjs().format("YYYY-MM-DD"),
-  description: "",
-  customDescription: "",
-})
-
-// State for default descriptions and threshold
-const selectedDefaultDescription = ref<string | undefined>(undefined)
-
-// Projects infinite scroll state
-const projectsData = ref<Array<{ id: string; name: string }>>([])
+const isDeleting = ref(false)
 
 // --- Data Fetching ---
 const {
@@ -132,7 +107,6 @@ const { data: initialProjects, status: loadingProjectsStatus } =
     }
   })
 
-// Fetch Default Descriptions
 const { data: defaultDescriptions, status: loadingDefaultsStatus } =
   await useLazyAsyncData("default-descriptions", async () => {
     const { data: descriptionsData, error } = await $eden.api[
@@ -145,10 +119,8 @@ const { data: defaultDescriptions, status: loadingDefaultsStatus } =
         description: "Could not load default descriptions.",
         color: "error",
       })
-      // Return the expected structure even on error
       return { defaultDescriptions: [], departmentThreshold: undefined }
     }
-    // Ensure the structure matches expectations, providing defaults if null/undefined
     return (
       descriptionsData ?? {
         defaultDescriptions: [],
@@ -158,81 +130,26 @@ const { data: defaultDescriptions, status: loadingDefaultsStatus } =
   })
 
 // --- Computed ---
-const modalTitle = computed(() =>
-  editingEntry.value ? "Edit Time Entry" : "Add Time Entry"
-)
+const projectsData = computed(() => {
+  if (!initialProjects.value) return []
 
-const modalDurationFormatted = computed(() => {
-  if (!modalTimeInput.value) return "00:00"
+  // If editing, ensure current project is available even if inactive
+  if (editingEntry.value) {
+    const currentProjectExists = initialProjects.value.some(
+      (p) => p.id === editingEntry.value!.projectId
+    )
+    if (!currentProjectExists) {
+      return [
+        {
+          id: editingEntry.value.projectId,
+          name: editingEntry.value.projectName,
+        },
+        ...initialProjects.value,
+      ]
+    }
+  }
 
-  // Parse HH:mm format from TimeInput
-  const parts = modalTimeInput.value.split(":")
-  if (parts.length !== 2) return "00:00"
-
-  const hours = Number(parts[0])
-  const minutes = Number(parts[1])
-  if (isNaN(hours) || isNaN(minutes)) return "00:00"
-
-  const totalSeconds = hours * 3600 + minutes * 60
-  return formatDuration(totalSeconds)
-})
-
-const exceedsDepartmentThresholdInModal = computed(() => {
-  if (!modalTimeInput.value) return false
-
-  const parts = modalTimeInput.value.split(":")
-  if (parts.length !== 2) return false
-
-  const hours = Number(parts[0])
-  const minutes = Number(parts[1])
-  if (isNaN(hours) || isNaN(minutes)) return false
-
-  const durationMinutes = hours * 60 + minutes
-  const thresholdMinutes = defaultDescriptions.value?.departmentThreshold || 0
-  return durationMinutes > thresholdMinutes
-})
-
-// --- Helper Functions ---
-const parseDurationFromTimeInput = (
-  timeStr: string | undefined
-): number | null => {
-  if (!timeStr) return null
-
-  const parts = timeStr.split(":")
-  if (parts.length !== 2) return null
-
-  const hours = Number(parts[0])
-  const minutes = Number(parts[1])
-  if (isNaN(hours) || isNaN(minutes)) return null
-
-  return hours * 3600 + minutes * 60
-}
-
-const formatDuration = (totalSeconds: number): string => {
-  if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0)
-    return "00:00"
-  const d = dayjs.duration(totalSeconds, "seconds")
-  // Note: dayjs duration format doesn't directly handle total hours > 24 well for HH:mm.
-  // We calculate total hours manually.
-  const totalHours = Math.floor(d.asHours())
-  const minutes = d.minutes()
-
-  const hoursStr = String(totalHours).padStart(2, "0")
-  const minutesStr =
-    typeof minutes === "number" && !isNaN(minutes)
-      ? String(minutes).padStart(2, "0")
-      : "00"
-
-  return `${hoursStr}:${minutesStr}`
-}
-
-// Determines if the 'Save' button in the modal should be enabled for editing
-const canEditEntry = computed(() => {
-  if (!editingEntry.value) return true // Always allow saving for new entries
-
-  const entryDate = dayjs(editingEntry.value.date)
-  const today = dayjs()
-  return entryDate.isSame(today, "day")
+  return initialProjects.value
 })
 
 // Table Columns Definition
@@ -277,197 +194,13 @@ const columns: ColumnDef<TimeEntry>[] = [
 ]
 
 // --- Methods ---
-
 const openModal = (entry: TimeEntry | null = null) => {
   editingEntry.value = entry
-  if (entry) {
-    // Edit mode: Pre-fill form
-    modalState.id = entry.id
-    modalState.date = entry.date
-    // Convert duration seconds to HH:mm format for TimeInput
-    const hours = Math.floor(entry.durationSeconds / 3600)
-    const minutes = Math.floor((entry.durationSeconds % 3600) / 60)
-    modalTimeInput.value = `${String(hours).padStart(2, "0")}:${String(
-      minutes
-    ).padStart(2, "0")}`
-    modalState.customDescription = entry.description || ""
-    selectedDefaultDescription.value = undefined // Reset selected default
-
-    // Ensure the current project is available in the dropdown even if it's inactive
-    const currentProjectExists = projectsData.value.some(
-      (p) => p.id === entry.projectId
-    )
-    if (!currentProjectExists && entry.projectName) {
-      // Add the current project to the dropdown options temporarily
-      projectsData.value = [
-        { id: entry.projectId, name: entry.projectName },
-        ...projectsData.value,
-      ]
-    }
-  } else {
-    // Add mode: Reset form
-    modalState.id = ""
-    modalState.date = dayjs().format("YYYY-MM-DD")
-    modalState.customDescription = ""
-    modalTimeInput.value = undefined // Reset time input
-    selectedDefaultDescription.value = undefined // Reset selected default
-
-    // For new entries, reload projects to ensure we only have active projects
-    if (initialProjects.value) {
-      projectsData.value = initialProjects.value || []
-    }
-  }
   isModalOpen.value = true
 }
 
-const closeModal = () => {
-  isModalOpen.value = false
-  // Reset potentially dirty form state after modal closes
-  editingEntry.value = null
-  modalState.id = ""
-  modalState.date = ""
-  modalState.customDescription = ""
-  modalTimeInput.value = undefined
-  selectedDefaultDescription.value = undefined
-}
-
-const saveEntry = async () => {
-  isSubmitting.value = true
-
-  try {
-    // 1. Validate inputs
-    if (!modalState.id || !modalState.date || !modalTimeInput.value) {
-      toast.add({
-        title: "Validation Error",
-        description: "Project, Date, and Duration are required.",
-        color: "warning",
-      })
-      return
-    }
-
-    const date = dayjs(modalState.date)
-
-    if (!date.isValid()) {
-      toast.add({
-        title: "Validation Error",
-        description: "Invalid date format.",
-        color: "warning",
-      })
-      return
-    }
-
-    // Validate that time entry is only for today
-    const today = dayjs()
-    if (!date.isSame(today, "day")) {
-      const todayFormatted = today.format("YYYY-MM-DD")
-      toast.add({
-        title: "Validation Error",
-        description: `Time entries can only be submitted for today (${todayFormatted})`,
-        color: "warning",
-      })
-      return
-    }
-
-    // 2. Parse duration from TimeInput
-    const durationSeconds = parseDurationFromTimeInput(modalTimeInput.value)
-    if (durationSeconds === null || durationSeconds <= 0) {
-      toast.add({
-        title: "Validation Error",
-        description: "Please enter a valid duration.",
-        color: "warning",
-      })
-      return
-    }
-
-    // 3. Validate description based on department threshold
-    let finalDescription = ""
-    if (exceedsDepartmentThresholdInModal.value) {
-      // If exceeds threshold, custom description is required
-      if (
-        !modalState.customDescription ||
-        modalState.customDescription.trim() === ""
-      ) {
-        toast.add({
-          title: "Validation Error",
-          description:
-            "A detailed description is required for sessions exceeding your department's threshold.",
-          color: "warning",
-        })
-        return
-      }
-      finalDescription = modalState.customDescription.trim()
-    } else {
-      // If doesn't exceed threshold, use custom description or selected default
-      finalDescription =
-        modalState.customDescription.trim() ||
-        selectedDefaultDescription.value ||
-        ""
-
-      if (finalDescription === "") {
-        toast.add({
-          title: "Validation Error",
-          description:
-            "Description is required. Please select a default description or enter a custom one.",
-          color: "warning",
-        })
-        return
-      }
-    }
-
-    const payload = {
-      projectId: modalState.id,
-      date: date.format("YYYY-MM-DD"),
-      durationSeconds: durationSeconds,
-      description: finalDescription,
-    }
-
-    let result
-    if (editingEntry.value) {
-      // Edit Mode - Check if editing is allowed
-      if (!canEditEntry.value) {
-        toast.add({
-          title: "Edit Restriction",
-          description: "You can only edit entries created today.",
-          color: "warning",
-        })
-        return
-      }
-      // Call PUT endpoint
-      result = await $eden.api["time-entries"]
-        .id({
-          id: editingEntry.value.id,
-        })
-        .put(payload)
-    } else {
-      // Add Mode
-      // Call POST endpoint
-      result = await $eden.api["time-entries"].post(payload)
-    }
-
-    // 4. Handle response
-    if (result?.error) {
-      toast.add({
-        title: `Error ${editingEntry.value ? "updating" : "adding"} entry`,
-        description: String(result.error.value),
-        color: "error",
-      })
-    } else {
-      toast.add({
-        title: `Entry ${editingEntry.value ? "Updated" : "Added"} Successfully`,
-        color: "success",
-      })
-      closeModal()
-      await refreshEntries() // Refresh the table data
-    }
-  } catch (e) {
-    toast.add({
-      title: "API Error",
-      description: `An unexpected error occurred. ${e}`,
-      color: "error",
-    })
-  } finally {
-    isSubmitting.value = false
-  }
+const handleModalSaved = async () => {
+  await refreshEntries()
 }
 
 const deleteEntry = async (id: string) => {
@@ -495,7 +228,7 @@ const confirmDelete = async () => {
         title: "Entry Deleted Successfully",
         color: "success",
       })
-      await refreshEntries() // Refresh the table data
+      await refreshEntries()
     }
   } catch (e) {
     toast.add({
@@ -518,145 +251,16 @@ watch([startDate, endDate], async () => {
 
 <template>
   <div>
-    <!-- Add/Edit Modal -->
-    <UModal
-      v-model:open="isModalOpen"
-      prevent-close
-      @close="closeModal"
-    >
-      <template #header>
-        <h2 class="text-lg font-semibold">{{ modalTitle }}</h2>
-      </template>
-
-      <template #body>
-        <UCard>
-          <UForm
-            :state="modalState"
-            @submit="saveEntry"
-          >
-            <UFormField
-              label="Project"
-              name="projectId"
-              required
-              class="mb-4"
-            >
-              <USelectMenu
-                v-model="modalState.id"
-                :items="projectsData || []"
-                class="w-full [&>[role='listbox']]:z-[60]"
-                value-key="id"
-                label-key="name"
-                placeholder="Select project"
-                to="body"
-                :loading="loadingProjectsStatus === 'pending'"
-              />
-            </UFormField>
-
-            <UFormField
-              label="Date"
-              name="date"
-              required
-              class="mb-4"
-            >
-              <UInput
-                v-model="modalState.date"
-                type="date"
-                :readonly="!editingEntry"
-                :disabled="!editingEntry"
-              />
-              <template #help>
-                <span class="text-sm text-gray-500">
-                  {{
-                    editingEntry
-                      ? "You can only edit entries from today"
-                      : "New entries can only be created for today"
-                  }}
-                </span>
-              </template>
-            </UFormField>
-
-            <UFormField
-              label="Duration"
-              name="duration"
-              required
-              class="mb-4"
-            >
-              <TimeInput v-model="modalTimeInput" />
-              <template #help>
-                <span class="text-sm text-gray-500">
-                  Formatted: {{ modalDurationFormatted }}
-                </span>
-              </template>
-            </UFormField>
-
-            <!-- Description Section -->
-            <div class="mb-4">
-              <UFormField
-                v-if="!exceedsDepartmentThresholdInModal"
-                label="Description (Select Default)"
-                name="defaultDescription"
-                class="mb-2"
-              >
-                <USelectMenu
-                  v-model="selectedDefaultDescription"
-                  class="w-full"
-                  :items="defaultDescriptions?.defaultDescriptions || []"
-                  value-key="description"
-                  label-key="description"
-                  placeholder="Select a default description"
-                  :loading="loadingDefaultsStatus === 'pending'"
-                />
-              </UFormField>
-
-              <UFormField
-                :label="
-                  exceedsDepartmentThresholdInModal
-                    ? 'Description (Required)'
-                    : 'Custom Description (Optional)'
-                "
-                name="customDescription"
-              >
-                <UTextarea
-                  v-model="modalState.customDescription"
-                  class="w-full"
-                  :placeholder="
-                    exceedsDepartmentThresholdInModal
-                      ? 'Please provide a detailed description for this extended session'
-                      : 'Enter custom description or leave blank to use selected default'
-                  "
-                  :required="exceedsDepartmentThresholdInModal"
-                />
-              </UFormField>
-
-              <p
-                v-if="exceedsDepartmentThresholdInModal"
-                class="text-sm text-orange-600 dark:text-orange-400 mt-1"
-              >
-                ⚠️ This session exceeds your department's threshold. A detailed
-                description is required.
-              </p>
-            </div>
-
-            <div class="flex justify-end gap-2">
-              <UButton
-                type="button"
-                variant="outline"
-                @click="closeModal"
-              >
-                Cancel
-              </UButton>
-              <UButton
-                type="submit"
-                :loading="isSubmitting"
-                :disabled="!canEditEntry"
-              >
-                {{ editingEntry ? "Update" : "Add" }} Entry
-              </UButton>
-            </div>
-          </UForm>
-        </UCard>
-      </template>
-    </UModal>
+    <TimeEntryModal
+      v-model:is-open="isModalOpen"
+      :editing-entry="editingEntry"
+      :projects-data="projectsData"
+      :default-descriptions="defaultDescriptions?.defaultDescriptions || []"
+      :department-threshold="defaultDescriptions?.departmentThreshold"
+      :loading-projects="loadingProjectsStatus === 'pending'"
+      :loading-defaults="loadingDefaultsStatus === 'pending'"
+      @saved="handleModalSaved"
+    />
 
     <!-- Delete Confirmation Modal -->
     <UModal v-model:open="isDeleteConfirmOpen">
