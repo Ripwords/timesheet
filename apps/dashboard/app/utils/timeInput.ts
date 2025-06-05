@@ -1,3 +1,5 @@
+import { useDayjs } from "#imports"
+
 export const parseDurationFromTimeInput = (
   timeStr: string | undefined
 ): number | null => {
@@ -15,8 +17,7 @@ export const parseDurationFromTimeInput = (
 
 export const formatDuration = (totalSeconds: number): string => {
   const dayjs = useDayjs()
-  if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0)
-    return "00:00"
+  if (totalSeconds < 0) return "00:00"
   const d = dayjs.duration(totalSeconds, "seconds")
   // Note: dayjs duration format doesn't directly handle total hours > 24 well for HH:mm.
   // We calculate total hours manually.

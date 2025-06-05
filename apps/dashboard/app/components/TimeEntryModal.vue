@@ -314,16 +314,12 @@ const saveEntry = async () => {
             <UInput
               v-model="modalState.date"
               type="date"
-              :readonly="!!editingEntry"
-              :disabled="!!editingEntry"
+              readonly
+              disabled
             />
             <template #help>
               <span class="text-sm text-gray-500">
-                {{
-                  editingEntry
-                    ? "You can only edit entries from today"
-                    : "New entries can only be created for today"
-                }}
+                Time entries can only be submitted for today
               </span>
             </template>
           </UFormField>
