@@ -452,6 +452,7 @@ const openTimeEntryModal = () => {
 
 const handleTimeEntryModalSaved = async () => {
   await refreshAllData()
+  isTimeEntryModalOpen.value = false
 }
 
 onMounted(() => {
