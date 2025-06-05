@@ -217,6 +217,19 @@ const selectedProjectId = useState<string | undefined>(
 ) // Changed type to allow undefined initially
 const timeEntryDescription = useState<string>("timeEntryDescription", () => "")
 
+// --- Time Entry Modal State ---
+const isTimeEntryModalOpen = ref(false)
+
+// --- Computed for TimeEntryModal ---
+const projectsDataForModal = computed(() => {
+  return (
+    projectsForSelect.value?.map((project) => ({
+      id: project.id,
+      name: project.name,
+    })) || []
+  )
+})
+
 // Separate function for just the display timer (UI updates)
 const startDisplayTimer = () => {
   if (import.meta.client) {
@@ -432,6 +445,15 @@ const resetDataAndCloseModal = async () => {
   showProjectModal.value = false
 }
 
+// --- Time Entry Modal Methods ---
+const openTimeEntryModal = () => {
+  isTimeEntryModalOpen.value = true
+}
+
+const handleTimeEntryModalSaved = async () => {
+  await refreshAllData()
+}
+
 onMounted(() => {
   startDisplayTimer()
 })
@@ -439,7 +461,26 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1 class="text-2xl font-semibold mb-6">My Dashboard</h1>
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">My Dashboard</h1>
+      <UButton
+        icon="i-heroicons-plus"
+        @click="openTimeEntryModal"
+      >
+        Add Entry
+      </UButton>
+    </div>
+
+    <!-- Time Entry Modal -->
+    <TimeEntryModal
+      v-model:is-open="isTimeEntryModalOpen"
+      :projects-data="projectsDataForModal"
+      :default-descriptions="defaultDescriptions?.defaultDescriptions || []"
+      :department-threshold="defaultDescriptions?.departmentThreshold"
+      :loading-projects="false"
+      :loading-defaults="false"
+      @saved="handleTimeEntryModalSaved"
+    />
 
     <div
       v-if="loading"
@@ -636,7 +677,7 @@ onMounted(() => {
             >
               <USelectMenu
                 v-model="selectedProjectId"
-                :items="projectsForSelect"
+                :items="projectsDataForModal"
                 label-key="name"
                 value-key="id"
                 placeholder="Select project"
