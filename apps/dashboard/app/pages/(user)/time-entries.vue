@@ -2,7 +2,6 @@
 import type { ColumnDef } from "@tanstack/vue-table"
 import { UButton } from "#components"
 import duration from "dayjs/plugin/duration"
-import TimeInput from "~/components/TimeInput.vue"
 
 useSeoMeta({
   title: "Timesheet | Time Entries",

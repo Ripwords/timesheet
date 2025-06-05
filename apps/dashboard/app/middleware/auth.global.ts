@@ -16,7 +16,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // --- Route Definitions ---
   // Define routes that require authentication (excluding admin routes)
-  const protectedRoutes = ["/"] // Removed '/admin', assuming it will be protected by 'admin' middleware
+  const protectedRoutes = ["/", "/time-entries"] // Removed '/admin', assuming it will be protected by 'admin' middleware
   const requiresAuth = protectedRoutes.includes(to.path)
 
   // Define authentication routes (e.g., login, register pages)
