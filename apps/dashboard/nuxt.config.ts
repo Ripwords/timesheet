@@ -27,6 +27,8 @@ export default defineNuxtConfig({
       name: "Timesheet",
       short_name: "Timesheet",
       description: "Timesheet",
+      theme_color: "#49a3ff",
+      background_color: "#000000",
       icons: [
         {
           src: "pwa-64x64.png",
