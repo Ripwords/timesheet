@@ -6,6 +6,21 @@ import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
 import { error as logError } from "@rasla/logify"
 import dayjs from "dayjs"
+import utc from "dayjs/plugin/utc"
+import timezone from "dayjs/plugin/timezone"
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// Helper function to get today's date in user's timezone
+const getUserTimezoneToday = (userTimezone?: string): string => {
+  if (userTimezone) {
+    return dayjs().tz(userTimezone).format("YYYY-MM-DD")
+  }
+  // Fallback to server timezone if not provided
+  return dayjs().format("YYYY-MM-DD")
+}
+
 export const timeEntries = baseApp("time-entries").group(
   "/time-entries",
   (app) =>
@@ -13,14 +28,17 @@ export const timeEntries = baseApp("time-entries").group(
       .use(authGuard())
       .post(
         "/",
-        async ({ db, body, status, getUser }) => {
+        async ({ db, body, status, getUser, headers }) => {
           const user = await getUser()
           if (!user) {
             return status(401, "Unauthorized")
           }
 
-          // Validate that time entry is only for today
-          const today = dayjs().format("YYYY-MM-DD")
+          // Get user's timezone from header
+          const userTimezone = headers["x-user-timezone"]
+
+          // Validate that time entry is only for today in user's timezone
+          const today = getUserTimezoneToday(userTimezone)
           if (!dayjs(body.date).isSame(today, "day")) {
             return status(
               400,
@@ -360,11 +378,14 @@ export const timeEntries = baseApp("time-entries").group(
       // UPDATE Time Entry
       .put(
         "/id/:id",
-        async ({ db, params, body, status, getUser }) => {
+        async ({ db, params, body, status, getUser, headers }) => {
           const user = await getUser()
           if (!user) {
             return status(401, "Unauthorized")
           }
+
+          // Get user's timezone from header
+          const userTimezone = headers["x-user-timezone"]
 
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({
@@ -390,7 +411,7 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (existingEntryDate) {
-            const today = dayjs().format("YYYY-MM-DD")
+            const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
               return status(400, "You can only edit time entries created today")
             }
@@ -398,7 +419,7 @@ export const timeEntries = baseApp("time-entries").group(
 
           // 4. If updating the date, validate it's for today
           if (body.date !== undefined) {
-            const today = dayjs().format("YYYY-MM-DD")
+            const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(body.date).isSame(today, "day")) {
               return status(
                 400,
@@ -470,11 +491,14 @@ export const timeEntries = baseApp("time-entries").group(
       // DELETE Time Entry
       .delete(
         "/id/:id",
-        async ({ db, params, status, getUser }) => {
+        async ({ db, params, status, getUser, headers }) => {
           const user = await getUser()
           if (!user) {
             return status(401, "Unauthorized")
           }
+
+          // Get user's timezone from header
+          const userTimezone = headers["x-user-timezone"]
 
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({
@@ -500,7 +524,7 @@ export const timeEntries = baseApp("time-entries").group(
           })
 
           if (existingEntryDate) {
-            const today = dayjs().format("YYYY-MM-DD")
+            const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
               return status(
                 400,

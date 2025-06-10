@@ -33,6 +33,7 @@ dayjs.extend(duration)
 
 const toast = useToast()
 const { $eden } = useNuxtApp()
+const { getTimezoneHeaders } = useUserTimezone()
 const isSubmitting = ref(false)
 const modalTimeInput = ref<string | undefined>(undefined)
 const selectedDefaultDescription = ref<string | undefined>(undefined)
@@ -238,11 +239,15 @@ const saveEntry = async () => {
         .id({
           id: props.editingEntry.id,
         })
-        .put(payload)
+        .put(payload, {
+          headers: getTimezoneHeaders(),
+        })
     } else {
       // Add Mode
       // Call POST endpoint
-      result = await $eden.api["time-entries"].post(payload)
+      result = await $eden.api["time-entries"].post(payload, {
+        headers: getTimezoneHeaders(),
+      })
     }
 
     // 4. Handle response
