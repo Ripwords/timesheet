@@ -15,6 +15,7 @@ dayjs.extend(duration)
 
 const toast = useToast()
 const { $eden } = useNuxtApp()
+const { getTimezoneHeaders } = useUserTimezone()
 
 // --- State ---
 const startDate = useState("startDate", () =>
@@ -215,7 +216,9 @@ const confirmDelete = async () => {
   try {
     const result = await $eden.api["time-entries"]
       .id({ id: entryToDeleteId.value })
-      .delete()
+      .delete({
+        headers: getTimezoneHeaders(),
+      })
 
     if (result?.error) {
       toast.add({
