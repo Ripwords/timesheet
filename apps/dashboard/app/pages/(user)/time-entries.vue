@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import type { ColumnDef } from "@tanstack/vue-table"
 import { UButton } from "#components"
+import { h } from "vue"
 import duration from "dayjs/plugin/duration"
 import type { TimeEntry } from "~/utils/timeInput"
+
+interface ProjectGroup {
+  id: string
+  projectName: string
+  projectId: number
+  totalDuration: string
+  entryCount: number
+  subRows: TimeEntry[]
+}
 
 useSeoMeta({
   title: "Timesheet | Time Entries",
@@ -27,6 +37,7 @@ const editingEntry: Ref<TimeEntry | null> = ref(null)
 const isDeleteConfirmOpen = ref(false)
 const entryToDeleteId: Ref<string | null> = ref(null)
 const isDeleting = ref(false)
+const expanded = ref<Record<string, boolean>>({})
 
 // --- Data Fetching ---
 const {
@@ -153,43 +164,121 @@ const projectsData = computed(() => {
   return initialProjects.value
 })
 
-// Table Columns Definition
-const columns: ColumnDef<TimeEntry>[] = [
+// Group time entries by project for expandable rows
+const groupedTimeEntries = computed(() => {
+  if (!timeEntries.value || timeEntries.value.length === 0) return []
+
+  // Group entries by project
+  const projectGroups = new Map<
+    string,
+    { project: ProjectGroup; entries: TimeEntry[] }
+  >()
+
+  timeEntries.value.forEach((entry) => {
+    const projectKey = String(entry.projectId)
+    if (!projectGroups.has(projectKey)) {
+      projectGroups.set(projectKey, {
+        project: {
+          id: `project-${entry.projectId}`,
+          projectName: entry.projectName || "Unknown Project",
+          projectId: Number(entry.projectId),
+          totalDuration: "",
+          entryCount: 0,
+          subRows: [],
+        },
+        entries: [],
+      })
+    }
+
+    const group = projectGroups.get(projectKey)!
+    group.entries.push(entry)
+    group.project.entryCount++
+  })
+
+  // Calculate totals and sort entries for each project
+  const result: ProjectGroup[] = []
+
+  projectGroups.forEach(({ project, entries }) => {
+    // Sort time entries within each project by date (newest first)
+    const sortedEntries = entries.sort(
+      (a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf()
+    )
+
+    // Calculate total duration for the project
+    const totalSeconds = sortedEntries.reduce(
+      (sum, entry) => sum + entry.durationSeconds,
+      0
+    )
+
+    project.totalDuration = dayjs
+      .duration(totalSeconds, "seconds")
+      .format("HH:mm:ss")
+    project.subRows = sortedEntries
+
+    result.push(project)
+  })
+
+  // Sort projects by latest entry date (newest first)
+  const sortedResult = result.sort((a, b) => {
+    const aLatest = a.subRows[0]?.date
+    const bLatest = b.subRows[0]?.date
+    return dayjs(bLatest).valueOf() - dayjs(aLatest).valueOf()
+  })
+
+  return sortedResult
+})
+
+// Table Columns Definition for expandable projects
+const columns: ColumnDef<ProjectGroup>[] = [
+  {
+    id: "expand",
+    cell: ({ row }) =>
+      h(UButton, {
+        color: "neutral",
+        variant: "ghost",
+        icon: "i-heroicons-chevron-down",
+        square: true,
+        "aria-label": "Expand",
+        ui: {
+          leadingIcon: [
+            "transition-transform",
+            row.getIsExpanded() ? "duration-200 rotate-180" : "",
+          ],
+        },
+        onClick: () => row.toggleExpanded(),
+      }),
+  },
   {
     accessorKey: "projectName",
     header: "Project",
-  },
-  {
-    accessorKey: "dateFormatted",
-    header: "Date",
-  },
-  {
-    accessorKey: "durationFormatted",
-    header: "Duration",
-  },
-  {
-    accessorKey: "description",
-    header: "Description",
-  },
-  {
-    id: "actions",
-    header: "Actions",
     cell: ({ row }) => {
-      return h("div", { class: "flex gap-2" }, [
-        h(UButton, {
-          icon: "i-heroicons-pencil-square",
-          size: "xl",
-          variant: "outline",
-          onClick: () => openModal(row.original),
-        }),
-        h(UButton, {
-          icon: "i-heroicons-trash",
-          size: "xl",
-          color: "error",
-          variant: "outline",
-          onClick: () => deleteEntry(row.original.id),
-        }),
+      const project = row.original
+      return h("div", { class: "flex items-center gap-2 font-medium" }, [
+        h("span", {}, project.projectName),
+        h(
+          "span",
+          { class: "text-sm text-gray-500" },
+          `(${project.entryCount} entries)`
+        ),
       ])
+    },
+  },
+  {
+    accessorKey: "totalDuration",
+    header: "Total Duration",
+    cell: ({ row }) => {
+      return h("span", { class: "font-medium" }, row.original.totalDuration)
+    },
+  },
+  {
+    header: "Latest Entry",
+    cell: ({ row }) => {
+      const latestEntry = row.original.subRows[0]
+      return h(
+        "span",
+        { class: "text-sm text-gray-500" },
+        latestEntry ? dayjs(latestEntry.date).format("YYYY-MM-DD") : ""
+      )
     },
   },
 ]
@@ -202,6 +291,8 @@ const openModal = (entry: TimeEntry | null = null) => {
 
 const handleModalSaved = async () => {
   await refreshEntries()
+  // Clear the editing entry after saving
+  editingEntry.value = null
 }
 
 const deleteEntry = async (id: string) => {
@@ -249,6 +340,14 @@ const confirmDelete = async () => {
 // Watch for date range changes to refresh data
 watch([startDate, endDate], async () => {
   await refreshEntries()
+})
+
+// Watch for modal close to clear editing entry
+watch(isModalOpen, (newValue) => {
+  if (!newValue) {
+    // Modal was closed, clear the editing entry
+    editingEntry.value = null
+  }
 })
 </script>
 
@@ -336,7 +435,8 @@ watch([startDate, endDate], async () => {
         </template>
 
         <UTable
-          :data="timeEntries || []"
+          v-model:expanded="expanded"
+          :data="groupedTimeEntries"
           :columns
           :loading="loadingEntriesStatus === 'pending'"
           :empty-state="{
@@ -344,35 +444,51 @@ watch([startDate, endDate], async () => {
             label: 'No time entries found',
             description: 'Add your first time entry to get started.',
           }"
+          :ui="{ tr: 'data-[expanded=true]:bg-elevated/50' }"
+          class="flex-1"
         >
-          <template #dateFormatted-data="{ row }">
-            {{ dayjs(row.original.date).format("YYYY-MM-DD") }}
-          </template>
-
-          <template #actions-data="{ row }">
-            <div class="flex gap-2">
-              <UButton
-                icon="i-heroicons-pencil-square"
-                size="sm"
-                variant="outline"
-                :disabled="
-                  !dayjs(row.original.date).isSame(dayjs(), 'day') ||
-                  loadingEntriesStatus === 'pending'
-                "
-                @click="openModal(row.original)"
-              >
-                Edit
-              </UButton>
-              <UButton
-                icon="i-heroicons-trash"
-                size="sm"
-                color="error"
-                variant="outline"
-                :disabled="loadingEntriesStatus === 'pending'"
-                @click="deleteEntry(row.original.id)"
-              >
-                Delete
-              </UButton>
+          <template #expanded="{ row }">
+            <div class="px-4 py-2 space-y-2">
+              <div class="space-y-1">
+                <div
+                  v-for="entry in row.original.subRows"
+                  :key="entry.id"
+                  class="flex justify-between items-center p-2 rounded border-l-2 border-gray-200"
+                >
+                  <div class="flex-1">
+                    <div>
+                      {{ entry.description || "No description" }}
+                    </div>
+                    <div>
+                      {{ dayjs(entry.date).format("YYYY-MM-DD") }}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono">{{ entry.durationFormatted }}</span>
+                    <div class="flex gap-1">
+                      <UButton
+                        icon="i-heroicons-pencil-square"
+                        size="sm"
+                        variant="outline"
+                        :disabled="!dayjs(entry.date).isSame(dayjs(), 'day')"
+                        @click="openModal(entry)"
+                      >
+                        Edit
+                      </UButton>
+                      <UButton
+                        icon="i-heroicons-trash"
+                        size="sm"
+                        color="error"
+                        variant="outline"
+                        :disabled="!dayjs(entry.date).isSame(dayjs(), 'day')"
+                        @click="deleteEntry(entry.id)"
+                      >
+                        Delete
+                      </UButton>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
         </UTable>
