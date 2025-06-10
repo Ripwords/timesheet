@@ -42,4 +42,5 @@ export interface TimeEntry {
   dateFormatted?: string
   durationFormatted?: string
   description?: string
+  subRows?: TimeEntry[] // Added for expandable table functionality
 }
