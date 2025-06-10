@@ -4,7 +4,6 @@ import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
-import { error as logError } from "@rasla/logify"
 import dayjs from "dayjs"
 interface AggregateDataPoint {
   [key: string]: string | number | Date | undefined // More specific index signature
@@ -121,14 +120,8 @@ export const adminReportsRoutes = baseApp("reports").group(
         try {
           const results = await queryBuilder
           return results as AggregateDataPoint[]
-        } catch (e) {
-          logError(`Error fetching aggregated report: ${e}`)
-          const message =
-            e instanceof Error ? e.message : "Unknown error occurred"
-          return status(
-            500,
-            `Failed to fetch aggregated report data: ${message}`
-          )
+        } catch {
+          return status(500, "Failed to fetch aggregated report data")
         }
       },
       {

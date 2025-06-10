@@ -10,7 +10,7 @@ import { drizzle } from "drizzle-orm/postgres-js"
 
 import * as schema from "../src/db/schema"
 import * as dotenv from "dotenv"
-import { logger } from "@rasla/logify"
+import logixlysia from "logixlysia"
 import { eq } from "drizzle-orm"
 
 dotenv.config({ path: "../../.env" })
@@ -34,11 +34,7 @@ export const baseApp = (name: string) =>
   new Elysia({
     name,
   })
-    // .use(
-    //   logger({
-    //     level: "debug",
-    //   })
-    // )
+    .use(logixlysia())
     .use(serverTiming())
     .decorate("db", db)
     .use(
@@ -50,7 +46,7 @@ export const baseApp = (name: string) =>
         ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-User-Timezone"],
       })
     )
     .use(

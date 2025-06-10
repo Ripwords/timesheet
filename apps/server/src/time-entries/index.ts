@@ -4,7 +4,6 @@ import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
-import { error as logError } from "@rasla/logify"
 import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
 import timezone from "dayjs/plugin/timezone"
@@ -64,8 +63,6 @@ export const timeEntries = baseApp("time-entries").group(
 
             return newTimeEntry[0]
           } catch (e) {
-            logError(`Failed to create time entry: ${e}`)
-            // Handle potential foreign key constraint errors if projectId is invalid
             if (
               e instanceof Error &&
               e.message.includes("violates foreign key constraint")
@@ -114,8 +111,7 @@ export const timeEntries = baseApp("time-entries").group(
             try {
               const start = dayjs(startDate).format("YYYY-MM-DD")
               conditions.push(gte(schema.timeEntries.date, start))
-            } catch (e) {
-              logError(`Invalid startDate format: ${startDate} ${e}`)
+            } catch {
               return status(400, "Invalid startDate format. Use YYYY-MM-DD.")
             }
           }
@@ -125,8 +121,7 @@ export const timeEntries = baseApp("time-entries").group(
             try {
               const end = dayjs(endDate).format("YYYY-MM-DD")
               conditions.push(lte(schema.timeEntries.date, end))
-            } catch (e) {
-              logError(`Invalid endDate format: ${endDate} ${e}`)
+            } catch {
               return status(400, "Invalid endDate format. Use YYYY-MM-DD.")
             }
           }
@@ -189,8 +184,7 @@ export const timeEntries = baseApp("time-entries").group(
             try {
               const start = dayjs(startDate).format("YYYY-MM-DD")
               conditions.push(gte(schema.timeEntries.date, start))
-            } catch (e) {
-              logError(`Invalid startDate format: ${startDate} ${e}`)
+            } catch {
               return status(400, "Invalid startDate format. Use YYYY-MM-DD.")
             }
           }
@@ -200,8 +194,7 @@ export const timeEntries = baseApp("time-entries").group(
             try {
               const end = dayjs(endDate).format("YYYY-MM-DD")
               conditions.push(lte(schema.timeEntries.date, end))
-            } catch (e) {
-              logError(`Invalid endDate format: ${endDate} ${e}`)
+            } catch {
               return status(400, "Invalid endDate format. Use YYYY-MM-DD.")
             }
           }
@@ -301,10 +294,7 @@ export const timeEntries = baseApp("time-entries").group(
               )
 
             return defaultDescriptions
-          } catch (e) {
-            logError(
-              `Failed to fetch default descriptions for department ${userDepartment}: ${e}`
-            )
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -459,7 +449,6 @@ export const timeEntries = baseApp("time-entries").group(
 
             return updatedEntry[0]
           } catch (e) {
-            logError(`Failed to update time entry ${params.id}: ${e}`)
             // Handle potential foreign key constraint errors if projectId is invalid
             if (
               e instanceof Error &&
@@ -545,8 +534,7 @@ export const timeEntries = baseApp("time-entries").group(
             }
 
             return deletedEntry[0]
-          } catch (e) {
-            logError(`Failed to delete time entry ${params.id}: ${e}`)
+          } catch {
             // Handle potential DB errors if necessary
             return status(500, "Internal Server Error")
           }

@@ -9,7 +9,6 @@ import { sendEmail } from "../../utils/mail"
 import * as schema from "../db/schema"
 import { seedAdminUser } from "../db/seedUser"
 import { UUID } from "../../utils/validtors"
-import { error as logError } from "@rasla/logify"
 
 seedAdminUser()
 export const auth = baseApp("auth").group("/auth", (app) =>
@@ -80,7 +79,6 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
           const serverUrl = process.env.SERVER_URL
           if (!serverUrl) {
-            logError("SERVER_URL environment variable is not set.")
             return status(
               500,
               "Server configuration error: SERVER_URL not set."
@@ -111,7 +109,6 @@ export const auth = baseApp("auth").group("/auth", (app) =>
           ) {
             return status(409, "User with this email already exists.")
           }
-          logError(`Signup Error: ${e}`)
           return status(500, "Failed to create user.")
         }
       },
@@ -191,7 +188,6 @@ export const auth = baseApp("auth").group("/auth", (app) =>
       const userProfile = await getUser()
 
       if (!userProfile) {
-        logError("Unauthorized")
         return status(401, "Unauthorized")
       }
 
@@ -235,9 +231,7 @@ export const auth = baseApp("auth").group("/auth", (app) =>
             message:
               "If an account with that email exists, a password reset link has been sent.",
           }
-        } catch (emailError) {
-          logError(`Failed to send password reset email: ${emailError}`)
-          // Optionally, revert the token saving if email fails, or log for retry
+        } catch {
           return status(500, "Failed to send password reset email.")
         }
       },
@@ -275,15 +269,11 @@ export const auth = baseApp("auth").group("/auth", (app) =>
 
         // 3. Check if a valid token was found
         if (!validTokenRecord) {
-          logError("No valid reset token found or token expired/mismatched.")
           return status(400, "Invalid or expired reset token.")
         }
 
         // Ensure userId is present on the valid token record
         if (!validTokenRecord.userId) {
-          logError(
-            `User ID missing from valid reset token record: ${validTokenRecord.id}`
-          )
           return status(500, "Internal server error during password reset.")
         }
 

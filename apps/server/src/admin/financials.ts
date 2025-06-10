@@ -1,7 +1,6 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
 import { asc, eq } from "drizzle-orm"
 import { t } from "elysia"
-import { error as logError } from "@rasla/logify"
 import { baseApp } from "../../utils/baseApp"
 import {
   projectBudgetInjections,
@@ -168,7 +167,6 @@ export const adminFinancials = baseApp("adminFinancials").group(
           } catch (e: any) {
             // Handle potential database errors or not found errors
             if (e.status === 404) throw e
-            logError(`Error updating budget injection: ${e}`)
             return status(
               500,
               `Failed to update budget injection: ${e.message}`
@@ -209,7 +207,6 @@ export const adminFinancials = baseApp("adminFinancials").group(
             return { success: true, deletedId: deletedInjection[0].id }
           } catch (e: any) {
             if (e.status === 404) throw e
-            logError(`Error deleting budget injection: ${e}`)
             return status(
               500,
               `Failed to delete budget injection: ${e.message}`
@@ -277,7 +274,6 @@ export const adminFinancials = baseApp("adminFinancials").group(
               budget: new Decimal(newInjection[0].budget).toNumber(),
             }
           } catch (e: any) {
-            logError(`Error creating budget injection: ${e}`)
             return status(
               500,
               `Failed to create budget injection: ${e.message}`

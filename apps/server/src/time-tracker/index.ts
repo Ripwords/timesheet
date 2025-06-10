@@ -3,7 +3,6 @@ import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { error as logError } from "@rasla/logify"
 import dayjs from "dayjs"
 
 export const timeTracker = baseApp("time-tracker").group(
@@ -60,8 +59,7 @@ export const timeTracker = baseApp("time-tracker").group(
               hasActiveSessions: true,
               sessions: sessionsWithElapsed,
             }
-          } catch (e) {
-            logError(`Failed to fetch active timer sessions: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -100,8 +98,7 @@ export const timeTracker = baseApp("time-tracker").group(
               action: "started",
               session: newSession[0],
             }
-          } catch (e) {
-            logError(`Failed to start timer session: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -172,8 +169,7 @@ export const timeTracker = baseApp("time-tracker").group(
               session: updatedSession[0],
               totalElapsed: newTotalDuration,
             }
-          } catch (e) {
-            logError(`Failed to pause timer session: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -226,8 +222,7 @@ export const timeTracker = baseApp("time-tracker").group(
               action: "resumed",
               session: updatedSession[0],
             }
-          } catch (e) {
-            logError(`Failed to resume timer session: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -292,8 +287,7 @@ export const timeTracker = baseApp("time-tracker").group(
               endTime: now.toDate(),
               session: deletedSession[0],
             }
-          } catch (e) {
-            logError(`Failed to end timer session: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -359,8 +353,7 @@ export const timeTracker = baseApp("time-tracker").group(
               currentElapsedTotal: currentElapsed,
               status: activeSession.status,
             }
-          } catch (e) {
-            logError(`Failed to sync timer session: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },
@@ -438,8 +431,7 @@ export const timeTracker = baseApp("time-tracker").group(
               endedSessions,
               totalSessions: endedSessions.length,
             }
-          } catch (e) {
-            logError(`Failed to end all timer sessions: ${e}`)
+          } catch {
             return status(500, "Internal Server Error")
           }
         },

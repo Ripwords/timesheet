@@ -4,7 +4,7 @@ import { baseApp } from "../../utils/baseApp"
 import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
-import { error as logError } from "@rasla/logify"
+
 const querySchema = t.Object({
   search: t.Optional(t.Nullable(t.String())),
   page: t.Optional(
@@ -125,11 +125,8 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               users: userListFormatted,
               total: totalResult[0]?.count ?? 0,
             }
-          } catch (e) {
-            logError(`Error fetching user list for admin: ${e}`)
-            const message =
-              e instanceof Error ? e.message : "Unknown error occurred"
-            return status(500, `Failed to fetch user list: ${message}`)
+          } catch {
+            return status(500, "Failed to fetch user list")
           }
         },
         {
@@ -275,7 +272,6 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
 
             return finalUserData[0]
           } catch (e) {
-            logError(`Error updating user ${userId}: ${e}`)
             if (e instanceof Error && e.message.includes("already in use")) {
               return error(409, e.message)
             }
@@ -324,11 +320,8 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               message: `User ${userId} activated successfully.`,
               user: updatedUserResult[0],
             }
-          } catch (e) {
-            logError(`Error activating user ${userId}: ${e}`)
-            const message =
-              e instanceof Error ? e.message : "Unknown error occurred"
-            return error(500, `Failed to activate user: ${message}`)
+          } catch {
+            return error(500, `Failed to activate user`)
           }
         },
         {
@@ -343,7 +336,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       )
       .delete(
         "/:id",
-        async ({ db, params, error }) => {
+        async ({ db, params, status }) => {
           const userId = params.id
 
           try {
@@ -357,18 +350,15 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               })
 
             if (!updatedUserResult || updatedUserResult.length === 0) {
-              return error(404, `User with ID ${userId} not found.`)
+              return status(404, `User with ID ${userId} not found.`)
             }
 
             return {
               message: `User ${userId} deactivated successfully.`,
               user: updatedUserResult[0],
             }
-          } catch (e) {
-            logError(`Error deactivating user ${userId}: ${e}`)
-            const message =
-              e instanceof Error ? e.message : "Unknown error occurred"
-            return error(500, `Failed to deactivate user: ${message}`)
+          } catch {
+            return status(500, `Failed to deactivate user`)
           }
         },
         {

@@ -3,7 +3,6 @@ import * as schema from "../db/schema"
 import { t } from "elysia"
 import { and, count, eq, ilike } from "drizzle-orm"
 import { authGuard } from "../middleware/authGuard"
-import { error as logError } from "@rasla/logify"
 const querySchema = t.Object({
   page: t.Optional(t.Number({ default: 1 })),
   limit: t.Optional(t.Number({ default: 10 })),
@@ -36,8 +35,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           }
 
           return newProject[0]
-        } catch (e) {
-          logError(`Failed to create project: ${e}`)
+        } catch {
           return status(500, "Internal Server Error")
         }
       },
@@ -168,8 +166,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
           }
 
           return updatedProject[0]
-        } catch (e) {
-          logError(`Failed to update project ${projectId}: ${e}`)
+        } catch {
           return status(500, "Internal Server Error")
         }
       },
@@ -233,8 +230,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
 
           set.status = 200
           return { message: `Project ${projectId} deactivated successfully` }
-        } catch (e) {
-          logError(`Failed to deactivate project ${projectId}: ${e}`)
+        } catch {
           return status(500, "Internal Server Error")
         }
       },
@@ -297,8 +293,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             message: `Project ${projectId} activated successfully`,
             project: updatedProject[0],
           }
-        } catch (e) {
-          logError(`Failed to activate project ${projectId}: ${e}`)
+        } catch {
           return status(500, "Internal Server Error")
         }
       },

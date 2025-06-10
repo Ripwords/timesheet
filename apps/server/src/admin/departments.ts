@@ -1,6 +1,5 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm"
 import { t } from "elysia"
-import { error as logError } from "@rasla/logify"
 
 import { baseApp } from "../../utils/baseApp"
 import { departments, departmentDefaultDescription, users } from "../db/schema"
@@ -100,8 +99,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             }
 
             return await allDepartments
-          } catch (e) {
-            logError(`Error fetching departments: ${e}`)
+          } catch {
             return status(500, "Failed to fetch departments")
           }
         },
@@ -153,7 +151,6 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               defaultDescriptions: descriptionsData, // No mapping needed if select is correct
             }
           } catch (e: any) {
-            logError(`Error fetching department ${params.id}: ${e}`)
             if (e.status) throw e // Re-throw Elysia/NotFound errors
             return status(500, "Failed to fetch department details")
           }
@@ -220,8 +217,6 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
               return newDepartment // Return the created department
             } catch (e: any) {
-              logError(`Error creating department: ${e}`)
-              // tx.rollback(); // Drizzle handles rollback on throw automatically
               if (e.status) throw e // Re-throw Elysia errors
               return status(500, "Failed to create department")
             }
@@ -383,10 +378,6 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
               // For simplicity, returning success status
               return { success: true, id: id, departmentUpdated }
             } catch (e: any) {
-              logError(
-                `[${params.id || "UNKNOWN"}] Error updating department: ${e}` // Add ID to error log
-              )
-              // tx.rollback(); // Drizzle handles rollback on throw automatically
               if (e.status) throw e // Re-throw Elysia errors
               return status(500, "Failed to update department")
             }
@@ -443,7 +434,6 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
 
             return { success: true, id: deletedDepartment[0].id }
           } catch (e: any) {
-            logError(`Error deleting department ${params.id}: ${e}`)
             if (e.status) throw e // Re-throw Elysia errors
             return status(500, e || "Failed to delete department")
           }
@@ -488,8 +478,7 @@ export const adminDepartmentsRoutes = baseApp("adminDepartments").group(
             const departmentsData = await descriptionsQuery
 
             return departmentsData
-          } catch (e) {
-            logError(`Error fetching departments for descriptions: ${e}`)
+          } catch {
             return status(
               500,
               "Failed to fetch department data for descriptions"
