@@ -11,6 +11,20 @@ import timezone from "dayjs/plugin/timezone"
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+// Helper to safely read the user's timezone header (case-insensitive)
+const extractUserTimezone = (
+  headers: Record<string, string | undefined>
+): string | undefined => {
+  // HTTP header names are case-insensitive but depending on the server
+  // implementation the original casing might be preserved. Iterate once
+  // to find a matching key regardless of its case.
+  const target = "x-user-timezone"
+  for (const key in headers) {
+    if (key.toLowerCase() === target) return headers[key]
+  }
+  return undefined
+}
+
 // Helper function to get today's date in user's timezone
 const getUserTimezoneToday = (userTimezone?: string): string => {
   if (userTimezone) {
@@ -34,7 +48,7 @@ export const timeEntries = baseApp("time-entries").group(
           }
 
           // Get user's timezone from header
-          const userTimezone = headers["x-user-timezone"]
+          const userTimezone = extractUserTimezone(headers)
 
           // Validate that time entry is only for today in user's timezone
           const today = getUserTimezoneToday(userTimezone)
@@ -375,7 +389,7 @@ export const timeEntries = baseApp("time-entries").group(
           }
 
           // Get user's timezone from header
-          const userTimezone = headers["x-user-timezone"]
+          const userTimezone = extractUserTimezone(headers)
 
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({
@@ -487,7 +501,7 @@ export const timeEntries = baseApp("time-entries").group(
           }
 
           // Get user's timezone from header
-          const userTimezone = headers["x-user-timezone"]
+          const userTimezone = extractUserTimezone(headers)
 
           // 1. Find the existing entry first to check ownership
           const existingEntry = await db.query.timeEntries.findFirst({

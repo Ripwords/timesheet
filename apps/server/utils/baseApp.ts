@@ -46,7 +46,12 @@ export const baseApp = (name: string) =>
         ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization", "X-User-Timezone"],
+        allowedHeaders: [
+          "Content-Type",
+          "Authorization",
+          "X-User-Timezone",
+          "x-user-timezone",
+        ],
       })
     )
     .use(

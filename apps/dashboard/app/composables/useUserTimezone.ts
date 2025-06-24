@@ -19,7 +19,7 @@ export const useUserTimezone = () => {
 
   // Get timezone headers for API requests
   const getTimezoneHeaders = () => {
-    return userTimezone.value ? { "X-User-Timezone": userTimezone.value } : {}
+    return userTimezone.value ? { "x-user-timezone": userTimezone.value } : {}
   }
 
   // Initialize timezone detection
