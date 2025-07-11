@@ -1,12 +1,12 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
-import { asc, eq } from "drizzle-orm"
+import { asc, eq, gte, and, lt } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import {
   projectBudgetInjections,
   projects,
   timeEntries,
-  users,
+  monthlyCostSummaries,
 } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
@@ -65,23 +65,84 @@ export const adminFinancials = baseApp("adminFinancials").group(
             })
           )
 
-          // 3. Fetch Time Entries with User Rate
-          const entriesWithRate = await db
+          // 3A. Pull pre-calculated summaries for **past months**
+          const firstDayCurrentMonth = new Date()
+          firstDayCurrentMonth.setUTCDate(1)
+          firstDayCurrentMonth.setUTCHours(0, 0, 0, 0)
+          const firstDayCurrentMonthStr = firstDayCurrentMonth
+            .toISOString()
+            .slice(0, 10) // YYYY-MM-DD
+
+          const summaryRows = await db.query.monthlyCostSummaries.findMany({
+            where: eq(monthlyCostSummaries.projectId, projectId),
+            columns: {
+              month: monthlyCostSummaries.month,
+              totalCost: monthlyCostSummaries.totalCost,
+            },
+          })
+
+          // Aggregate summaries into a record keyed by YYYY-MM
+          const monthlyCosts: Record<string, Decimal> = {}
+
+          for (const row of summaryRows) {
+            const monthKey = formatToYearMonth(new Date(row.month))
+            monthlyCosts[monthKey] = new Decimal(row.totalCost)
+          }
+
+          // 3B. Fetch **current month** Time Entries using the SNAPSHOT hourlyRate field
+          const currentMonthEntries = await db
             .select({
               date: timeEntries.date,
               durationSeconds: timeEntries.durationSeconds,
-              ratePerHour: users.ratePerHour, // numeric type
+              hourlyRate: timeEntries.hourlyRate,
             })
             .from(timeEntries)
-            .innerJoin(users, eq(timeEntries.userId, users.id))
-            .where(eq(timeEntries.projectId, projectId))
+            .where(
+              and(
+                eq(timeEntries.projectId, projectId),
+                gte(timeEntries.date, firstDayCurrentMonthStr)
+              )
+            )
 
-          // 4. Calculate Cost Over Time
-          const monthlyCosts: Record<string, Decimal> = {} // Use Decimal for aggregation
+          for (const entry of currentMonthEntries) {
+            const month = formatToYearMonth(new Date(entry.date)) // will always be current month
+            const rate = new Decimal(entry.hourlyRate)
+            const durationHours = new Decimal(entry.durationSeconds).div(3600)
+            const cost = rate.mul(durationHours)
 
-          for (const entry of entriesWithRate) {
+            if (!monthlyCosts[month]) {
+              monthlyCosts[month] = new Decimal(0)
+            }
+            monthlyCosts[month] = monthlyCosts[month].add(cost)
+          }
+
+          // -------------------------------------------------------------------------------------------------
+          // 3C. Fallback: dynamically calculate any **historical months** that do not yet have a stored
+          //     summary (e.g. if the month-end batch job hasn't run yet). This guarantees the endpoint
+          //     always returns a complete picture.
+          // -------------------------------------------------------------------------------------------------
+
+          const historicalEntries = await db
+            .select({
+              date: timeEntries.date,
+              durationSeconds: timeEntries.durationSeconds,
+              hourlyRate: timeEntries.hourlyRate,
+            })
+            .from(timeEntries)
+            .where(
+              and(
+                eq(timeEntries.projectId, projectId),
+                lt(timeEntries.date, firstDayCurrentMonthStr)
+              )
+            )
+
+          for (const entry of historicalEntries) {
             const month = formatToYearMonth(new Date(entry.date))
-            const rate = new Decimal(entry.ratePerHour)
+
+            // Skip months that already have a persisted summary row
+            if (monthlyCosts[month]) continue
+
+            const rate = new Decimal(entry.hourlyRate)
             const durationHours = new Decimal(entry.durationSeconds).div(3600)
             const cost = rate.mul(durationHours)
 

@@ -59,6 +59,16 @@ export const timeEntries = baseApp("time-entries").group(
             )
           }
 
+          // Fetch the user's current hourly rate once so we can persist it with the entry
+          const rateRow = await db.query.users.findFirst({
+            where: eq(schema.users.id, user.userId),
+            columns: { ratePerHour: true },
+          })
+
+          if (!rateRow) {
+            return status(400, "User record not found while creating entry")
+          }
+
           try {
             const newTimeEntry = await db
               .insert(schema.timeEntries)
@@ -68,6 +78,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: body.description,
                 date: body.date,
                 durationSeconds: body.durationSeconds,
+                hourlyRate: rateRow.ratePerHour,
               })
               .returning() // Return the newly created entry
 

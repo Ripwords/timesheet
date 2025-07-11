@@ -91,6 +91,12 @@ export const timeEntries = pgTable("time_entries", {
   date: date("date").notNull(),
   description: text("description"),
   durationSeconds: integer("duration_seconds").notNull(),
+  /**
+   * Snapshot of the user\'s hourly rate **at the time the entry is created**.
+   * This ensures historical cost calculations remain accurate even if the
+   * user\'s `ratePerHour` changes later on.
+   */
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -140,6 +146,38 @@ export const activeTimerSessions = pgTable("active_timer_sessions", {
     withTimezone: true,
   }), // null when paused, set when running
   description: text("description"), // can be updated during session
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})
+
+// -------------------------------------------------------------------------------------------------
+// Monthly Cost Summaries
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Stores pre-calculated monthly cost summaries per user per project. These rows represent **closed
+ * months** (all dates strictly before the first day of the current month). The current month is
+ * always calculated on-the-fly from `timeEntries` so that dashboards remain live and reflect any
+ * in-month edits.
+ */
+export const monthlyCostSummaries = pgTable("monthly_cost_summaries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references((): AnyPgColumn => users.id, { onDelete: "restrict" }),
+  /**
+   * Represents the month this summary belongs to. We store the **first day of the month in UTC**
+   * for easy range comparisons (e.g. 2024-03-01). Only the year-month component is relevant.
+   */
+  month: date("month").notNull(),
+  totalDurationSeconds: integer("total_duration_seconds").notNull(),
+  totalCost: numeric("total_cost", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
