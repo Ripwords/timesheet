@@ -29,7 +29,12 @@ declare module "drizzle-orm" {
 }
 
 declare module "drizzle-orm/postgres-js" {
+  export function drizzle<TSchema = any>(client: any, config: { schema: TSchema }): any
   export type PostgresJsDatabase<TSchema = any> = any
+}
+
+declare module "drizzle-orm/pg-core" {
+  export * from "drizzle-orm"
 }
 
 declare module "vitest/globals" {
@@ -91,11 +96,30 @@ declare module "@elysiajs/*" {
 
 // Postgres-js driver minimal type
 declare module "postgres" {
-  const pg: (...args: any[]) => any
-  export = pg
+  const postgres: (...args: any[]) => any
+  export = postgres
 }
 
 // Additional dayjs plugins stubs
 declare module "dayjs/plugin/relativeTime" { const fn: any; export = fn }
 declare module "dayjs/plugin/duration" { const fn: any; export = fn }
 declare module "dayjs/plugin/localizedFormat" { const fn: any; export = fn }
+
+// -------------------------------------------------------------------------------------------------
+// Additional explicit module stubs to silence TS for external deps that lack types
+// -------------------------------------------------------------------------------------------------
+
+declare module "@elysiajs/swagger" { const swagger: any; export = swagger }
+declare module "@elysiajs/cors" { const cors: any; export = cors }
+declare module "@elysiajs/jwt" { const jwt: any; export = jwt }
+declare module "@elysiajs/server-timing" { const plugin: any; export = plugin }
+declare module "@elysiajs/cookie" { const plugin: any; export = plugin }
+
+declare module "logixlysia" {
+  const plugin: any
+  export = plugin
+}
+
+declare module "dotenv" {
+  export function config(options?: any): { parsed?: Record<string,string> }
+}
