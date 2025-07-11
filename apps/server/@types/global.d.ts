@@ -18,9 +18,7 @@ declare module "better-sqlite3" {
   export = y
 }
 
-declare module "vitest" {
-  export * from "vitest"
-}
+// vitest types are provided by the package; no additional stubs required.
 
 // Ensure base drizzle import type is available in case of path resolution issues
 declare module "drizzle-orm" {
@@ -112,6 +110,9 @@ declare module "dayjs" {
     isSame(date: any, unit?: string): boolean
   }
   function dayjs(input?: any): DayjsInstance
+  namespace dayjs {
+    function extend(plugin: (opt: any, c: any) => void, opts?: any): void
+  }
   export default dayjs
 }
 
