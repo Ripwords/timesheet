@@ -46,6 +46,38 @@ declare module "vitest/globals" {
 // These keep the compiler happy without impacting runtime (actual libs ship JS).
 // -------------------------------------------------------------------------------------------------
 
+// --------------------------- Elysia core types -----------------------------
+
+declare module "elysia" {
+  export class Elysia<Context = any> {
+    constructor(config?: any)
+    use(plugin: any): this
+    decorate(key: string, value: any): this
+    group(prefix: string, fn: (app: this) => any): this
+    macro(def: Record<string, (...args: any[]) => any>): this
+    get(path: string, handler: any, opts?: any): this
+    post(path: string, handler: any, opts?: any): this
+    put(path: string, handler: any, opts?: any): this
+    delete(path: string, handler: any, opts?: any): this
+    patch(path: string, handler: any, opts?: any): this
+    listen(port: number | string): this & { server: { hostname: string; port: number } }
+    server?: { hostname: string; port: number }
+  }
+  export const t: {
+    Object: (...args: any[]) => any
+    String: (...args: any[]) => any
+    Number: (...args: any[]) => any
+    Boolean: (...args: any[]) => any
+    Optional: (...args: any[]) => any
+    UnionEnum: (...args: any[]) => any
+    Array: (...args: any[]) => any
+    Literal: (...args: any[]) => any
+    Integer: (...args: any[]) => any
+  }
+}
+
+// ------------------------ Decimal.js default export ------------------------
+
 declare module "decimal.js" {
   class Decimal {
     constructor(value: string | number | Decimal)
@@ -56,18 +88,26 @@ declare module "decimal.js" {
     toNumber(): number
   }
   export = Decimal
+  export default Decimal
 }
 
+// ------------------------------ DayJS base ---------------------------------
+
 declare module "dayjs" {
-  function dayjs(input?: any): any
+  interface DayjsInstance {
+    format(fmt?: string): string
+    tz(zone: string): DayjsInstance
+    startOf(unit: string): DayjsInstance
+    isSame(date: any, unit?: string): boolean
+  }
+  function dayjs(input?: any): DayjsInstance
   export default dayjs
 }
 
-declare module "elysia" {
-  export class Elysia {
-    [key: string]: any
-  }
-}
+// dayjs plugin modules
+
+declare module "dayjs/plugin/utc" { const plugin: (opt: any, c: any) => void; export = plugin }
+declare module "dayjs/plugin/timezone" { const plugin: (opt: any, c: any) => void; export = plugin }
 
 // Drizzle ORM helpers – simplified but typed enough for app usage
 // We expose the most common DSL helpers as `any` functions and types.
