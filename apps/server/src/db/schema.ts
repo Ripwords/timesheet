@@ -96,7 +96,9 @@ export const timeEntries = pgTable("time_entries", {
    * This ensures historical cost calculations remain accurate even if the
    * user\'s `ratePerHour` changes later on.
    */
-  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }).notNull(),
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0.00"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
