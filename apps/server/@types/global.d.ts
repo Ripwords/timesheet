@@ -35,6 +35,16 @@ declare module "drizzle-orm/postgres-js" {
 
 declare module "drizzle-orm/pg-core" {
   export * from "drizzle-orm"
+  export const boolean: (...args: any[]) => any
+  export const integer: (...args: any[]) => any
+  export const numeric: (...args: any[]) => any
+  export const pgEnum: (...args: any[]) => any
+  export const pgTable: (...args: any[]) => any
+  export const text: (...args: any[]) => any
+  export const timestamp: (...args: any[]) => any
+  export const uuid: (...args: any[]) => any
+  export const date: (...args: any[]) => any
+  export type AnyPgColumn = any
 }
 
 declare module "vitest/globals" {
