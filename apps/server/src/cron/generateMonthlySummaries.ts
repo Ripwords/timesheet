@@ -5,6 +5,8 @@ import {
   monthlyCostSummaries,
   timeEntries,
 } from "../db/schema"
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
+import * as schema from "../db/schema"
 
 /**
  * Generates cost summaries for **all months strictly before the provided `currentDate` month**.
@@ -12,8 +14,9 @@ import {
  * tuple it will skip insertion for that tuple.
  */
 export const generateMonthlySummaries = async (
-  db: any,
-  currentDate: Date = new Date()
+  db: PostgresJsDatabase<typeof schema>,
+  currentDate: Date = new Date(),
+  onProgress?: (processed: number, total: number) => void
 ) => {
   // Determine the first day of the current month (exclusive upper bound)
   const currentMonthStartStr = dayjs(currentDate)
@@ -51,8 +54,9 @@ export const generateMonthlySummaries = async (
 
   if (aggregated.length === 0) return
 
-  const valuesToInsert = aggregated.filter((row) => {
+  const valuesToInsert = aggregated.filter((row: any, idx: number) => {
     const key = `${row.projectId}:${row.userId}:${dayjs(row.month).format("YYYY-MM")}`
+    onProgress?.(idx + 1, aggregated.length)
     return !existingSet.has(key)
   })
 

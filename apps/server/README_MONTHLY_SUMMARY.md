@@ -41,3 +41,36 @@ The script will recompute summaries for all closed months and insert any that ar
 ## Tests
 
 `tests/monthlySummary.test.ts` contains a smoke-test ensuring the generator executes without throwing.  In future this can be expanded with an in-memory database fixture for full correctness checks.
+
+## Admin API – Financial Overview
+
+`GET  /api/admin/financials/:projectId`
+
+Response example:
+```jsonc
+{
+  "projectId": "3f8c4978-9f90-42b9-a2da-8aaf3bfe8a99",
+  "projectName": "Website Revamp",
+  "budgetInjections": [
+    { "id": "…", "amount": 20000, "date": "2024-01-15", "description": "Initial budget" }
+  ],
+  "costOverTime": [
+    { "month": "2024-01", "cost": 3200.00 },
+    { "month": "2024-02", "cost": 4100.50 }
+  ]
+}
+```
+
+Error codes:
+| Status | Meaning                            | Typical Fix                                   |
+|--------|------------------------------------|-----------------------------------------------|
+| 400    | Invalid UUID / bad request         | Verify `projectId` param & request payload    |
+| 404    | Project not found                  | Ensure project exists & isActive=true         |
+| 500    | Internal error / db unavailable    | Check DB connection / run migrations          |
+
+## Troubleshooting & FAQ
+
+* **`monthly_cost_summaries` table missing** → run migrations: `nr --workspace=apps/server db:migrate`
+* **Historical costs incorrect after changing rates** → rerun back-fill: `nr --workspace=apps/server backfill:monthly`
+* **Generator skipped a month** → ensure `generateMonthlySummaries` job runs **after** month-end (00:15 UTC recommended). You can tweak the `setInterval` or a proper cron if needed.
+* **Out-of-memory on initial backfill** → perform backfill per year: add `?end=YYYY-12-31` param to script (coming soon) or temporarily raise memory.
