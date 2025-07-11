@@ -21,7 +21,7 @@ if (!connectionString) {
 }
 
 const client = postgres(connectionString)
-const db = drizzle(client, { schema })
+export const db = drizzle(client, { schema })
 
 const JWT_SECRET = process.env.JWT_SECRET
 if (!JWT_SECRET) {
