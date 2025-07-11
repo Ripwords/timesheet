@@ -82,3 +82,20 @@ declare module "drizzle-orm" {
 
   export type InferModel<T> = any
 }
+
+// Generic catch-all for Elysia plugins (swagger, cors, jwt, etc.)
+declare module "@elysiajs/*" {
+  const plugin: any
+  export = plugin
+}
+
+// Postgres-js driver minimal type
+declare module "postgres" {
+  const pg: (...args: any[]) => any
+  export = pg
+}
+
+// Additional dayjs plugins stubs
+declare module "dayjs/plugin/relativeTime" { const fn: any; export = fn }
+declare module "dayjs/plugin/duration" { const fn: any; export = fn }
+declare module "dayjs/plugin/localizedFormat" { const fn: any; export = fn }
