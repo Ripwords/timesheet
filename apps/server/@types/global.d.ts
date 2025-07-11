@@ -86,6 +86,7 @@ declare module "decimal.js" {
     div(n: Decimal | number | string): Decimal
     add(n: Decimal | number | string): Decimal
     toNumber(): number
+    toDecimalPlaces(dp?: number): Decimal
   }
   export = Decimal
   export default Decimal

@@ -1,9 +1,9 @@
 import { Elysia, t } from "elysia"
 
-import { swagger } from "@elysiajs/swagger"
-import { serverTiming } from "@elysiajs/server-timing"
-import { cors } from "@elysiajs/cors"
-import { jwt } from "@elysiajs/jwt"
+import swagger from "@elysiajs/swagger"
+import serverTiming from "@elysiajs/server-timing"
+import cors from "@elysiajs/cors"
+import jwt from "@elysiajs/jwt"
 
 import postgres from "postgres"
 import { drizzle } from "drizzle-orm/postgres-js"
@@ -71,7 +71,7 @@ export const baseApp = (name: string) =>
     .use(swagger())
     .macro({
       adminOnly: () => ({
-        resolve: async ({ db, jwt, cookie, error }) => {
+        resolve: async ({ db, jwt, cookie, error }: { db: any; jwt: any; cookie: any; error: any }): Promise<any> => {
           const profile = await jwt.verify(cookie.auth.value)
           if (!profile) {
             return error(401, "Unauthorized")

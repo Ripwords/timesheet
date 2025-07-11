@@ -1,4 +1,4 @@
-import { Decimal } from "decimal.js" // For precise calculations with numeric types
+import Decimal from "decimal.js" // For precise calculations with numeric types
 import { asc, eq, gte, and, lt } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"

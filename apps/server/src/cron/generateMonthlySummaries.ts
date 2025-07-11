@@ -1,5 +1,5 @@
 import { lt, sql } from "drizzle-orm"
-import { Decimal } from "decimal.js"
+import Decimal from "decimal.js"
 import dayjs from "dayjs"
 import {
   monthlyCostSummaries,
