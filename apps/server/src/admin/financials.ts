@@ -83,10 +83,13 @@ export const adminFinancials = baseApp("adminFinancials").group(
 
           // Aggregate summaries into a record keyed by YYYY-MM
           const monthlyCosts: Record<string, Decimal> = {}
+          // Track which months already have a persisted summary row to avoid double-counting later
+          const monthsWithSummary = new Set<string>()
 
           for (const row of summaryRows) {
             const monthKey = formatToYearMonth(new Date(row.month))
             monthlyCosts[monthKey] = new Decimal(row.totalCost)
+            monthsWithSummary.add(monthKey)
           }
 
           // 3B. Fetch **current month** Time Entries using the SNAPSHOT hourlyRate field
@@ -140,7 +143,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
             const month = formatToYearMonth(new Date(entry.date))
 
             // Skip months that already have a persisted summary row
-            if (monthlyCosts[month]) continue
+            if (monthsWithSummary.has(month)) continue
 
             const rate = new Decimal(entry.hourlyRate)
             const durationHours = new Decimal(entry.durationSeconds).div(3600)
@@ -240,7 +243,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }),
           body: t.Object({
             amount: t.Optional(t.Number({ minimum: 0.01 })), // Ensure positive amount
-            date: t.Optional(t.Date()),
+            date: t.Optional(t.String({ format: "date" })),
             description: t.Optional(t.String()), // Description is optional
           }),
           detail: {
@@ -347,7 +350,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }),
           body: t.Object({
             amount: t.Number({ minimum: 0.01 }),
-            date: t.Date(),
+            date: t.String({ format: "date" }),
             description: t.Optional(t.String()),
           }),
           detail: {
