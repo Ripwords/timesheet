@@ -17,7 +17,7 @@ export const generateMonthlySummaries = async (
   db: PostgresJsDatabase<typeof schema>,
   currentDate: Date = new Date(),
   onProgress?: (processed: number, total: number) => void
-) => {
+) : Promise<void> => {
   // Determine the first day of the current month (exclusive upper bound)
   const currentMonthStartStr = dayjs(currentDate)
     .startOf("month")
@@ -38,7 +38,7 @@ export const generateMonthlySummaries = async (
   }
 
   // Aggregate time entries for months before current month
-  const aggregated = await db
+  const aggregated: AggregatedRow[] = await db
     .select({
       projectId: timeEntries.projectId,
       userId: timeEntries.userId,
@@ -54,7 +54,7 @@ export const generateMonthlySummaries = async (
 
   if (aggregated.length === 0) return
 
-  const valuesToInsert = aggregated.filter((row: any, idx: number) => {
+  const valuesToInsert = aggregated.filter((row, idx) => {
     const key = `${row.projectId}:${row.userId}:${dayjs(row.month).format("YYYY-MM")}`
     onProgress?.(idx + 1, aggregated.length)
     return !existingSet.has(key)
@@ -72,4 +72,16 @@ export const generateMonthlySummaries = async (
       totalCost: new Decimal(r.totalCost).toFixed(2),
     }))
   )
+}
+
+// -------------------------------------------------------------------------------------------------
+// Types
+// -------------------------------------------------------------------------------------------------
+
+interface AggregatedRow {
+  projectId: string
+  userId: string
+  month: unknown
+  totalDurationSeconds: number
+  totalCost: string
 }

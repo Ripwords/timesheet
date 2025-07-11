@@ -7,12 +7,10 @@ declare module "cli-progress" {
 }
 
 declare module "drizzle-orm/better-sqlite3" {
-  import type { BetterSQLite3Database } from "drizzle-orm"
-  // Simplified type signature – returns generic BetterSQLite3Database
   export function drizzle<TSchema = any>(
     db: any,
     config: { schema: TSchema }
-  ): BetterSQLite3Database<TSchema>
+  ): any
 }
 
 declare module "better-sqlite3" {
@@ -28,4 +26,12 @@ declare module "vitest" {
 declare module "drizzle-orm" {
   const whatever: any
   export = whatever
+}
+
+declare module "drizzle-orm/postgres-js" {
+  export type PostgresJsDatabase<TSchema = any> = any
+}
+
+declare module "vitest/globals" {
+  import "vitest"
 }
