@@ -18,6 +18,7 @@ interface WeeklyBreakdownRow {
   week2: string
   week3: string
   week4: string
+  week5: string // Added week5
   monthlyTotal: string
 }
 
@@ -99,13 +100,20 @@ const processedData = computed(() => {
   > = {}
 
   // Initialize weekly totals in seconds
-  const totals = { week1: 0, week2: 0, week3: 0, week4: 0, monthlyTotal: 0 }
+  const totals = {
+    week1: 0,
+    week2: 0,
+    week3: 0,
+    week4: 0,
+    week5: 0,
+    monthlyTotal: 0,
+  } // Added week5
 
   // Initialize projects based on fetched projects
   projects.value?.forEach((p) => {
     if (p) {
       // Add check for null/undefined project
-      projectHours[p.id] = { name: p.name, weeks: [0, 0, 0, 0, 0], total: 0 }
+      projectHours[p.id] = { name: p.name, weeks: [0, 0, 0, 0, 0], total: 0 } // 5 weeks
     }
   })
 
@@ -154,7 +162,7 @@ const processedData = computed(() => {
       if (weekIndex === 1) totals.week2 += durationSeconds
       if (weekIndex === 2) totals.week3 += durationSeconds
       if (weekIndex === 3) totals.week4 += durationSeconds
-      // Note: week 5 data isn't displayed but is calculated, could add totals.week5 if needed
+      if (weekIndex === 4) totals.week5 += durationSeconds // Add week5
       totals.monthlyTotal += durationSeconds
     }
   })
@@ -170,6 +178,7 @@ const processedData = computed(() => {
         week2: formatDuration(data.weeks[1] || 0),
         week3: formatDuration(data.weeks[2] || 0),
         week4: formatDuration(data.weeks[3] || 0),
+        week5: formatDuration(data.weeks[4] || 0), // Add week5
         monthlyTotal: formatDuration(data.total || 0),
       })
     )
@@ -191,6 +200,7 @@ const processedData = computed(() => {
         week2: formatDuration(totals.week2),
         week3: formatDuration(totals.week3),
         week4: formatDuration(totals.week4),
+        week5: formatDuration(totals.week5), // Add week5
         monthlyTotal: formatDuration(totals.monthlyTotal),
       },
     ],
@@ -231,6 +241,10 @@ const columns: TableColumn<WeeklyBreakdownRow>[] = [
   {
     accessorKey: "week4",
     header: "Week 4",
+  },
+  {
+    accessorKey: "week5",
+    header: "Week 5", // Add week5 column
   },
   {
     accessorKey: "monthlyTotal",
