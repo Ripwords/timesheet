@@ -124,6 +124,7 @@ interface WeeklyBreakdownRow {
   week2: string
   week3: string
   week4: string
+  week5: string // Added week5
   monthlyTotal: string
 }
 
@@ -174,7 +175,14 @@ const userBreakdowns = computed(() => {
       string,
       { name: string; weeks: number[]; total: number }
     > = {}
-    const totals = { week1: 0, week2: 0, week3: 0, week4: 0, monthlyTotal: 0 }
+    const totals = {
+      week1: 0,
+      week2: 0,
+      week3: 0,
+      week4: 0,
+      week5: 0,
+      monthlyTotal: 0,
+    } // Added week5
 
     // Initialize projects
     userEntries.forEach((responseItem) => {
@@ -182,7 +190,7 @@ const userBreakdowns = computed(() => {
       if (project && !projectHours[project.id]) {
         projectHours[project.id] = {
           name: project.name,
-          weeks: [0, 0, 0, 0, 0],
+          weeks: [0, 0, 0, 0, 0], // 5 weeks
           total: 0,
         }
       }
@@ -201,7 +209,7 @@ const userBreakdowns = computed(() => {
       if (!projectHours[projectId]) {
         projectHours[projectId] = {
           name: project?.name || `Project ${projectId}`,
-          weeks: [0, 0, 0, 0, 0],
+          weeks: [0, 0, 0, 0, 0], // 5 weeks
           total: 0,
         }
       }
@@ -217,6 +225,7 @@ const userBreakdowns = computed(() => {
         if (weekIndex === 1) totals.week2 += durationSeconds
         if (weekIndex === 2) totals.week3 += durationSeconds
         if (weekIndex === 3) totals.week4 += durationSeconds
+        if (weekIndex === 4) totals.week5 += durationSeconds // Add week5
         totals.monthlyTotal += durationSeconds
       }
     })
@@ -232,6 +241,7 @@ const userBreakdowns = computed(() => {
           week2: formatDuration(data.weeks[1] || 0),
           week3: formatDuration(data.weeks[2] || 0),
           week4: formatDuration(data.weeks[3] || 0),
+          week5: formatDuration(data.weeks[4] || 0), // Add week5
           monthlyTotal: formatDuration(data.total || 0),
         })
       )
@@ -254,6 +264,7 @@ const userBreakdowns = computed(() => {
           week2: formatDuration(totals.week2),
           week3: formatDuration(totals.week3),
           week4: formatDuration(totals.week4),
+          week5: formatDuration(totals.week5), // Add week5
           monthlyTotal: formatDuration(totals.monthlyTotal),
         },
       ],
@@ -267,6 +278,7 @@ const columns: TableColumn<WeeklyBreakdownRow>[] = [
   { accessorKey: "week2", header: "Week 2" },
   { accessorKey: "week3", header: "Week 3" },
   { accessorKey: "week4", header: "Week 4" },
+  { accessorKey: "week5", header: "Week 5" },
   { accessorKey: "monthlyTotal", header: "Total" },
 ]
 
