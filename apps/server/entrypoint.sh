@@ -10,6 +10,10 @@ export DATABASE_URL
 echo "Running database migrations..."
 bun run db:push
 
+# Run rate backfill for existing time entries
+echo "Running rate backfill for existing time entries..."
+bun run db:backfill-rates
+
 # Now execute the command provided as arguments to this script (e.g., the CMD from Dockerfile)
 echo "Starting server..."
 exec "$@" 

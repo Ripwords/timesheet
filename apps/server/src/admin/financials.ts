@@ -1,5 +1,5 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
-import { asc, eq } from "drizzle-orm"
+import { asc, eq, and, gte, lt } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import {
@@ -7,6 +7,8 @@ import {
   projects,
   timeEntries,
   users,
+  departments as departmentsTable,
+  projectRecurringBudgetInjections,
 } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validtors"
@@ -65,15 +67,14 @@ export const adminFinancials = baseApp("adminFinancials").group(
             })
           )
 
-          // 3. Fetch Time Entries with User Rate
+          // 3. Fetch Time Entries with Historical Rate
           const entriesWithRate = await db
             .select({
               date: timeEntries.date,
               durationSeconds: timeEntries.durationSeconds,
-              ratePerHour: users.ratePerHour, // numeric type
+              ratePerHour: timeEntries.ratePerHour, // Use historical rate from time entry
             })
             .from(timeEntries)
-            .innerJoin(users, eq(timeEntries.userId, users.id))
             .where(eq(timeEntries.projectId, projectId))
 
           // 4. Calculate Cost Over Time
@@ -292,6 +293,239 @@ export const adminFinancials = baseApp("adminFinancials").group(
           detail: {
             summary: "Create a new budget injection for a project (Admin)",
             tags: ["Admin", "Financials"],
+          },
+        }
+      )
+      // GET Monthly Breakdown
+      .get(
+        "/:projectId/monthly-breakdown",
+        async ({ params, query, db, status }) => {
+          const { projectId } = params
+          const { year, month } = query
+
+          // Validate year and month
+          if (!year || !month) {
+            return status(400, "Year and month are required")
+          }
+
+          const yearNum = parseInt(year as string)
+          const monthNum = parseInt(month as string)
+
+          if (
+            yearNum < 2020 ||
+            yearNum > 2030 ||
+            monthNum < 1 ||
+            monthNum > 12
+          ) {
+            return status(400, "Invalid year or month")
+          }
+
+          // 1. Fetch Project Details
+          const projectDetails = await db.query.projects.findFirst({
+            where: eq(projects.id, projectId),
+            columns: {
+              id: true,
+              name: true,
+            },
+          })
+
+          if (!projectDetails) {
+            return status(404, "Project not found")
+          }
+
+          // 2. Get Monthly Budget Injection (Retainer Fee) from Recurring Budget
+          const recurringBudgetInjection =
+            await db.query.projectRecurringBudgetInjections.findFirst({
+              where: and(
+                eq(projectRecurringBudgetInjections.projectId, projectId),
+                eq(projectRecurringBudgetInjections.isActive, true)
+              ),
+              columns: {
+                amount: true,
+                frequency: true,
+                startDate: true,
+                endDate: true,
+              },
+            })
+
+          let retainerFee = 0
+          if (recurringBudgetInjection) {
+            const { amount, frequency, startDate, endDate } =
+              recurringBudgetInjection
+            const startDateObj = new Date(startDate)
+            const endDateObj = endDate ? new Date(endDate) : null
+            const currentMonthStart = new Date(yearNum, monthNum - 1, 1)
+            const currentMonthEnd = new Date(yearNum, monthNum, 1)
+
+            // Check if the recurring budget is active for this month
+            if (
+              startDateObj <= currentMonthEnd &&
+              (!endDateObj || endDateObj >= currentMonthStart)
+            ) {
+              // Calculate the amount for this specific month based on frequency
+              const monthlyAmount = new Decimal(amount)
+
+              if (frequency === "monthly") {
+                retainerFee = monthlyAmount.toNumber()
+              } else if (frequency === "quarterly") {
+                retainerFee = monthlyAmount.div(3).toNumber()
+              } else if (frequency === "yearly") {
+                retainerFee = monthlyAmount.div(12).toNumber()
+              }
+            }
+          }
+
+          // 3. Fetch Time Entries for the Month with User and Department Info
+          const timeEntriesWithUsers = await db
+            .select({
+              id: timeEntries.id,
+              description: timeEntries.description,
+              date: timeEntries.date,
+              durationSeconds: timeEntries.durationSeconds,
+              ratePerHour: timeEntries.ratePerHour,
+              userId: timeEntries.userId,
+              userName: users.email,
+              userRatePerHour: users.ratePerHour,
+              departmentId: users.departmentId,
+              departmentName: departmentsTable.name,
+              departmentColor: departmentsTable.color,
+            })
+            .from(timeEntries)
+            .innerJoin(users, eq(timeEntries.userId, users.id))
+            .innerJoin(
+              departmentsTable,
+              eq(users.departmentId, departmentsTable.id)
+            )
+            .where(
+              and(
+                eq(timeEntries.projectId, projectId),
+                gte(
+                  timeEntries.date,
+                  `${yearNum}-${monthNum.toString().padStart(2, "0")}-01`
+                ),
+                lt(
+                  timeEntries.date,
+                  `${yearNum}-${(monthNum + 1).toString().padStart(2, "0")}-01`
+                )
+              )
+            )
+
+          // 4. Helper function to get week number
+          const getWeekNumber = (dateString: string): number => {
+            const date = new Date(dateString)
+            const dayOfMonth = date.getDate()
+            if (dayOfMonth <= 7) return 1
+            if (dayOfMonth <= 14) return 2
+            if (dayOfMonth <= 21) return 3
+            if (dayOfMonth <= 28) return 4
+            return 5
+          }
+
+          // 5. Process and group data
+          const departmentMap = new Map()
+          let totalSpend = 0
+
+          for (const entry of timeEntriesWithUsers) {
+            const cost = new Decimal(entry.ratePerHour)
+              .mul(entry.durationSeconds)
+              .div(3600)
+            const hours = new Decimal(entry.durationSeconds).div(3600)
+            const weekNumber = getWeekNumber(entry.date)
+
+            totalSpend += cost.toNumber()
+
+            // Initialize department if not exists
+            if (!departmentMap.has(entry.departmentId)) {
+              departmentMap.set(entry.departmentId, {
+                id: entry.departmentId,
+                name: entry.departmentName,
+                color: entry.departmentColor,
+                totalHours: 0,
+                totalSpend: 0,
+                users: new Map(),
+              })
+            }
+
+            const department = departmentMap.get(entry.departmentId)
+
+            // Initialize user if not exists
+            if (!department.users.has(entry.userId)) {
+              department.users.set(entry.userId, {
+                id: entry.userId,
+                name: entry.userName,
+                ratePerHour: entry.userRatePerHour,
+                totalHours: 0,
+                totalSpend: 0,
+                weeklyHours: [0, 0, 0, 0, 0],
+                timeEntries: [],
+              })
+            }
+
+            const user = department.users.get(entry.userId)
+
+            // Update user totals
+            user.totalHours += hours.toNumber()
+            user.totalSpend += cost.toNumber()
+            user.weeklyHours[weekNumber - 1] += hours.toNumber()
+
+            // Add time entry
+            user.timeEntries.push({
+              id: entry.id,
+              description: entry.description,
+              date: entry.date,
+              durationSeconds: entry.durationSeconds,
+              cost: cost.toNumber(),
+              weekNumber,
+            })
+
+            // Update department totals
+            department.totalHours += hours.toNumber()
+            department.totalSpend += cost.toNumber()
+          }
+
+          // 6. Convert maps to arrays and calculate percentages
+          const departments = Array.from(departmentMap.values()).map(
+            (dept) => ({
+              ...dept,
+              users: Array.from(dept.users.values()),
+            })
+          )
+
+          const leftover = retainerFee - totalSpend
+          const usedPercentage =
+            retainerFee > 0 ? Math.round((totalSpend / retainerFee) * 100) : 0
+          const remainingPercentage =
+            retainerFee > 0 ? Math.round((leftover / retainerFee) * 100) : 0
+
+          // 7. Structure Response
+          return {
+            project: {
+              id: projectDetails.id,
+              name: projectDetails.name,
+            },
+            monthData: {
+              year: yearNum,
+              month: monthNum,
+              retainerFee,
+              totalSpend,
+              leftover,
+              usedPercentage,
+              remainingPercentage,
+            },
+            departments,
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+          }),
+          query: t.Object({
+            year: t.String(),
+            month: t.String(),
+          }),
+          detail: {
+            summary: "Get monthly breakdown for a project (Admin)",
+            tags: ["Admin", "Financials", "Monthly Breakdown"],
           },
         }
       )

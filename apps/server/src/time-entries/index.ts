@@ -60,6 +60,18 @@ export const timeEntries = baseApp("time-entries").group(
           }
 
           try {
+            // Get user's current rate for historical tracking
+            const userRecord = await db.query.users.findFirst({
+              where: eq(schema.users.id, user.userId),
+              columns: {
+                ratePerHour: true,
+              },
+            })
+
+            if (!userRecord) {
+              return status(400, "User not found")
+            }
+
             const newTimeEntry = await db
               .insert(schema.timeEntries)
               .values({
@@ -68,6 +80,7 @@ export const timeEntries = baseApp("time-entries").group(
                 description: body.description,
                 date: body.date,
                 durationSeconds: body.durationSeconds,
+                ratePerHour: userRecord.ratePerHour, // Capture current rate for historical accuracy
               })
               .returning() // Return the newly created entry
 

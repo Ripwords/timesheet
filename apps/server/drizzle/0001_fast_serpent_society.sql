@@ -1,1 +1,0 @@
-ALTER TABLE "project_budget_injections" ADD COLUMN "date" timestamp with time zone NOT NULL;
