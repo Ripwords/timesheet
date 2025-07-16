@@ -35,7 +35,7 @@ const { data: user } = await useLazyAsyncData(`user-${userId}`, async () => {
   return data
 })
 
-const { data: userTimeEntries } = await useLazyAsyncData(
+const { data: userTimeEntries, refresh } = await useLazyAsyncData(
   `user-time-entries-${projectId}`,
   async () => {
     const { data } = await $eden.api["time-entries"]
@@ -63,13 +63,116 @@ interface TimeEntryRow {
   date: string
   description: string
   duration: string
+  originalEntry?: {
+    id: string
+    projectId: string
+    date: string
+    durationSeconds: number
+    description: string | null
+  }
 }
 
 const columns: TableColumn<TimeEntryRow>[] = [
   { accessorKey: "date", header: "Date" },
   { accessorKey: "description", header: "Description" },
   { accessorKey: "duration", header: "Duration" },
+  { accessorKey: "actions", header: "Actions" },
 ]
+
+// --- Time Entry Modal State ---
+const isTimeEntryModalOpen = ref(false)
+const editingTimeEntry = ref<{
+  id: string
+  projectId: string
+  date: string
+  durationSeconds: number
+  description?: string
+} | null>(null)
+const isAddingNewEntry = ref(false)
+
+// --- Projects Data ---
+const { data: allProjects } = await useLazyAsyncData("projects", async () => {
+  const { data } = await $eden.api.projects.get({ query: {} })
+  console.log("All projects data:", data) // Debug log
+  return data
+})
+
+// --- Time Entry Functions ---
+function editTimeEntry(entry: {
+  id: string
+  projectId: string
+  date: string
+  durationSeconds: number
+  description: string | null
+}) {
+  console.log("Editing time entry:", entry) // Debug log
+  editingTimeEntry.value = {
+    id: entry.id,
+    projectId: entry.projectId,
+    date: entry.date,
+    durationSeconds: entry.durationSeconds,
+    description: entry.description || undefined,
+  }
+  isAddingNewEntry.value = false
+  isTimeEntryModalOpen.value = true
+}
+
+async function deleteTimeEntry(entry: {
+  id: string
+  projectId: string
+  date: string
+  durationSeconds: number
+  description: string | null
+}) {
+  const toast = useToast()
+
+  try {
+    const { error } = await $eden.api["time-entries"]
+      .id({ id: entry.id })
+      .delete()
+
+    if (error) {
+      toast.add({
+        title: "Error",
+        description: String(error.value) || "Failed to delete time entry",
+        color: "error",
+      })
+    } else {
+      toast.add({
+        title: "Success",
+        description: "Time entry deleted successfully",
+        color: "success",
+      })
+      // Refresh the time entries data
+      await refresh()
+    }
+  } catch (err) {
+    toast.add({
+      title: "Error",
+      description:
+        err instanceof Error ? err.message : "An unexpected error occurred",
+      color: "error",
+    })
+  }
+}
+
+function addNewEntry() {
+  editingTimeEntry.value = null
+  isAddingNewEntry.value = true
+  isTimeEntryModalOpen.value = true
+}
+
+function closeTimeEntryModal() {
+  isTimeEntryModalOpen.value = false
+  editingTimeEntry.value = null
+  isAddingNewEntry.value = false
+}
+
+async function handleTimeEntrySaved() {
+  // Refresh the time entries data
+  await refresh()
+  closeTimeEntryModal()
+}
 
 // --- Computed Properties ---
 
@@ -144,13 +247,13 @@ const accordionItems = computed(() => {
           duration: `${hours.toString().padStart(2, "0")}:${minutes
             .toString()
             .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`,
+          originalEntry: timeEntry, // Keep reference to original entry for editing
         }
       })
       .filter(Boolean) as TimeEntryRow[]
 
     const totalSeconds = formattedEntries.reduce((total, entry) => {
-      const originalEntry = entriesInWeek.find((e) => e.id === entry.id)
-      return total + (originalEntry?.durationSeconds || 0)
+      return total + (entry.originalEntry?.durationSeconds || 0)
     }, 0)
 
     const formattedDuration =
@@ -210,18 +313,29 @@ watch(selectedMonth, () => {
         <h2 class="text-xl font-semibold">
           {{ user?.email || "Loading User..." }}
         </h2>
-        <div>
-          <label class="mr-2 text-sm font-medium">Month:</label>
-          <UDropdownMenu
-            :items="monthOptions"
-            :popper="{ placement: 'bottom-end' }"
+        <div class="flex items-center gap-3">
+          <UButton
+            icon="i-heroicons-plus"
+            size="sm"
+            color="primary"
+            variant="outline"
+            @click="addNewEntry"
           >
-            <UButton
-              icon="i-heroicons-calendar-days-20-solid"
-              :label="dayjs(selectedMonth).format('MMMM YYYY')"
-              color="neutral"
-            />
-          </UDropdownMenu>
+            Add Entry
+          </UButton>
+          <div>
+            <label class="mr-2 text-sm font-medium">Month:</label>
+            <UDropdownMenu
+              :items="monthOptions"
+              :popper="{ placement: 'bottom-end' }"
+            >
+              <UButton
+                icon="i-heroicons-calendar-days-20-solid"
+                :label="dayjs(selectedMonth).format('MMMM YYYY')"
+                color="neutral"
+              />
+            </UDropdownMenu>
+          </div>
         </div>
       </div>
       <div v-if="user || project">
@@ -262,7 +376,28 @@ watch(selectedMonth, () => {
                 icon: 'i-heroicons-clock',
                 label: 'No time entries found for this week.',
               }"
-            />
+            >
+              <template #actions-cell="{ row }">
+                <div class="flex gap-2">
+                  <UButton
+                    icon="i-heroicons-pencil-square"
+                    size="md"
+                    color="warning"
+                    variant="outline"
+                    aria-label="Edit Time Entry"
+                    @click="editTimeEntry(row.original.originalEntry!)"
+                  />
+                  <UButton
+                    icon="i-heroicons-trash"
+                    size="md"
+                    color="error"
+                    variant="outline"
+                    aria-label="Delete Time Entry"
+                    @click="deleteTimeEntry(row.original.originalEntry!)"
+                  />
+                </div>
+              </template>
+            </UTable>
             <template #footer>
               <div class="mt-2 text-right text-sm font-semibold">
                 Weekly Total:
@@ -283,5 +418,31 @@ watch(selectedMonth, () => {
     >
       Loading time entries...
     </div>
+
+    <!-- Time Entry Modal -->
+    <TimeEntryModal
+      v-model:is-open="isTimeEntryModalOpen"
+      :editing-entry="editingTimeEntry"
+      :projects-data="
+        allProjects?.projects
+          ? [
+              ...allProjects.projects,
+              // Ensure current project is included even if not in allProjects
+              {
+                id: projectId,
+                name: project?.name || 'Current Project',
+              },
+            ]
+          : [
+              {
+                id: projectId,
+                name: project?.name || 'Current Project',
+              },
+            ]
+      "
+      :default-descriptions="[]"
+      :is-admin="true"
+      @saved="handleTimeEntrySaved"
+    />
   </UCard>
 </template>

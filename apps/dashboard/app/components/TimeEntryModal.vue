@@ -13,6 +13,7 @@ interface Props {
   defaultDescriptions: { description: string }[]
   loadingProjects?: boolean
   loadingDefaults?: boolean
+  isAdmin?: boolean
 }
 
 interface Emits {
@@ -24,6 +25,7 @@ const props = withDefaults(defineProps<Props>(), {
   departmentThreshold: 0,
   loadingProjects: false,
   loadingDefaults: false,
+  isAdmin: false,
 })
 
 const emit = defineEmits<Emits>()
@@ -43,6 +45,15 @@ const modalState = reactive({
   date: dayjs().format("YYYY-MM-DD"),
   description: "",
   customDescription: "",
+})
+
+// Computed property for project selection
+const selectedProjectId = computed({
+  get: () => modalState.id,
+  set: (value) => {
+    modalState.id = value
+    console.log("TimeEntryModal: selectedProjectId set to:", value)
+  },
 })
 
 // Computed properties
@@ -80,6 +91,7 @@ const modalDurationFormatted = computed(() => {
 })
 
 const canEditEntry = computed(() => {
+  if (props.isAdmin) return true
   if (!props.editingEntry) return true
 
   const entryDate = dayjs(props.editingEntry.date)
@@ -91,8 +103,21 @@ const canEditEntry = computed(() => {
 watch(
   () => props.editingEntry,
   (entry) => {
+    console.log("TimeEntryModal: editingEntry changed:", entry) // Debug log
     if (entry) {
       // Edit mode: Pre-fill form
+      console.log("TimeEntryModal: Setting form data for edit:", {
+        projectId: entry.projectId,
+        date: entry.date,
+        durationSeconds: entry.durationSeconds,
+        description: entry.description,
+      }) // Debug log
+      console.log("TimeEntryModal: Available projects:", props.projectsData) // Debug log
+      console.log("TimeEntryModal: Looking for project ID:", entry.projectId) // Debug log
+      console.log(
+        "TimeEntryModal: Available project IDs:",
+        props.projectsData?.map((p) => p.id)
+      ) // Debug log
       modalState.id = entry.projectId
       modalState.date = entry.date
       // Convert duration seconds to HH:mm format for TimeInput
@@ -103,9 +128,16 @@ watch(
       ).padStart(2, "0")}`
       modalState.customDescription = entry.description || ""
       selectedDefaultDescription.value = undefined
+      console.log("TimeEntryModal: modalState after setting:", modalState) // Debug log
     } else {
       // Add mode: Reset form
-      modalState.id = ""
+      // Default to first project if available (for admin adding new entries)
+      modalState.id =
+        props.projectsData &&
+        props.projectsData.length > 0 &&
+        props.projectsData[0]
+          ? props.projectsData[0].id
+          : ""
       modalState.date = dayjs().format("YYYY-MM-DD")
       modalState.customDescription = ""
       modalTimeInput.value = undefined
@@ -113,6 +145,14 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Watch modalState.id changes
+watch(
+  () => modalState.id,
+  (newId) => {
+    console.log("TimeEntryModal: modalState.id changed to:", newId)
+  }
 )
 
 const isOpen = defineModel<boolean>("isOpen", { required: true })
@@ -158,16 +198,18 @@ const saveEntry = async () => {
       return
     }
 
-    // Validate that time entry is only for today
-    const today = dayjs()
-    if (!date.isSame(today, "day")) {
-      const todayFormatted = today.format("YYYY-MM-DD")
-      toast.add({
-        title: "Validation Error",
-        description: `Time entries can only be submitted for today (${todayFormatted})`,
-        color: "warning",
-      })
-      return
+    // Validate that time entry is only for today (unless admin)
+    if (!props.isAdmin) {
+      const today = dayjs()
+      if (!date.isSame(today, "day")) {
+        const todayFormatted = today.format("YYYY-MM-DD")
+        toast.add({
+          title: "Validation Error",
+          description: `Time entries can only be submitted for today (${todayFormatted})`,
+          color: "warning",
+        })
+        return
+      }
     }
 
     // 2. Parse duration from TimeInput
@@ -225,8 +267,8 @@ const saveEntry = async () => {
 
     let result
     if (props.editingEntry) {
-      // Edit Mode - Check if editing is allowed
-      if (!canEditEntry.value) {
+      // Edit Mode - Check if editing is allowed (unless admin)
+      if (!props.isAdmin && !canEditEntry.value) {
         toast.add({
           title: "Edit Restriction",
           description: "You can only edit entries created today.",
@@ -299,7 +341,7 @@ const saveEntry = async () => {
             class="mb-4"
           >
             <USelectMenu
-              v-model="modalState.id"
+              v-model="selectedProjectId"
               :items="projectsData || []"
               class="w-full [&>[role='listbox']]:z-[60]"
               value-key="id"
@@ -319,12 +361,16 @@ const saveEntry = async () => {
             <UInput
               v-model="modalState.date"
               type="date"
-              readonly
-              disabled
+              :readonly="!props.isAdmin"
+              :disabled="!props.isAdmin"
             />
             <template #help>
               <span class="text-sm text-gray-500">
-                Time entries can only be submitted for today
+                {{
+                  props.isAdmin
+                    ? "Admins can select any date for time entries"
+                    : "Time entries can only be submitted for today"
+                }}
               </span>
             </template>
           </UFormField>
@@ -404,7 +450,7 @@ const saveEntry = async () => {
               :loading="isSubmitting"
               :disabled="!canEditEntry"
             >
-              {{ editingEntry ? "Update" : "Add" }} Entry
+              {{ props.editingEntry ? "Update" : "Add" }} Entry
             </UButton>
           </div>
         </UForm>

@@ -414,28 +414,26 @@ export const timeEntries = baseApp("time-entries").group(
             return status(404, "Time entry not found")
           }
 
-          // 2. Authorization check: Only the owner can update their entry
-          if (existingEntry.userId !== user.userId) {
-            // Admins typically shouldn't modify others' time entries directly
-            // If admin override is needed, add `&& user.role !== "admin"` check here
+          // 2. Authorization check: Only the owner can update their entry, unless admin
+          if (existingEntry.userId !== user.userId && user.role !== "admin") {
             return status(403, "Forbidden: You cannot update this time entry")
           }
 
-          // 3. Validate that the existing entry is from today (can only edit today's entries)
+          // 3. Validate that the existing entry is from today (can only edit today's entries, unless admin)
           const existingEntryDate = await db.query.timeEntries.findFirst({
             where: eq(schema.timeEntries.id, params.id),
             columns: { date: true },
           })
 
-          if (existingEntryDate) {
+          if (existingEntryDate && user.role !== "admin") {
             const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
               return status(400, "You can only edit time entries created today")
             }
           }
 
-          // 4. If updating the date, validate it's for today
-          if (body.date !== undefined) {
+          // 4. If updating the date, validate it's for today (unless admin)
+          if (body.date !== undefined && user.role !== "admin") {
             const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(body.date).isSame(today, "day")) {
               return status(
@@ -526,20 +524,18 @@ export const timeEntries = baseApp("time-entries").group(
             return status(404, "Time entry not found")
           }
 
-          // 2. Authorization check: Only the owner can delete their entry
-          if (existingEntry.userId !== user.userId) {
-            // Admins typically shouldn't delete others' time entries directly
-            // If admin override is needed, add `&& user.role !== "admin"` check here
+          // 2. Authorization check: Only the owner can delete their entry, unless admin
+          if (existingEntry.userId !== user.userId && user.role !== "admin") {
             return status(403, "Forbidden: You cannot delete this time entry")
           }
 
-          // 3. Validate that the existing entry is from today (can only delete today's entries)
+          // 3. Validate that the existing entry is from today (can only delete today's entries, unless admin)
           const existingEntryDate = await db.query.timeEntries.findFirst({
             where: eq(schema.timeEntries.id, params.id),
             columns: { date: true },
           })
 
-          if (existingEntryDate) {
+          if (existingEntryDate && user.role !== "admin") {
             const today = getUserTimezoneToday(userTimezone)
             if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
               return status(
