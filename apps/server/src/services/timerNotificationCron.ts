@@ -29,7 +29,7 @@ const db = drizzle(pool, { schema })
 
 export const timerNotificationCron = cron({
   name: "timer-notification-reminder",
-  pattern: "*/5 * * * * *",
+  pattern: "* */5 * * * *",
   run: async () => {
     try {
       // 1. Get system settings for reminder time and enabled flag
