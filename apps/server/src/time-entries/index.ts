@@ -62,7 +62,7 @@ export const timeEntries = baseApp("time-entries").group(
             }
 
             try {
-              const newTimeEntry = await db.transaction(async (tx: any) => {
+              const newTimeEntry = await db.transaction(async (tx) => {
                 // Get user's current rate for historical tracking
                 const userRecord = await tx.query.users.findFirst({
                   where: eq(schema.users.id, user.userId),
@@ -115,7 +115,7 @@ export const timeEntries = baseApp("time-entries").group(
         .get(
           "/",
           async (ctx) => {
-            const { db, status, query } = ctx as any
+            const { db, status, query } = ctx
             const user = await ctx.getUser()
             if (!user) {
               return status(401, "Unauthorized")
@@ -193,7 +193,7 @@ export const timeEntries = baseApp("time-entries").group(
         .get(
           "/project/:id",
           async (ctx) => {
-            const { db, params, query, status } = ctx as any
+            const { db, params, query, status } = ctx
             const user = await ctx.getUser()
             if (!user) {
               return status(401, "Unauthorized")
@@ -279,7 +279,7 @@ export const timeEntries = baseApp("time-entries").group(
         .get(
           "/department-list",
           async (ctx) => {
-            const { db, status } = ctx as any
+            const { db, status } = ctx
             const userPayload = await ctx.getUser()
             if (!userPayload) {
               return status(401, "Unauthorized")
@@ -298,7 +298,7 @@ export const timeEntries = baseApp("time-entries").group(
               )
               .where(eq(schema.users.id, userPayload.userId))
               .limit(1)
-              .then((res: any) => res[0])
+              .then((res) => res[0])
 
             // Ensure the user record and department exist
             if (!userRecord || !userRecord.departmentId) {
@@ -339,7 +339,7 @@ export const timeEntries = baseApp("time-entries").group(
         .get(
           "/defaults",
           async (ctx) => {
-            const { db, status } = ctx as any
+            const { db, status } = ctx
             const userPayload = await ctx.getUser()
             if (!userPayload) {
               return status(401, "Unauthorized")
@@ -400,7 +400,7 @@ export const timeEntries = baseApp("time-entries").group(
         .put(
           "/id/:id",
           async (ctx) => {
-            const { db, params, body, status, headers } = ctx as any
+            const { db, params, body, status, headers } = ctx
             const user = await ctx.getUser()
             if (!user) {
               return status(401, "Unauthorized")
@@ -483,7 +483,7 @@ export const timeEntries = baseApp("time-entries").group(
               }
 
               return updatedEntry[0]
-            } catch (e: any) {
+            } catch (e) {
               // Handle potential foreign key constraint errors if projectId is invalid
               if (
                 e instanceof Error &&
@@ -516,7 +516,7 @@ export const timeEntries = baseApp("time-entries").group(
         .delete(
           "/id/:id",
           async (ctx) => {
-            const { db, params, status, headers } = ctx as any
+            const { db, params, status, headers } = ctx
             const user = await ctx.getUser()
             if (!user) {
               return status(401, "Unauthorized")
