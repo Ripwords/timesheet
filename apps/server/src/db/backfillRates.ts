@@ -22,7 +22,7 @@ async function backfillTimeEntryRates() {
         userId: timeEntries.userId,
       })
       .from(timeEntries)
-      .where(eq(timeEntries.ratePerHour, "0.00"))
+      .where(eq(timeEntries.ratePerHour, "0"))
 
     console.log(
       `Found ${entriesWithZeroRates.length} time entries with 0.00 rates`
