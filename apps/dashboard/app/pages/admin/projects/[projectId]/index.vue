@@ -588,7 +588,6 @@ const currentProfit = computed(() => totalBudget.value - totalCost.value)
 const recurringBudget = computed(
   () => recurringBudgetData.value?.recurringBudget || null
 )
-const hasRecurringBudget = computed(() => !!recurringBudget.value)
 
 // Helper to format date for the button
 function formatDateButton(date: Date | undefined | string) {
@@ -895,7 +894,7 @@ const frequencyOptions = [
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-semibold">Recurring Budget</h3>
           <UButton
-            v-if="!hasRecurringBudget"
+            v-if="!recurringBudget"
             icon="i-heroicons-plus-circle"
             size="sm"
             variant="solid"
@@ -906,7 +905,7 @@ const frequencyOptions = [
 
         <!-- Active Recurring Budget Display -->
         <div
-          v-if="hasRecurringBudget && recurringBudget"
+          v-if="recurringBudget"
           class="mt-4"
         >
           <UCard>
@@ -1248,7 +1247,10 @@ const frequencyOptions = [
       </div>
 
       <!-- Monthly Breakdown Section -->
-      <div class="mt-8">
+      <div
+        v-if="recurringBudget"
+        class="mt-8"
+      >
         <AdminMonthlyBreakdownTable :project-id="projectId" />
       </div>
     </UCard>
