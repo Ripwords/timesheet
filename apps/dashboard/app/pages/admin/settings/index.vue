@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import type { CellContext, ColumnDef } from "@tanstack/vue-table"
-import { UBadge, UButton, UInput, UIcon } from "#components"
+import { UBadge, UButton, UIcon, UInput } from "#components"
 import type { FormSubmitEvent } from "#ui/types"
 
 definePageMeta({
@@ -651,10 +651,127 @@ const departmentColumns: ColumnDef<Department, unknown>[] = [
     },
   },
 ]
+
+// --- Timer Notification Settings State --- //
+const timerReminderTime = ref<string>("18:00")
+const enableTimerReminders = ref<boolean>(false)
+const isLoadingTimerSettings = ref(true)
+const isSavingTimerSettings = ref(false)
+
+// Generate 5-minute interval time options ("00:00" to "23:55")
+const timerTimeOptions = Array.from({ length: 24 * 12 }, (_, i) => {
+  const hours = Math.floor(i / 12)
+  const minutes = (i % 12) * 5
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`
+})
+
+async function fetchTimerSettings() {
+  isLoadingTimerSettings.value = true
+  try {
+    const { data, error } = await $eden.api.admin.settings.get()
+    if (error) throw error.value
+    timerReminderTime.value = data.timerReminderTime || "18:00"
+    enableTimerReminders.value = !!data.enableTimerReminders
+  } catch {
+    toast.add({
+      title: "Error",
+      description: "Failed to load timer notification settings",
+      color: "error",
+    })
+  } finally {
+    isLoadingTimerSettings.value = false
+  }
+}
+
+async function saveTimerSettings() {
+  isSavingTimerSettings.value = true
+  try {
+    const { error } = await $eden.api.admin.settings.patch({
+      timerReminderTime: timerReminderTime.value,
+      enableTimerReminders: enableTimerReminders.value,
+    })
+    if (error) throw error.value
+    toast.add({
+      title: "Success",
+      description: "Timer notification settings saved",
+      color: "success",
+    })
+  } catch {
+    toast.add({
+      title: "Error",
+      description: "Failed to save timer notification settings",
+      color: "error",
+    })
+  } finally {
+    isSavingTimerSettings.value = false
+  }
+}
+
+onMounted(fetchTimerSettings)
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Timer Notification Settings Section -->
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">Timer Notification Settings</h2>
+      </template>
+      <div
+        v-if="isLoadingTimerSettings"
+        class="flex items-center gap-2 py-4"
+      >
+        <UIcon
+          name="i-heroicons-arrow-path-20-solid"
+          class="animate-spin text-xl"
+        />
+        <span>Loading settings...</span>
+      </div>
+      <div
+        v-else
+        class="space-y-4"
+      >
+        <UFormField
+          label="Timer Reminder Time"
+          name="timerReminderTime"
+        >
+          <USelectMenu
+            v-model="timerReminderTime"
+            :items="timerTimeOptions"
+            :disabled="isSavingTimerSettings"
+            placeholder="Select time"
+            searchable
+          >
+            <template #default>
+              <span v-if="timerReminderTime">{{ timerReminderTime }}</span>
+              <span
+                v-else
+                class="text-gray-500 dark:text-gray-400"
+                >Select time</span
+              >
+            </template>
+          </USelectMenu>
+        </UFormField>
+        <UFormField
+          label="Enable Timer Reminders"
+          name="enableTimerReminders"
+        >
+          <USwitch
+            v-model="enableTimerReminders"
+            :disabled="isSavingTimerSettings"
+          />
+        </UFormField>
+        <div class="flex justify-end">
+          <UButton
+            :loading="isSavingTimerSettings"
+            label="Save Settings"
+            @click="saveTimerSettings"
+          />
+        </div>
+      </div>
+    </UCard>
     <UCard>
       <template #header>
         <div class="flex justify-between items-center">
