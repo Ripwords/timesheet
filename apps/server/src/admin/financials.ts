@@ -11,7 +11,7 @@ import {
   projectRecurringBudgetInjections,
 } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { UUID } from "../../utils/validtors"
+import { UUID } from "../../utils/validators"
 
 // Helper function to format date to YYYY-MM
 const formatToYearMonth = (date: Date): string => {
@@ -163,7 +163,9 @@ export const adminFinancials = baseApp("adminFinancials").group(
             // Format the returned budget back to a number for the response
             return {
               ...updatedInjection[0],
-              budget: new Decimal(updatedInjection[0].budget).toNumber(),
+              budget: new Decimal(
+                updatedInjection[0]?.budget ?? "0"
+              ).toNumber(),
             }
           } catch (e: any) {
             // Handle potential database errors or not found errors
@@ -205,7 +207,10 @@ export const adminFinancials = baseApp("adminFinancials").group(
               return status(404, "Budget injection not found.")
             }
 
-            return { success: true, deletedId: deletedInjection[0].id }
+            return {
+              success: true,
+              deletedId: deletedInjection[0]?.id,
+            }
           } catch (e: any) {
             if (e.status === 404) throw e
             return status(
@@ -272,7 +277,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
             // Format the returned budget back to a number for the response
             return {
               ...newInjection[0],
-              budget: new Decimal(newInjection[0].budget).toNumber(),
+              budget: new Decimal(newInjection[0]?.budget ?? "0").toNumber(),
             }
           } catch (e: any) {
             return status(
