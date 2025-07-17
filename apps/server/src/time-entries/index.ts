@@ -95,7 +95,8 @@ export const timeEntries = baseApp("time-entries").group(
               })
 
               return newTimeEntry
-            } catch {
+            } catch (e) {
+              console.error("Error creating time entry", e)
               return status(500, "Internal Server Error")
             }
           },
@@ -241,7 +242,7 @@ export const timeEntries = baseApp("time-entries").group(
 
             // Authorization check: User must own the entry OR be an admin
             if (
-              timeEntry.some((entry: any) => entry.userId !== user.userId) &&
+              timeEntry.some((entry) => entry.userId !== user.userId) &&
               user.role !== "admin"
             ) {
               return status(403, "Forbidden: You do not own this time entry")
