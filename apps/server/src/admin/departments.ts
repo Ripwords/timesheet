@@ -4,7 +4,7 @@ import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { departments, departmentDefaultDescription, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { UUID } from "../../utils/validtors"
+import { UUID } from "../../utils/validators"
 
 // --- Schemas for Department CRUD ---
 

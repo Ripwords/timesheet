@@ -8,7 +8,7 @@ import { baseApp } from "../../utils/baseApp"
 import { sendEmail } from "../../utils/mail"
 import * as schema from "../db/schema"
 import { seedAdminUser } from "../db/seedUser"
-import { UUID } from "../../utils/validtors"
+import { UUID } from "../../utils/validators"
 
 seedAdminUser()
 export const auth = baseApp("auth").group("/auth", (app) =>

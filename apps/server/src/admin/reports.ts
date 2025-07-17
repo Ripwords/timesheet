@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { baseApp } from "../../utils/baseApp"
 import { projects, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { UUID } from "../../utils/validtors"
+import { UUID } from "../../utils/validators"
 import dayjs from "dayjs"
 interface AggregateDataPoint {
   [key: string]: string | number | Date | undefined // More specific index signature

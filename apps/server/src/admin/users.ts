@@ -3,7 +3,7 @@ import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import { departments, timeEntries, users } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
-import { UUID } from "../../utils/validtors"
+import { UUID } from "../../utils/validators"
 
 const querySchema = t.Object({
   search: t.Optional(t.Nullable(t.String())),
