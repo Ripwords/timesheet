@@ -462,22 +462,17 @@ export const timeEntries = baseApp("time-entries").group(
 
             // 5. Perform the update
             try {
-              const updateData: Record<string, unknown> = {
+              const updateData: Partial<
+                typeof schema.timeEntries.$inferInsert
+              > = {
                 updatedAt: new Date(),
               }
-              if (typeof body === "object" && body !== null) {
-                if ("projectId" in body && body.projectId !== undefined)
-                  updateData.projectId = body.projectId
-                if ("date" in body && body.date !== undefined)
-                  updateData.date = body.date
-                if (
-                  "durationSeconds" in body &&
-                  body.durationSeconds !== undefined
-                )
-                  updateData.durationSeconds = body.durationSeconds
-                if ("description" in body && body.description !== undefined)
-                  updateData.description = body.description
-              }
+              if (body.projectId) updateData.projectId = body.projectId
+              if (body.date) updateData.date = body.date
+              if (body.durationSeconds)
+                updateData.durationSeconds = body.durationSeconds
+              if (body.description) updateData.description = body.description
+
               const updatedEntry = await db
                 .update(schema.timeEntries)
                 .set(updateData)
