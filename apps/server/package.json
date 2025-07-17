@@ -12,31 +12,33 @@
     "db:push": "drizzle-kit push",
     "db:reset": "bun run src/db/reset.ts",
     "db:seed": "bun run src/db/seedTestData.ts",
-    "db:seed:prod": "bun run src/db/seedProdData.ts"
+    "db:seed:prod": "bun run src/db/seedProdData.ts",
+    "db:backfill-rates": "bun run src/db/backfillRates.ts"
   },
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",
-    "@elysiajs/cors": "^1.3.1",
+    "@elysiajs/cors": "^1.3.3",
+    "@elysiajs/cron": "^1.3.0",
     "@elysiajs/eden": "^1.3.2",
-    "@elysiajs/jwt": "^1.3.0",
+    "@elysiajs/jwt": "^1.3.2",
     "@elysiajs/server-timing": "^1.3.0",
-    "@elysiajs/swagger": "^1.3.0",
+    "@elysiajs/swagger": "^1.3.1",
     "bcryptjs": "^3.0.2",
     "dayjs": "^1.11.13",
-    "decimal.js": "^10.5.0",
-    "drizzle-kit": "^0.31.1",
-    "drizzle-orm": "^0.43.1",
-    "elysia": "^1.3.1",
-    "logixlysia": "^5.0.0",
-    "nodemailer": "^7.0.3",
-    "pg": "^8.15.6",
-    "postgres": "^3.4.5"
+    "decimal.js": "^10.6.0",
+    "drizzle-kit": "^0.31.4",
+    "drizzle-orm": "^0.44.3",
+    "elysia": "^1.3.5",
+    "logixlysia": "^5.1.0",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.16.3",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.7.0",
+    "@faker-js/faker": "^9.9.0",
     "@types/nodemailer": "^6.4.17",
-    "@types/pg": "^8.15.1",
-    "bun-types": "^1.2.12",
+    "@types/pg": "^8.15.4",
+    "bun-types": "^1.2.18",
     "drizzle-seed": "^0.3.1"
   },
   "overrides": {

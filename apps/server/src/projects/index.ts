@@ -310,4 +310,259 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         adminOnly: true,
       }
     )
+    // RECURRING BUDGET INJECTIONS
+    // GET recurring budget injection for a project
+    .get(
+      "/id/:id/recurring-budget",
+      async ({ db, params, status, isAdmin }) => {
+        if (!isAdmin) {
+          return status(403, "Forbidden")
+        }
+
+        const projectId = params.id
+
+        // Check if project exists
+        const project = await db.query.projects.findFirst({
+          where: eq(schema.projects.id, projectId),
+          columns: { id: true, name: true },
+        })
+
+        if (!project) {
+          return status(404, "Project not found")
+        }
+
+        // Get active recurring budget injection for this project
+        const recurringBudget =
+          await db.query.projectRecurringBudgetInjections.findFirst({
+            where: and(
+              eq(schema.projectRecurringBudgetInjections.projectId, projectId),
+              eq(schema.projectRecurringBudgetInjections.isActive, true)
+            ),
+          })
+
+        return {
+          project,
+          recurringBudget,
+        }
+      },
+      {
+        params: t.Object({
+          id: t.String({ format: "uuid" }),
+        }),
+        detail: {
+          summary: "Get recurring budget injection for a project",
+          tags: ["Projects", "Recurring Budget"],
+        },
+        adminOnly: true,
+      }
+    )
+    // CREATE recurring budget injection for a project
+    .post(
+      "/id/:id/recurring-budget",
+      async ({ db, params, body, status, isAdmin }) => {
+        if (!isAdmin) {
+          return status(403, "Forbidden")
+        }
+
+        const projectId = params.id
+
+        // Check if project exists
+        const project = await db.query.projects.findFirst({
+          where: eq(schema.projects.id, projectId),
+          columns: { id: true },
+        })
+
+        if (!project) {
+          return status(404, "Project not found")
+        }
+
+        try {
+          // Check if there's already an active recurring budget injection
+          const existingActive =
+            await db.query.projectRecurringBudgetInjections.findFirst({
+              where: and(
+                eq(
+                  schema.projectRecurringBudgetInjections.projectId,
+                  projectId
+                ),
+                eq(schema.projectRecurringBudgetInjections.isActive, true)
+              ),
+            })
+
+          if (existingActive) {
+            return status(
+              400,
+              "Project already has an active recurring budget injection"
+            )
+          }
+
+          // Create new recurring budget injection
+          const newRecurringBudget = await db
+            .insert(schema.projectRecurringBudgetInjections)
+            .values({
+              projectId,
+              amount: body.amount.toString(),
+              frequency: body.frequency,
+              startDate: body.startDate,
+              endDate: body.endDate,
+              description: body.description,
+              isActive: true,
+            })
+            .returning()
+
+          if (!newRecurringBudget || newRecurringBudget.length === 0) {
+            return status(500, "Failed to create recurring budget injection")
+          }
+
+          return newRecurringBudget[0]
+        } catch (error) {
+          console.error("Error creating recurring budget injection:", error)
+          return status(500, "Internal Server Error")
+        }
+      },
+      {
+        params: t.Object({
+          id: t.String({ format: "uuid" }),
+        }),
+        body: t.Object({
+          amount: t.Number({ minimum: 0.01 }),
+          frequency: t.UnionEnum(["monthly", "quarterly", "yearly"]),
+          startDate: t.String({ format: "date" }),
+          endDate: t.Optional(t.String({ format: "date" })),
+          description: t.Optional(t.String()),
+        }),
+        detail: {
+          summary: "Create recurring budget injection for a project",
+          tags: ["Projects", "Recurring Budget"],
+        },
+        adminOnly: true,
+      }
+    )
+    // UPDATE recurring budget injection
+    .put(
+      "/recurring-budget/:injectionId",
+      async ({ db, params, body, status, isAdmin }) => {
+        if (!isAdmin) {
+          return status(403, "Forbidden")
+        }
+
+        const injectionId = params.injectionId
+
+        // Check if recurring budget injection exists
+        const existingInjection =
+          await db.query.projectRecurringBudgetInjections.findFirst({
+            where: eq(schema.projectRecurringBudgetInjections.id, injectionId),
+          })
+
+        if (!existingInjection) {
+          return status(404, "Recurring budget injection not found")
+        }
+
+        try {
+          const updatedInjection = await db
+            .update(schema.projectRecurringBudgetInjections)
+            .set({
+              amount: body.amount.toString(),
+              frequency: body.frequency,
+              startDate: body.startDate,
+              endDate: body.endDate,
+              description: body.description,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.projectRecurringBudgetInjections.id, injectionId))
+            .returning()
+
+          if (!updatedInjection || updatedInjection.length === 0) {
+            return status(500, "Failed to update recurring budget injection")
+          }
+
+          return updatedInjection[0]
+        } catch (error) {
+          console.error("Error updating recurring budget injection:", error)
+          return status(500, "Internal Server Error")
+        }
+      },
+      {
+        params: t.Object({
+          injectionId: t.String({ format: "uuid" }),
+        }),
+        body: t.Object({
+          amount: t.Number({ minimum: 0.01 }),
+          frequency: t.UnionEnum(["monthly", "quarterly", "yearly"]),
+          startDate: t.String({ format: "date" }),
+          endDate: t.Optional(t.String({ format: "date" })),
+          description: t.Optional(t.String()),
+        }),
+        detail: {
+          summary: "Update recurring budget injection",
+          tags: ["Projects", "Recurring Budget"],
+        },
+        adminOnly: true,
+      }
+    )
+    // DEACTIVATE recurring budget injection
+    .patch(
+      "/recurring-budget/:injectionId/deactivate",
+      async ({ db, params, status, isAdmin }) => {
+        if (!isAdmin) {
+          return status(403, "Forbidden")
+        }
+
+        const injectionId = params.injectionId
+
+        // Check if recurring budget injection exists and is active
+        const existingInjection =
+          await db.query.projectRecurringBudgetInjections.findFirst({
+            where: eq(schema.projectRecurringBudgetInjections.id, injectionId),
+            columns: { id: true, isActive: true },
+          })
+
+        if (!existingInjection) {
+          return status(404, "Recurring budget injection not found")
+        }
+
+        if (!existingInjection.isActive) {
+          return status(400, "Recurring budget injection is already inactive")
+        }
+
+        try {
+          const updatedInjection = await db
+            .update(schema.projectRecurringBudgetInjections)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.projectRecurringBudgetInjections.id, injectionId))
+            .returning({
+              id: schema.projectRecurringBudgetInjections.id,
+              isActive: schema.projectRecurringBudgetInjections.isActive,
+            })
+
+          if (!updatedInjection || updatedInjection.length === 0) {
+            return status(
+              500,
+              "Failed to deactivate recurring budget injection"
+            )
+          }
+
+          return {
+            message: `Recurring budget injection ${injectionId} deactivated successfully`,
+            injection: updatedInjection[0],
+          }
+        } catch (error) {
+          console.error("Error deactivating recurring budget injection:", error)
+          return status(500, "Internal Server Error")
+        }
+      },
+      {
+        params: t.Object({
+          injectionId: t.String({ format: "uuid" }),
+        }),
+        detail: {
+          summary: "Deactivate recurring budget injection",
+          tags: ["Projects", "Recurring Budget"],
+        },
+        adminOnly: true,
+      }
+    )
 )

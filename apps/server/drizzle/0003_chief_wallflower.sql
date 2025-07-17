@@ -1,1 +1,0 @@
-ALTER TABLE "projects" ADD COLUMN "is_active" boolean DEFAULT true NOT NULL;

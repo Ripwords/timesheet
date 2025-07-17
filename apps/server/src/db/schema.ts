@@ -91,6 +91,9 @@ export const timeEntries = pgTable("time_entries", {
   date: date("date").notNull(),
   description: text("description"),
   durationSeconds: integer("duration_seconds").notNull(),
+  ratePerHour: numeric("rate_per_hour", { precision: 10, scale: 2 })
+    .default("0.00")
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -123,6 +126,27 @@ export const projectBudgetInjections = pgTable("project_budget_injections", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+
+export const projectRecurringBudgetInjections = pgTable(
+  "project_recurring_budget_injections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references((): AnyPgColumn => projects.id, { onDelete: "restrict" }),
+    amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+    frequency: text("frequency").notNull(), // 'monthly', 'quarterly', 'yearly'
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"), // nullable for ongoing
+    description: text("description"),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  }
+)
 
 export const timerStatusEnum = pgEnum("timer_status", ["running", "paused"])
 

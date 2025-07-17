@@ -9,9 +9,11 @@ import { adminFinancials } from "./admin/financials"
 import { publicDepartmentsRoutes } from "./departments"
 import { Elysia } from "elysia"
 import { timeTracker } from "./time-tracker"
+import { recurringBudgetCron } from "./services/recurringBudgetCron"
 
 const app = new Elysia()
   .use(baseApp("main"))
+  .use(recurringBudgetCron)
   .group("/api", (app) =>
     app
       .use(auth)

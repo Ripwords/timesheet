@@ -7,6 +7,7 @@ export default withNuxt(
     rules: {
       "vue/multi-word-component-names": "off",
       "vue/html-self-closing": "off",
+      "no-unexpected-multiline": "off",
     },
   }
 )
