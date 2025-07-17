@@ -412,28 +412,28 @@ export const timeEntries = baseApp("time-entries").group(
 
             // 1. Find the existing entry first to check ownership
             const existingEntry = await db.query.timeEntries.findFirst({
-              where: eq(schema.timeEntries.id, params.id), // Use numeric ID
-              columns: { id: true, userId: true }, // Only fetch necessary columns
+              where: eq(schema.timeEntries.id, params.id),
+              columns: { id: true, userId: true },
             })
 
             if (!existingEntry) {
               return status(404, "Time entry not found")
             }
 
-            // 2. Authorization check: Only the owner can update their entry
-            if (existingEntry.userId !== user.userId) {
-              // Admins typically shouldn't modify others' time entries directly
-              // If admin override is needed, add `&& user.role !== "admin"` check here
+            // 2. Authorization check: Only the owner or admin can update the entry
+            const isOwner = existingEntry.userId === user.userId
+            const isAdmin = user.role === "admin"
+            if (!isOwner && !isAdmin) {
               return status(403, "Forbidden: You cannot update this time entry")
             }
 
-            // 3. Validate that the existing entry is from today (can only edit today's entries)
+            // 3. Validate that the existing entry is from today (can only edit today's entries, unless admin)
             const existingEntryDate = await db.query.timeEntries.findFirst({
               where: eq(schema.timeEntries.id, params.id),
               columns: { date: true },
             })
 
-            if (existingEntryDate) {
+            if (existingEntryDate && !isAdmin) {
               const today = getUserTimezoneToday(userTimezone)
               if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
                 return status(
@@ -443,8 +443,14 @@ export const timeEntries = baseApp("time-entries").group(
               }
             }
 
-            // 4. If updating the date, validate it's for today
-            if (body.date !== undefined) {
+            // 4. If updating the date, validate it's for today (unless admin)
+            if (
+              typeof body === "object" &&
+              body !== null &&
+              "date" in body &&
+              body.date !== undefined &&
+              !isAdmin
+            ) {
               const today = getUserTimezoneToday(userTimezone)
               if (!dayjs(body.date).isSame(today, "day")) {
                 return status(
@@ -456,41 +462,43 @@ export const timeEntries = baseApp("time-entries").group(
 
             // 5. Perform the update
             try {
+              const updateData: Partial<
+                typeof schema.timeEntries.$inferInsert
+              > = {
+                updatedAt: new Date(),
+              }
+              if (body.projectId) updateData.projectId = body.projectId
+              if (body.date) updateData.date = body.date
+              if (body.durationSeconds)
+                updateData.durationSeconds = body.durationSeconds
+              if (body.description) updateData.description = body.description
+
               const updatedEntry = await db
                 .update(schema.timeEntries)
-                .set({
-                  // Only update fields provided in the body
-                  ...(body.projectId !== undefined && {
-                    projectId: body.projectId,
-                  }),
-                  ...(body.date !== undefined && {
-                    date: body.date,
-                  }),
-                  ...(body.durationSeconds !== undefined && {
-                    durationSeconds: body.durationSeconds,
-                  }),
-                  ...(body.description !== undefined && {
-                    description: body.description,
-                  }),
-                  updatedAt: new Date(),
-                })
-                .where(eq(schema.timeEntries.id, params.id)) // Use numeric ID
-                .returning() // Return the updated entry
+                .set(updateData)
+                .where(eq(schema.timeEntries.id, params.id))
+                .returning()
 
               if (!updatedEntry || updatedEntry.length === 0) {
-                // This case might be redundant due to the initial findFirst check,
-                // but good for robustness.
                 return status(500, "Failed to update time entry")
               }
 
               return updatedEntry[0]
             } catch (e) {
-              // Handle potential foreign key constraint errors if projectId is invalid
               if (
                 e instanceof Error &&
                 e.message.includes("violates foreign key constraint")
               ) {
-                return status(400, `Invalid projectId: ${body.projectId}`)
+                return status(
+                  400,
+                  `Invalid projectId: ${
+                    typeof body === "object" &&
+                    body !== null &&
+                    "projectId" in body
+                      ? body.projectId
+                      : undefined
+                  }`
+                )
               }
               return status(500, "Internal Server Error")
             }
@@ -528,28 +536,28 @@ export const timeEntries = baseApp("time-entries").group(
 
             // 1. Find the existing entry first to check ownership
             const existingEntry = await db.query.timeEntries.findFirst({
-              where: eq(schema.timeEntries.id, params.id), // Use numeric ID
-              columns: { id: true, userId: true }, // Only fetch necessary columns
+              where: eq(schema.timeEntries.id, params.id),
+              columns: { id: true, userId: true },
             })
 
             if (!existingEntry) {
               return status(404, "Time entry not found")
             }
 
-            // 2. Authorization check: Only the owner can delete their entry
-            if (existingEntry.userId !== user.userId) {
-              // Admins typically shouldn't delete others' time entries directly
-              // If admin override is needed, add `&& user.role !== "admin"` check here
+            // 2. Authorization check: Only the owner or admin can delete the entry
+            const isOwner = existingEntry.userId === user.userId
+            const isAdmin = user.role === "admin"
+            if (!isOwner && !isAdmin) {
               return status(403, "Forbidden: You cannot delete this time entry")
             }
 
-            // 3. Validate that the existing entry is from today (can only delete today's entries)
+            // 3. Validate that the existing entry is from today (can only delete today's entries, unless admin)
             const existingEntryDate = await db.query.timeEntries.findFirst({
               where: eq(schema.timeEntries.id, params.id),
               columns: { date: true },
             })
 
-            if (existingEntryDate) {
+            if (existingEntryDate && !isAdmin) {
               const today = getUserTimezoneToday(userTimezone)
               if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
                 return status(
@@ -563,8 +571,8 @@ export const timeEntries = baseApp("time-entries").group(
             try {
               const deletedEntry = await db
                 .delete(schema.timeEntries)
-                .where(eq(schema.timeEntries.id, params.id)) // Use numeric ID
-                .returning({ id: schema.timeEntries.id }) // Return the id of the deleted item
+                .where(eq(schema.timeEntries.id, params.id))
+                .returning({ id: schema.timeEntries.id })
 
               if (!deletedEntry || deletedEntry.length === 0) {
                 return status(500, "Failed to delete time entry")
@@ -572,7 +580,6 @@ export const timeEntries = baseApp("time-entries").group(
 
               return deletedEntry[0]
             } catch {
-              // Handle potential DB errors if necessary
               return status(500, "Internal Server Error")
             }
           },

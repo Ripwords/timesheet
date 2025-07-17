@@ -151,18 +151,9 @@ function nextMonth() {
 
 // Helper function to format hours in XXh XXm format
 function formatHours(hours: number): string {
-  if (hours === 0) return "0h 0m"
-
   const wholeHours = Math.floor(hours)
   const minutes = Math.round((hours - wholeHours) * 60)
-
-  if (wholeHours === 0) {
-    return `${minutes}m`
-  } else if (minutes === 0) {
-    return `${wholeHours}h`
-  } else {
-    return `${wholeHours}h ${minutes}m`
-  }
+  return `${wholeHours}h ${minutes}m`
 }
 
 // CSV Export functionality

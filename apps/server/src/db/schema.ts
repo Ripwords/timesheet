@@ -170,3 +170,28 @@ export const activeTimerSessions = pgTable("active_timer_sessions", {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+
+// --- Timer Notification System Tables ---
+
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: text("key").unique().notNull(),
+  value: text("value").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})
+
+export const emailNotifications = pgTable("email_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // e.g., 'timer_reminder'
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+  date: date("date").notNull(), // Track which day the notification was sent
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
