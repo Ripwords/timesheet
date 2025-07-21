@@ -92,8 +92,11 @@ const isAddingNewEntry = ref(false)
 
 // --- Projects Data ---
 const { data: allProjects } = await useLazyAsyncData("projects", async () => {
-  const { data } = await $eden.api.projects.get({ query: {} })
-  console.log("All projects data:", data) // Debug log
+  const { data } = await $eden.api.projects.get({
+    query: {
+      limit: 0,
+    },
+  })
   return data
 })
 
