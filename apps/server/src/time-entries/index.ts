@@ -52,13 +52,15 @@ export const timeEntries = baseApp("time-entries").group(
             // Get user's timezone from header
             const userTimezone = extractUserTimezone(headers)
 
-            // Validate that time entry is only for today in user's timezone
-            const today = getUserTimezoneToday(userTimezone)
-            if (!dayjs(body.date).isSame(today, "day")) {
-              return status(
-                400,
-                `Time entries can only be submitted for today (${today})`
-              )
+            // Validate that time entry is only for today in user's timezone (unless admin)
+            if (user.role !== "admin") {
+              const today = getUserTimezoneToday(userTimezone)
+              if (!dayjs(body.date).isSame(today, "day")) {
+                return status(
+                  400,
+                  `Time entries can only be submitted for today (${today})`
+                )
+              }
             }
 
             try {
@@ -428,18 +430,20 @@ export const timeEntries = baseApp("time-entries").group(
             }
 
             // 3. Validate that the existing entry is from today (can only edit today's entries, unless admin)
-            const existingEntryDate = await db.query.timeEntries.findFirst({
-              where: eq(schema.timeEntries.id, params.id),
-              columns: { date: true },
-            })
+            if (!isAdmin) {
+              const existingEntryDate = await db.query.timeEntries.findFirst({
+                where: eq(schema.timeEntries.id, params.id),
+                columns: { date: true },
+              })
 
-            if (existingEntryDate && !isAdmin) {
-              const today = getUserTimezoneToday(userTimezone)
-              if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
-                return status(
-                  400,
-                  "You can only edit time entries created today"
-                )
+              if (existingEntryDate) {
+                const today = getUserTimezoneToday(userTimezone)
+                if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
+                  return status(
+                    400,
+                    "You can only edit time entries created today"
+                  )
+                }
               }
             }
 
@@ -552,18 +556,20 @@ export const timeEntries = baseApp("time-entries").group(
             }
 
             // 3. Validate that the existing entry is from today (can only delete today's entries, unless admin)
-            const existingEntryDate = await db.query.timeEntries.findFirst({
-              where: eq(schema.timeEntries.id, params.id),
-              columns: { date: true },
-            })
+            if (!isAdmin) {
+              const existingEntryDate = await db.query.timeEntries.findFirst({
+                where: eq(schema.timeEntries.id, params.id),
+                columns: { date: true },
+              })
 
-            if (existingEntryDate && !isAdmin) {
-              const today = getUserTimezoneToday(userTimezone)
-              if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
-                return status(
-                  400,
-                  "You can only delete time entries created today"
-                )
+              if (existingEntryDate) {
+                const today = getUserTimezoneToday(userTimezone)
+                if (!dayjs(existingEntryDate.date).isSame(today, "day")) {
+                  return status(
+                    400,
+                    "You can only delete time entries created today"
+                  )
+                }
               }
             }
 
