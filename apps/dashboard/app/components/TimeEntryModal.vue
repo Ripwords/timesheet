@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import duration from "dayjs/plugin/duration"
-import {
-  formatDuration,
-  parseDurationFromTimeInput,
-  type TimeEntry,
-} from "~/utils/timeInput"
+import { formatDuration, parseDurationFromTimeInput } from "~/utils/timeInput"
+import type { TimeEntry } from "~/utils/timeInput"
 
 interface Props {
   editingEntry?: TimeEntry | null
@@ -14,6 +11,8 @@ interface Props {
   loadingProjects?: boolean
   loadingDefaults?: boolean
   isAdmin?: boolean
+  defaultProjectId?: string
+  targetUserId?: string
 }
 
 interface Emits {
@@ -26,6 +25,8 @@ const props = withDefaults(defineProps<Props>(), {
   loadingProjects: false,
   loadingDefaults: false,
   isAdmin: false,
+  defaultProjectId: undefined,
+  targetUserId: undefined,
 })
 
 const emit = defineEmits<Emits>()
@@ -131,13 +132,14 @@ watch(
       console.log("TimeEntryModal: modalState after setting:", modalState) // Debug log
     } else {
       // Add mode: Reset form
-      // Default to first project if available (for admin adding new entries)
+      // Default to specified project or first project if available (for admin adding new entries)
       modalState.id =
-        props.projectsData &&
+        props.defaultProjectId ||
+        (props.projectsData &&
         props.projectsData.length > 0 &&
         props.projectsData[0]
           ? props.projectsData[0].id
-          : ""
+          : "")
       modalState.date = dayjs().format("YYYY-MM-DD")
       modalState.customDescription = ""
       modalTimeInput.value = undefined
@@ -263,6 +265,7 @@ const saveEntry = async () => {
       date: date.format("YYYY-MM-DD"),
       durationSeconds: durationSeconds,
       description: finalDescription,
+      ...(props.targetUserId && { userId: props.targetUserId }), // Include target user ID if provided
     }
 
     let result
@@ -286,10 +289,12 @@ const saveEntry = async () => {
         })
     } else {
       // Add Mode
+      console.log("TimeEntryModal: Creating new entry with payload:", payload) // Debug log
       // Call POST endpoint
       result = await $eden.api["time-entries"].post(payload, {
         headers: getTimezoneHeaders(),
       })
+      console.log("TimeEntryModal: API result:", result) // Debug log
     }
 
     // 4. Handle response

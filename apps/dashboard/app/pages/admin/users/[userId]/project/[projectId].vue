@@ -163,6 +163,7 @@ function addNewEntry() {
   editingTimeEntry.value = null
   isAddingNewEntry.value = true
   isTimeEntryModalOpen.value = true
+  console.log("Adding new entry for project:", projectId) // Debug log
 }
 
 function closeTimeEntryModal() {
@@ -172,6 +173,7 @@ function closeTimeEntryModal() {
 }
 
 async function handleTimeEntrySaved() {
+  console.log("TimeEntryModal: Entry saved, refreshing data...") // Debug log
   // Refresh the time entries data
   await refresh()
   closeTimeEntryModal()
@@ -427,22 +429,21 @@ watch(selectedMonth, () => {
       v-model:is-open="isTimeEntryModalOpen"
       :editing-entry="editingTimeEntry"
       :projects-data="
-        allProjects?.projects
-          ? [
-              ...allProjects.projects,
-              // Ensure current project is included even if not in allProjects
-              {
-                id: projectId,
-                name: project?.name || 'Current Project',
-              },
-            ]
-          : [
-              {
-                id: projectId,
-                name: project?.name || 'Current Project',
-              },
-            ]
+        (() => {
+          const projects = allProjects?.projects || []
+          const currentProject = {
+            id: projectId,
+            name: project?.name || 'Current Project',
+          }
+
+          // Check if current project already exists in the projects array
+          const currentProjectExists = projects.some((p) => p.id === projectId)
+
+          return currentProjectExists ? projects : [...projects, currentProject]
+        })()
       "
+      :default-project-id="projectId"
+      :target-user-id="userId"
       :default-descriptions="[]"
       :is-admin="true"
       @saved="handleTimeEntrySaved"

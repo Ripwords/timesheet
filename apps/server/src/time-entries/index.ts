@@ -65,22 +65,36 @@ export const timeEntries = baseApp("time-entries").group(
 
             try {
               const newTimeEntry = await db.transaction(async (tx) => {
-                // Get user's current rate for historical tracking
+                // Authorization check: Only admin can specify userId in body
+                if (body.userId && user.role !== "admin") {
+                  return status(
+                    403,
+                    "Forbidden: Only admins can create entries for other users"
+                  )
+                }
+
+                // Determine target user ID - only allow body.userId if user is admin
+                const targetUserId =
+                  user.role === "admin" && body.userId
+                    ? body.userId
+                    : user.userId
+
+                // Get target user's current rate for historical tracking
                 const userRecord = await tx.query.users.findFirst({
-                  where: eq(schema.users.id, user.userId),
+                  where: eq(schema.users.id, targetUserId),
                   columns: {
                     ratePerHour: true,
                   },
                 })
 
                 if (!userRecord) {
-                  return status(400, "User not found")
+                  return status(400, "Target user not found")
                 }
 
                 const newTimeEntry = await tx
                   .insert(schema.timeEntries)
                   .values({
-                    userId: user.userId,
+                    userId: targetUserId,
                     projectId: body.projectId,
                     description: body.description,
                     date: body.date,
@@ -108,6 +122,7 @@ export const timeEntries = baseApp("time-entries").group(
               date: t.String({ format: "date" }),
               durationSeconds: t.Integer(),
               description: t.Optional(t.String()),
+              userId: t.Optional(UUID), // Allow admin to specify target user
             }),
             detail: {
               summary: "Create a new time entry",
