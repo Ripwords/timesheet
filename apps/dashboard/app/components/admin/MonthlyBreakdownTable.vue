@@ -168,34 +168,141 @@ function exportToCSV() {
   }
 
   try {
-    // Prepare CSV headers
-    const headers = [
+    const csvRows: string[][] = []
+
+    // Project and period information
+    csvRows.push([`Project: ${monthlyData.value.project.name}`])
+    csvRows.push([`Period: ${currentMonthYear.value}`])
+    csvRows.push([])
+
+    // Financial Summary Section
+    csvRows.push(["FINANCIAL SUMMARY"])
+    csvRows.push([])
+
+    const retainerFee = monthlyData.value.monthData.retainerFee
+    const totalSpend = monthlyData.value.monthData.totalSpend
+    const leftover = monthlyData.value.monthData.leftover
+    const usedPercentage = monthlyData.value.monthData.usedPercentage
+    const remainingPercentage = monthlyData.value.monthData.remainingPercentage
+
+    csvRows.push(["Retainer Fee (Recurring Budget)", retainerFee.toFixed(2)])
+    csvRows.push(["Total Team Cost", totalSpend.toFixed(2)])
+    csvRows.push(["Profit (Retainer - Cost)", leftover.toFixed(2)])
+    csvRows.push(["Budget Used", `${usedPercentage.toFixed(2)}%`])
+    csvRows.push(["Budget Remaining", `${remainingPercentage.toFixed(2)}%`])
+    csvRows.push([])
+
+    // Detailed Breakdown Section
+    csvRows.push(["DETAILED BREAKDOWN"])
+    csvRows.push([])
+
+    // Main header row
+    const mainHeader = [
       "User/Department",
+      "Rate/Day (MYR)",
+      "Rate/Hour (MYR)",
       "Week 1",
       "Week 2",
       "Week 3",
       "Week 4",
       "Week 5",
-      "Total Hours (Formatted)",
-      "Total Hours (Decimal)",
-      "Actual Spend",
+      "Total Hours",
+      "Hours (Decimal)",
+      "Cost (MYR)",
     ]
+    csvRows.push(mainHeader)
 
-    // Prepare CSV data
-    const csvData = tableData.value.map((row) => [
-      row.name,
-      row.week1 > 0 ? formatHours(row.week1) : "0h 0m",
-      row.week2 > 0 ? formatHours(row.week2) : "0h 0m",
-      row.week3 > 0 ? formatHours(row.week3) : "0h 0m",
-      row.week4 > 0 ? formatHours(row.week4) : "0h 0m",
-      row.week5 > 0 ? formatHours(row.week5) : "0h 0m",
-      row.totalHoursFormatted,
-      row.totalHours.toFixed(2),
-      `$${row.actualSpend.toFixed(2)}`,
-    ])
+    // Sub-header row
+    const subHeader = [
+      "",
+      "",
+      "",
+      "Hours",
+      "Hours",
+      "Hours",
+      "Hours",
+      "Hours",
+      "",
+      "",
+      "",
+    ]
+    csvRows.push(subHeader)
 
-    // Combine headers and data
-    const csvContent = [headers, ...csvData]
+    // Add department and user rows
+    for (const department of monthlyData.value.departments) {
+      // Add department summary row
+      if (department.totalHours > 0) {
+        csvRows.push([]) // Empty row for spacing
+        const deptRow = [
+          `DEPARTMENT: ${department.name}`,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          formatHours(department.totalHours),
+          department.totalHours.toFixed(2),
+          department.totalSpend.toFixed(2),
+        ]
+        csvRows.push(deptRow)
+        csvRows.push([]) // Empty row for spacing
+      }
+
+      // Add user rows
+      for (const user of department.users) {
+        if (user.totalHours > 0) {
+          // Get rate per hour from backend data, convert string to number if needed
+          const ratePerHour =
+            typeof user.ratePerHour === "number"
+              ? user.ratePerHour
+              : typeof user.ratePerHour === "string"
+              ? parseFloat(user.ratePerHour)
+              : 0
+          const ratePerDay = ratePerHour * 8 // Calculate rate per day (8-hour workday)
+
+          const userRow = [
+            user.name,
+            ratePerDay.toFixed(2),
+            ratePerHour.toFixed(2),
+            user.weeklyHours[0] > 0 ? formatHours(user.weeklyHours[0]) : "-",
+            user.weeklyHours[1] > 0 ? formatHours(user.weeklyHours[1]) : "-",
+            user.weeklyHours[2] > 0 ? formatHours(user.weeklyHours[2]) : "-",
+            user.weeklyHours[3] > 0 ? formatHours(user.weeklyHours[3]) : "-",
+            user.weeklyHours[4] > 0 ? formatHours(user.weeklyHours[4]) : "-",
+            formatHours(user.totalHours),
+            user.totalHours.toFixed(2),
+            user.totalSpend.toFixed(2),
+          ]
+          csvRows.push(userRow)
+        }
+      }
+    }
+
+    // Add grand total row
+    csvRows.push([]) // Empty row for spacing
+    const grandTotalHours = monthlyData.value.departments.reduce(
+      (sum, dept) => sum + dept.totalHours,
+      0
+    )
+    const grandTotalRow = [
+      "TOTAL",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      formatHours(grandTotalHours),
+      grandTotalHours.toFixed(2),
+      totalSpend.toFixed(2),
+    ]
+    csvRows.push(grandTotalRow)
+
+    // Convert to CSV format
+    const csvContent = csvRows
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
       .join("\n")
 
@@ -206,9 +313,10 @@ function exportToCSV() {
     link.setAttribute("href", url)
     link.setAttribute(
       "download",
-      `monthly-breakdown-${
-        monthlyData.value.project.name
-      }-${currentMonthYear.value.replace(" ", "-")}.csv`
+      `${monthlyData.value.project.name}-${currentMonthYear.value}.csv`.replace(
+        " ",
+        "-"
+      )
     )
     link.style.visibility = "hidden"
     document.body.appendChild(link)
@@ -225,167 +333,6 @@ function exportToCSV() {
     toast.add({
       title: "Export Failed",
       description: "Failed to export monthly breakdown.",
-      color: "error",
-    })
-  }
-}
-
-// PDF Export functionality
-async function exportToPDF() {
-  if (!monthlyData.value || !tableData.value.length) {
-    toast.add({
-      title: "No Data",
-      description: "No data available to export.",
-      color: "warning",
-    })
-    return
-  }
-
-  try {
-    // Dynamic import of jsPDF to avoid SSR issues
-    const { jsPDF } = await import("jspdf")
-    const doc = new jsPDF()
-
-    // Set up document
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
-    const margin = 20
-    let yPosition = margin
-
-    // Title
-    doc.setFontSize(20)
-    doc.setFont("helvetica", "bold")
-    doc.text("Monthly Breakdown Report", pageWidth / 2, yPosition, {
-      align: "center",
-    })
-    yPosition += 15
-
-    // Project and Date
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Project: ${monthlyData.value.project.name}`, margin, yPosition)
-    yPosition += 8
-    doc.text(`Period: ${currentMonthYear.value}`, margin, yPosition)
-    yPosition += 20
-
-    // Summary Cards
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("Summary", margin, yPosition)
-    yPosition += 10
-
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-
-    // Summary data in a table format
-    const summaryData = [
-      [
-        "Retainer Fee",
-        `$${monthlyData.value.monthData.retainerFee.toFixed(2)}`,
-      ],
-      ["Actual Spend", `$${monthlyData.value.monthData.totalSpend.toFixed(2)}`],
-      ["Leftover", `$${monthlyData.value.monthData.leftover.toFixed(2)}`],
-      ["Usage", `${monthlyData.value.monthData.usedPercentage}%`],
-    ]
-
-    summaryData.forEach(([label, value]) => {
-      if (label && value) {
-        doc.text(label, margin, yPosition)
-        doc.text(value, margin + 80, yPosition)
-        yPosition += 6
-      }
-    })
-
-    yPosition += 15
-
-    // Detailed Breakdown Table
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("Detailed Breakdown", margin, yPosition)
-    yPosition += 10
-
-    // Table headers
-    doc.setFontSize(8)
-    doc.setFont("helvetica", "bold")
-    const headers = [
-      "User/Department",
-      "Week 1",
-      "Week 2",
-      "Week 3",
-      "Week 4",
-      "Week 5",
-      "Total Hours",
-      "Actual Spend",
-    ]
-    const colWidths = [50, 20, 20, 20, 20, 20, 25, 25]
-    let xPosition = margin
-
-    headers.forEach((header, index) => {
-      doc.text(header, xPosition, yPosition)
-      xPosition += colWidths[index] || 0
-    })
-
-    yPosition += 8
-
-    // Table data
-    doc.setFontSize(7)
-    doc.setFont("helvetica", "normal")
-
-    tableData.value.forEach((row) => {
-      // Check if we need a new page
-      if (yPosition > pageHeight - 30) {
-        doc.addPage()
-        yPosition = margin
-      }
-
-      // Determine font weight based on row type
-      if (row.type === "department") {
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(8)
-      } else if (row.type === "user") {
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(7)
-      } else {
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(6)
-      }
-
-      xPosition = margin
-      doc.text(row.name, xPosition, yPosition)
-      xPosition += colWidths[0] || 0
-
-      // Weekly hours
-      const weeks = [row.week1, row.week2, row.week3, row.week4, row.week5]
-      weeks.forEach((week, index) => {
-        const formatted = week > 0 ? formatHours(week) : "0h 0m"
-        doc.text(formatted, xPosition, yPosition)
-        xPosition += colWidths[index + 1] || 0
-      })
-
-      // Total hours and actual spend
-      doc.text(row.totalHoursFormatted, xPosition, yPosition)
-      xPosition += colWidths[6] || 0
-      doc.text(`$${row.actualSpend.toFixed(2)}`, xPosition, yPosition)
-
-      yPosition += 5
-    })
-
-    // Save the PDF
-    const filename = `monthly-breakdown-${
-      monthlyData.value.project.name
-    }-${currentMonthYear.value.replace(" ", "-")}.pdf`
-    doc.save(filename)
-
-    toast.add({
-      title: "Export Successful",
-      description: "Monthly breakdown exported to PDF.",
-      color: "success",
-    })
-  } catch (error) {
-    console.error("PDF export failed:", error)
-    toast.add({
-      title: "Export Failed",
-      description: "Failed to export monthly breakdown to PDF.",
       color: "error",
     })
   }
@@ -686,14 +633,6 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
           variant="outline"
           label="Export CSV"
           @click="exportToCSV"
-        />
-        <UButton
-          v-if="monthlyData && tableData.length > 0"
-          icon="i-heroicons-document-text"
-          size="sm"
-          variant="outline"
-          label="Export PDF"
-          @click="exportToPDF"
         />
       </div>
     </div>
