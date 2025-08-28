@@ -107,7 +107,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
     // READ Single Project
     .get(
       "/id/:id",
-      async ({ db, params, error }) => {
+      async ({ db, params, status }) => {
         const projectId = params.id
         const project = await db.query.projects.findFirst({
           where: and(
@@ -118,7 +118,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         })
 
         if (!project) {
-          return error(404, "Project not found")
+          return status(404, "Project not found")
         }
         return project
       },

@@ -75,14 +75,14 @@ export const baseApp = (name: string) =>
     .use(swagger())
     .macro({
       adminOnly: () => ({
-        resolve: async ({ db, jwt, cookie, error }) => {
+        resolve: async ({ db, jwt, cookie, status }) => {
           const profile = await jwt.verify(cookie.auth.value)
           if (!profile) {
-            return error(401, "Unauthorized")
+            return status(401, "Unauthorized")
           }
 
           if (!db) {
-            return error(500, "Database not initialized")
+            return status(500, "Database not initialized")
           }
 
           const user = await db.query.users.findFirst({
@@ -90,7 +90,7 @@ export const baseApp = (name: string) =>
           })
 
           if (user?.role !== "admin") {
-            return error(403, "Forbidden")
+            return status(403, "Forbidden")
           }
 
           return {

@@ -6,15 +6,15 @@ type UserRole = (typeof users.$inferSelect)["role"]
 export const authGuard = (role: UserRole = "user") =>
   baseApp("authGuard").resolve(
     { as: "scoped" },
-    async ({ jwt, cookie, error }) => {
+    async ({ jwt, cookie, status }) => {
       const profile = await jwt.verify(cookie.auth.value)
 
       if (!profile) {
-        return error(401, "Unauthorized")
+        return status(401, "Unauthorized")
       }
 
       if (role !== profile.role && profile.role !== "admin") {
-        return error(403, "Forbidden")
+        return status(403, "Forbidden")
       }
 
       return {

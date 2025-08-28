@@ -25,13 +25,7 @@ const updateUserBodySchema = t.Object({
   email: t.Optional(t.String({ format: "email" })),
   departmentId: t.Optional(UUID),
   ratePerHour: t.Optional(t.Number({ minimum: 0 })),
-  emailVerified: t.Optional(
-    t.Boolean({
-      error: {
-        message: "Email verified must be a boolean",
-      },
-    })
-  ),
+  emailVerified: t.Optional(t.Boolean()),
 })
 
 const userIdParamsSchema = t.Object({
@@ -141,7 +135,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       )
       .get(
         "/user/:id",
-        async ({ db, params, error }) => {
+        async ({ db, params, status }) => {
           const userId = params.id
 
           const userData = await db
@@ -165,7 +159,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
           const user = userData[0]
 
           if (!user) {
-            return error(404, `User with ID ${userId} not found`)
+            return status(404, `User with ID ${userId} not found`)
           }
           return user
         },
@@ -181,7 +175,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       )
       .patch(
         "/:id",
-        async ({ db, params, body, error }) => {
+        async ({ db, params, body, status }) => {
           const userId = params.id
           const { email, departmentId, ratePerHour, emailVerified } = body
 
@@ -191,7 +185,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
             ratePerHour === undefined &&
             emailVerified === undefined
           ) {
-            return error(
+            return status(
               400,
               "No update data provided. Provide email, departmentId, ratePerHour, or emailVerified."
             )
@@ -203,7 +197,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               columns: { id: true },
             })
             if (!departmentExists) {
-              return error(400, `Invalid departmentId: ${departmentId}`)
+              return status(400, `Invalid departmentId: ${departmentId}`)
             }
           }
 
@@ -218,7 +212,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               columns: { id: true },
             })
             if (existingUser) {
-              return error(
+              return status(
                 409,
                 `Email "${email}" is already in use by another user.`
               )
@@ -252,7 +246,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               })
 
             if (!updatedUserResult || updatedUserResult.length === 0) {
-              return error(404, `User with ID ${userId} not found.`)
+              return status(404, `User with ID ${userId} not found.`)
             }
 
             const finalUserData = await db
@@ -273,17 +267,17 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
             return finalUserData[0]
           } catch (e) {
             if (e instanceof Error && e.message.includes("already in use")) {
-              return error(409, e.message)
+              return status(409, e.message)
             }
             if (
               e instanceof Error &&
               e.message.includes("Invalid departmentId")
             ) {
-              return error(400, e.message)
+              return status(400, e.message)
             }
             const message =
               e instanceof Error ? e.message : "Unknown error occurred"
-            return error(500, `Failed to update user: ${message}`)
+            return status(500, `Failed to update user: ${message}`)
           }
         },
         {
@@ -299,7 +293,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
       )
       .patch(
         "/:id/activate",
-        async ({ db, params, error }) => {
+        async ({ db, params, status }) => {
           const userId = params.id
 
           try {
@@ -313,7 +307,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               })
 
             if (!updatedUserResult || updatedUserResult.length === 0) {
-              return error(404, `User with ID ${userId} not found.`)
+              return status(404, `User with ID ${userId} not found.`)
             }
 
             return {
@@ -321,7 +315,7 @@ export const adminUsersRoutes = baseApp("adminUsers").group(
               user: updatedUserResult[0],
             }
           } catch {
-            return error(500, `Failed to activate user`)
+            return status(500, `Failed to activate user`)
           }
         },
         {
