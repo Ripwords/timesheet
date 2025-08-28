@@ -6,7 +6,6 @@ RUN mkdir -p /temp/prod
 COPY package.json bun.lock /temp/prod/
 WORKDIR /temp/prod
 COPY apps/dashboard/package.json apps/dashboard/
-COPY apps/desktop/package.json apps/desktop/
 COPY apps/server/package.json apps/server/
 
 COPY apps/dashboard/ apps/dashboard/

@@ -1,79 +1,80 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
+
 # Project Structure and Cost/Profit Tracking Guide
 
 **Overall Architecture:**
 
-*   **Client-Server Model:** The application operates with a central backend server managing data and logic, serving multiple clients.
-*   **Backend:** ElysiaJS server handling API requests and database interactions.
-*   **Database:** PostgreSQL (inferred from `drizzle-orm/pg-core`) managed via Drizzle ORM.
-*   **Clients:**
-    *   **Tauri Desktop App:** Primary interface for users to perform core time tracking actions.
-    *   **Nuxt Web Dashboard:** For user registration, administration, viewing history, managing profile, and now cost/profit dashboards.
+- **Client-Server Model:** The application operates with a central backend server managing data and logic, serving multiple clients.
+- **Backend:** ElysiaJS server handling API requests and database interactions.
+- **Database:** PostgreSQL (inferred from `drizzle-orm/pg-core`) managed via Drizzle ORM.
+- **Clients:**
+  - **Nuxt Web Dashboard:** For user registration, administration, viewing history, managing profile, and now cost/profit dashboards.
 
 **Backend & Data Model (`schema.ts`):**
 
 1.  **User Management:**
-    *   Store user information (`users` table: `id`, `email`, `passwordHash`).
-    *   Support distinct user roles (`userRoleEnum`: `admin`, `user`).
-    *   Implement email verification (`emailVerified`, `verificationToken`).
-    *   **Hourly Rate:** Each user (staff) is expected to have a rate per hour attached (add a `ratePerHour` field to the `users` table if not present).
+    - Store user information (`users` table: `id`, `email`, `passwordHash`).
+    - Support distinct user roles (`userRoleEnum`: `admin`, `user`).
+    - Implement email verification (`emailVerified`, `verificationToken`).
+    - **Hourly Rate:** Each user (staff) is expected to have a rate per hour attached (add a `ratePerHour` field to the `users` table if not present).
 2.  **Authentication & Security:**
-    *   Secure password storage (hashing required).
-    *   Implement password reset functionality (`resetPasswordTokens` table).
-    *   API endpoints likely require authentication (e.g., JWT).
+    - Secure password storage (hashing required).
+    - Implement password reset functionality (`resetPasswordTokens` table).
+    - API endpoints likely require authentication (e.g., JWT).
 3.  **Project Management:**
-    *   Define and store projects (`projects` table: `id`, `name`).
-    *   **Budget Injections:** Each project can have one or more budget injections (`projectBudgetInjections` table), giving each project a total budget to deduct from.
+    - Define and store projects (`projects` table: `id`, `name`).
+    - **Budget Injections:** Each project can have one or more budget injections (`projectBudgetInjections` table), giving each project a total budget to deduct from.
 4.  **Time Tracking:**
-    *   Store detailed time entries (`timeEntries` table: `id`, `startTime`, `endTime`, `durationSeconds`).
-    *   Associate time entries with specific users (`userId` foreign key to `users`).
-    *   Associate time entries with specific projects (`projectId` foreign key to `projects`).
-    *   Store timestamps with time zone information (`withTimezone: true`).
-    *   **Cost Calculation:** For each time entry, cost is calculated as `user.ratePerHour * (durationSeconds / 3600)`.
+    - Store detailed time entries (`timeEntries` table: `id`, `startTime`, `endTime`, `durationSeconds`).
+    - Associate time entries with specific users (`userId` foreign key to `users`).
+    - Associate time entries with specific projects (`projectId` foreign key to `projects`).
+    - Store timestamps with time zone information (`withTimezone: true`).
+    - **Cost Calculation:** For each time entry, cost is calculated as `user.ratePerHour * (durationSeconds / 3600)`.
 5.  **Profit Calculation:**
-    *   **Project Profit:** For each project, profit is calculated as:
-        *   `totalBudget - totalUserCosts`
-        *   Where `totalBudget` is the sum of all budget injections for the project, and `totalUserCosts` is the sum of all user costs (rate per hour * hours worked) for all time entries on that project.
+    - **Project Profit:** For each project, profit is calculated as:
+      - `totalBudget - totalUserCosts`
+      - Where `totalBudget` is the sum of all budget injections for the project, and `totalUserCosts` is the sum of all user costs (rate per hour \* hours worked) for all time entries on that project.
 
 **Functionality (Distributed across clients):**
 
 1.  **Authentication:**
-    *   User **Registration** (Nuxt Dashboard).
-    *   User **Login** (Tauri App and Nuxt Dashboard).
-    *   **Email Verification** flow.
-    *   **Password Reset** flow (Request and confirmation).
+    - User **Registration** (Nuxt Dashboard).
+    - User **Login** (Tauri App and Nuxt Dashboard).
+    - **Email Verification** flow.
+    - **Password Reset** flow (Request and confirmation).
 2.  **Core Time Tracking (Tauri App):**
-    *   **Start/Pause/Resume/End** timer functionality.
-    *   On **End Session**:
-        *   Prompt user to select a **Project**.
-        *   Send the completed `timeEntry` (with `userId`, `projectId`, `startTime`, `endTime`, `durationSeconds`) to the backend API for storage.
-    *   Display user's recent time entries.
+    - **Start/Pause/Resume/End** timer functionality.
+    - On **End Session**:
+      - Prompt user to select a **Project**.
+      - Send the completed `timeEntry` (with `userId`, `projectId`, `startTime`, `endTime`, `durationSeconds`) to the backend API for storage.
+    - Display user's recent time entries.
 3.  **Project & Cost Management (Nuxt Dashboard/Admin):**
-    *   **CRUD** projects and budget injections (API endpoints needed). Access might be role-restricted (e.g., admins).
-    *   **View project budgets, costs, and profit** (dashboard views).
+    - **CRUD** projects and budget injections (API endpoints needed). Access might be role-restricted (e.g., admins).
+    - **View project budgets, costs, and profit** (dashboard views).
 4.  **Web Dashboard (Nuxt):**
-    *   **User Registration** interface.
-    *   **Login** interface.
-    *   **Admin Panel:**
-        *   View list of users and their rates.
-        *   Manage user roles or verification status.
-        *   View/manage all projects, time entries, budgets, and profit.
-    *   **User View:**
-        *   Allow logged-in users to view their own time entry history and cost contribution.
-        *   Profile/Password management.
+    - **User Registration** interface.
+    - **Login** interface.
+    - **Admin Panel:**
+      - View list of users and their rates.
+      - Manage user roles or verification status.
+      - View/manage all projects, time entries, budgets, and profit.
+    - **User View:**
+      - Allow logged-in users to view their own time entry history and cost contribution.
+      - Profile/Password management.
 5.  **Data Persistence:**
-    *   All core data (`users`, `projects`, `timeEntries`, `projectBudgetInjections`, tokens) is persisted in the **backend PostgreSQL database**.
-    *   Client-side `localStorage` is only used for storing authentication tokens (e.g., JWT) or temporary UI state, not primary application data.
+    - All core data (`users`, `projects`, `timeEntries`, `projectBudgetInjections`, tokens) is persisted in the **backend PostgreSQL database**.
+    - Client-side `localStorage` is only used for storing authentication tokens (e.g., JWT) or temporary UI state, not primary application data.
 
 **Cost & Profit Tracking Summary:**
+
 - Each project has a budget (sum of all injections).
 - Each user has a rate per hour.
 - Each time entry records duration and is linked to a user and project.
-- Project cost = sum of (user rate * hours worked) for all time entries on the project.
+- Project cost = sum of (user rate \* hours worked) for all time entries on the project.
 - Project profit = project budget - project cost.
 
 This enables the application to serve as a comprehensive dashboard for both time and cost tracking, supporting project profitability analysis.
