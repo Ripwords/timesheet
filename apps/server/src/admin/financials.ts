@@ -193,7 +193,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
             userRecord.totalHours += hours.toNumber()
             userRecord.decimalHours += hours.toNumber()
             userRecord.cost += cost.toNumber()
-            userRecord[`week${weekNumber}` as keyof Pick<ProjectUserRecord, 'week1' | 'week2' | 'week3' | 'week4' | 'week5'>] += hours.toNumber()
+            userRecord[
+              `week${weekNumber}` as keyof Pick<
+                ProjectUserRecord,
+                "week1" | "week2" | "week3" | "week4" | "week5"
+              >
+            ] += hours.toNumber()
           }
 
           // Convert projects to array format with formatted user records and per-project financials
@@ -759,12 +764,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }
 
           // 6. Convert maps to arrays and calculate percentages
-          const departments = Array.from(
-            departmentMap.values()
-          ).map((dept) => ({
-            ...dept,
-            users: Array.from(dept.users.values()),
-          }))
+          const departments = Array.from(departmentMap.values()).map(
+            (dept) => ({
+              ...dept,
+              users: Array.from(dept.users.values()),
+            })
+          )
 
           const leftover = retainerFee - totalSpend
           const usedPercentage =
