@@ -1,5 +1,5 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
-import { asc, eq, and, gte, lt } from "drizzle-orm"
+import { asc, eq, and, gte, lt, lte } from "drizzle-orm"
 import { t } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import {
@@ -13,6 +13,55 @@ import {
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validators"
 
+// TypeScript interfaces for financial data structures
+interface ProjectUserRecord {
+  team: string
+  project: string
+  week1: number
+  week2: number
+  week3: number
+  week4: number
+  week5: number
+  totalHours: number
+  decimalHours: number
+  cost: number
+}
+
+interface ProjectData {
+  projectName: string
+  projectId: string
+  users: Map<string, ProjectUserRecord>
+  totalHours: number
+  totalCost: number
+  revenue: number
+}
+
+interface MonthlyBreakdownUser {
+  id: string
+  name: string
+  ratePerHour: string
+  totalHours: number
+  totalSpend: number
+  weeklyHours: number[]
+  timeEntries: Array<{
+    id: string
+    description: string | null
+    date: string
+    durationSeconds: number
+    cost: number
+    weekNumber: number
+  }>
+}
+
+interface MonthlyBreakdownDepartment {
+  id: string
+  name: string
+  color: string
+  totalHours: number
+  totalSpend: number
+  users: Map<string, MonthlyBreakdownUser>
+}
+
 // Helper function to format date to YYYY-MM
 const formatToYearMonth = (date: Date): string => {
   const year = new Date(date).getFullYear()
@@ -25,6 +74,219 @@ export const adminFinancials = baseApp("adminFinancials").group(
   (app) =>
     app
       .use(authGuard("admin"))
+      // GET General Financial Overview
+      .get(
+        "/",
+        async ({ query, db }) => {
+          const { startDate, endDate, projectId } = query
+
+          // Build filters
+          const filters = []
+          if (startDate) {
+            filters.push(gte(timeEntries.date, startDate))
+          }
+          if (endDate) {
+            filters.push(lte(timeEntries.date, endDate))
+          }
+          if (projectId) {
+            filters.push(eq(timeEntries.projectId, projectId))
+          }
+
+          const whereCondition =
+            filters.length > 0 ? and(...filters) : undefined
+
+          // Fetch time entries with user and project info
+          const timeEntriesWithUsers = await db
+            .select({
+              id: timeEntries.id,
+              date: timeEntries.date,
+              durationSeconds: timeEntries.durationSeconds,
+              ratePerHour: timeEntries.ratePerHour,
+              userId: timeEntries.userId,
+              userName: users.email,
+              projectId: timeEntries.projectId,
+              projectName: projects.name,
+            })
+            .from(timeEntries)
+            .innerJoin(users, eq(timeEntries.userId, users.id))
+            .innerJoin(projects, eq(timeEntries.projectId, projects.id))
+            .$dynamic()
+            .where(whereCondition)
+            .orderBy(asc(timeEntries.date))
+
+          // Fetch budget injections for all projects
+          const budgetInjections =
+            await db.query.projectBudgetInjections.findMany({
+              columns: {
+                projectId: true,
+                budget: true,
+              },
+            })
+
+          // Create a map of project budgets
+          const projectBudgets = new Map<string, Decimal>()
+          for (const injection of budgetInjections) {
+            const currentBudget =
+              projectBudgets.get(injection.projectId) || new Decimal(0)
+            projectBudgets.set(
+              injection.projectId,
+              currentBudget.add(new Decimal(injection.budget))
+            )
+          }
+
+          // Helper function to get week number
+          const getWeekNumber = (dateString: string): number => {
+            const date = new Date(dateString)
+            const dayOfMonth = date.getDate()
+            if (dayOfMonth <= 7) return 1
+            if (dayOfMonth <= 14) return 2
+            if (dayOfMonth <= 21) return 3
+            if (dayOfMonth <= 28) return 4
+            return 5
+          }
+
+          // Process data into the required format - group by project, then by user
+          const projectMap = new Map<string, ProjectData>()
+
+          for (const entry of timeEntriesWithUsers) {
+            const cost = new Decimal(entry.ratePerHour)
+              .mul(entry.durationSeconds)
+              .div(3600)
+            const hours = new Decimal(entry.durationSeconds).div(3600)
+            const weekNumber = getWeekNumber(entry.date)
+
+            // Group by project first
+            if (!projectMap.has(entry.projectName)) {
+              const projectBudget =
+                projectBudgets.get(entry.projectId) || new Decimal(0)
+              projectMap.set(entry.projectName, {
+                projectName: entry.projectName,
+                projectId: entry.projectId,
+                users: new Map<string, ProjectUserRecord>(),
+                totalHours: 0,
+                totalCost: 0,
+                revenue: projectBudget.toNumber(),
+              })
+            }
+
+            const project = projectMap.get(entry.projectName)!
+            project.totalHours += hours.toNumber()
+            project.totalCost += cost.toNumber()
+
+            // Group users within each project
+            if (!project.users.has(entry.userName)) {
+              project.users.set(entry.userName, {
+                team: entry.userName,
+                project: entry.projectName,
+                week1: 0,
+                week2: 0,
+                week3: 0,
+                week4: 0,
+                week5: 0,
+                totalHours: 0,
+                decimalHours: 0,
+                cost: 0,
+              })
+            }
+
+            const userRecord = project.users.get(entry.userName)!
+            userRecord.totalHours += hours.toNumber()
+            userRecord.decimalHours += hours.toNumber()
+            userRecord.cost += cost.toNumber()
+            userRecord[`week${weekNumber}` as keyof Pick<ProjectUserRecord, 'week1' | 'week2' | 'week3' | 'week4' | 'week5'>] += hours.toNumber()
+          }
+
+          // Convert projects to array format with formatted user records and per-project financials
+          const projectData = Array.from(projectMap.values()).map(
+            (project: ProjectData) => {
+              const userRecords = Array.from(project.users.values()).map(
+                (userRecord: ProjectUserRecord) => ({
+                  ...userRecord,
+                  week1:
+                    userRecord.week1 > 0
+                      ? `${Math.floor(userRecord.week1)}h ${Math.round(
+                          (userRecord.week1 % 1) * 60
+                        )}m`
+                      : "-",
+                  week2:
+                    userRecord.week2 > 0
+                      ? `${Math.floor(userRecord.week2)}h ${Math.round(
+                          (userRecord.week2 % 1) * 60
+                        )}m`
+                      : "-",
+                  week3:
+                    userRecord.week3 > 0
+                      ? `${Math.floor(userRecord.week3)}h ${Math.round(
+                          (userRecord.week3 % 1) * 60
+                        )}m`
+                      : "-",
+                  week4:
+                    userRecord.week4 > 0
+                      ? `${Math.floor(userRecord.week4)}h ${Math.round(
+                          (userRecord.week4 % 1) * 60
+                        )}m`
+                      : "-",
+                  week5:
+                    userRecord.week5 > 0
+                      ? `${Math.floor(userRecord.week5)}h ${Math.round(
+                          (userRecord.week5 % 1) * 60
+                        )}m`
+                      : "-",
+                  totalHours: `${Math.floor(
+                    userRecord.totalHours
+                  )}h ${Math.round((userRecord.totalHours % 1) * 60)}m`,
+                  decimalHours: userRecord.decimalHours.toFixed(2),
+                  cost: userRecord.cost.toFixed(2),
+                })
+              )
+
+              // Calculate per-project financial metrics
+              const revenue = project.revenue
+              const cost = project.totalCost
+              const profit = revenue - cost
+              const usedPercentage =
+                revenue > 0 ? Math.round((cost / revenue) * 100) : 0
+              const marginsPercentage =
+                revenue > 0 ? Math.round((profit / revenue) * 100) : 0
+
+              return {
+                projectName: project.projectName,
+                projectId: project.projectId,
+                users: userRecords,
+                totalHours: `${Math.floor(project.totalHours)}h ${Math.round(
+                  (project.totalHours % 1) * 60
+                )}m`,
+                totalCost: project.totalCost.toFixed(2),
+                revenue: revenue.toFixed(2),
+                profit: profit.toFixed(2),
+                usedPercentage: `${usedPercentage}%`,
+                marginsPercentage: `${marginsPercentage}%`,
+              }
+            }
+          )
+
+          return {
+            projects: projectData,
+            summary: {
+              revenue: "0.00",
+              profit: "0.00",
+              usedPercentage: "0%",
+              marginsPercentage: "0%",
+            },
+          }
+        },
+        {
+          query: t.Object({
+            startDate: t.Optional(t.String()),
+            endDate: t.Optional(t.String()),
+            projectId: t.Optional(UUID),
+          }),
+          detail: {
+            summary: "Get general financial overview (Admin)",
+            tags: ["Admin", "Financials"],
+          },
+        }
+      )
       // GET Project Financial Overview
       .get(
         "/:projectId",
@@ -167,12 +429,15 @@ export const adminFinancials = baseApp("adminFinancials").group(
                 updatedInjection[0]?.budget ?? "0"
               ).toNumber(),
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
             // Handle potential database errors or not found errors
-            if (e.status === 404) throw e
+            if (e && typeof e === "object" && "status" in e && e.status === 404)
+              throw e
+            const errorMessage =
+              e instanceof Error ? e.message : "Unknown error occurred"
             return status(
               500,
-              `Failed to update budget injection: ${e.message}`
+              `Failed to update budget injection: ${errorMessage}`
             )
           }
         },
@@ -211,11 +476,14 @@ export const adminFinancials = baseApp("adminFinancials").group(
               success: true,
               deletedId: deletedInjection[0]?.id,
             }
-          } catch (e: any) {
-            if (e.status === 404) throw e
+          } catch (e: unknown) {
+            if (e && typeof e === "object" && "status" in e && e.status === 404)
+              throw e
+            const errorMessage =
+              e instanceof Error ? e.message : "Unknown error occurred"
             return status(
               500,
-              `Failed to delete budget injection: ${e.message}`
+              `Failed to delete budget injection: ${errorMessage}`
             )
           }
         },
@@ -279,10 +547,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
               ...newInjection[0],
               budget: new Decimal(newInjection[0]?.budget ?? "0").toNumber(),
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
+            const errorMessage =
+              e instanceof Error ? e.message : "Unknown error occurred"
             return status(
               500,
-              `Failed to create budget injection: ${e.message}`
+              `Failed to create budget injection: ${errorMessage}`
             )
           }
         },
@@ -427,7 +697,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }
 
           // 5. Process and group data
-          const departmentMap = new Map()
+          const departmentMap = new Map<string, MonthlyBreakdownDepartment>()
           let totalSpend = 0
 
           for (const entry of timeEntriesWithUsers) {
@@ -447,11 +717,11 @@ export const adminFinancials = baseApp("adminFinancials").group(
                 color: entry.departmentColor,
                 totalHours: 0,
                 totalSpend: 0,
-                users: new Map(),
+                users: new Map<string, MonthlyBreakdownUser>(),
               })
             }
 
-            const department = departmentMap.get(entry.departmentId)
+            const department = departmentMap.get(entry.departmentId)!
 
             // Initialize user if not exists
             if (!department.users.has(entry.userId)) {
@@ -466,7 +736,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
               })
             }
 
-            const user = department.users.get(entry.userId)
+            const user = department.users.get(entry.userId)!
 
             // Update user totals
             user.totalHours += hours.toNumber()
@@ -489,12 +759,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
           }
 
           // 6. Convert maps to arrays and calculate percentages
-          const departments = Array.from(departmentMap.values()).map(
-            (dept) => ({
-              ...dept,
-              users: Array.from(dept.users.values()),
-            })
-          )
+          const departments = Array.from(
+            departmentMap.values()
+          ).map((dept) => ({
+            ...dept,
+            users: Array.from(dept.users.values()),
+          }))
 
           const leftover = retainerFee - totalSpend
           const usedPercentage =

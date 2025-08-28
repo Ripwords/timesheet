@@ -56,6 +56,11 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
           to: "/admin/projects",
         },
         {
+          label: "Financials",
+          icon: "i-lucide-dollar-sign",
+          to: "/admin/financials",
+        },
+        {
           label: "Settings",
           icon: "i-lucide-settings",
           to: "/admin/settings",
@@ -68,11 +73,7 @@ const navItems = computed<NavigationMenuItem[][]>(() => {
   // No need to check role === 'user' again if not admin, assuming only two roles
   // or adjust logic if more roles exist
   return [
-    [
-      { label: "Time Entries", icon: "i-lucide-clock", to: "/time-entries" },
-      // { label: "Projects", icon: "i-lucide-folder-kanban", to: "/projects" },
-      // { label: "Profile", icon: "i-lucide-user-cog", to: "/profile" },
-    ],
+    [{ label: "Time Entries", icon: "i-lucide-clock", to: "/time-entries" }],
     defaultItems,
   ]
 })

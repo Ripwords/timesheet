@@ -36,7 +36,11 @@ export const baseApp = (name: string) =>
   })
     .use(logixlysia())
     .use(serverTiming())
-    .decorate("db", db)
+    .derive(() => {
+      return {
+        db,
+      }
+    })
     .use(
       cors({
         origin: [
@@ -75,6 +79,10 @@ export const baseApp = (name: string) =>
           const profile = await jwt.verify(cookie.auth.value)
           if (!profile) {
             return error(401, "Unauthorized")
+          }
+
+          if (!db) {
+            return error(500, "Database not initialized")
           }
 
           const user = await db.query.users.findFirst({
