@@ -26,6 +26,8 @@ const { data: projectsResponse } = await useLazyAsyncData(
     const { data } = await $eden.api.projects.get({
       query: {
         isActive: true,
+        page: 1,
+        limit: 0,
       },
     })
     return data
