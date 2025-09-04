@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-import { UButton } from "#components"
+import { UButton, ULink } from "#components"
 
 definePageMeta({
   middleware: "admin",
@@ -101,20 +101,27 @@ const columns: ColumnDef<Project, unknown>[] = [
     cell: (context: CellContext<Project, unknown>) => {
       const project = context.row.original as Project
       return h("div", { class: "space-x-2" }, [
-        h(UButton, {
-          icon: "i-heroicons-eye",
-          size: "xl",
-          variant: "outline",
-          color: "primary",
-          ariaLabel: "View Details",
-          onClick: () => viewProjectDetails(project.id),
-        }),
+        h(
+          ULink,
+          {
+            to: `/admin/projects/${project.id}`,
+          },
+          h(UButton, {
+            icon: "i-heroicons-eye",
+            size: "xl",
+            variant: "outline",
+            color: "primary",
+            ariaLabel: "View Details",
+            class: "cursor-pointer",
+          })
+        ),
         h(UButton, {
           icon: "i-heroicons-pencil-square",
           size: "xl",
           variant: "outline",
           color: "warning",
           ariaLabel: "Edit",
+          class: "cursor-pointer",
           onClick: () => editProject(project),
         }),
         h(UButton, {
@@ -125,6 +132,7 @@ const columns: ColumnDef<Project, unknown>[] = [
           ariaLabel: projectStatus.value ? "Deactivate" : "Activate",
           loading:
             isDeletingProject.value && projectToDelete.value?.id === project.id,
+          class: "cursor-pointer",
           onClick: () =>
             projectStatus.value
               ? deleteProject(project)
@@ -134,10 +142,6 @@ const columns: ColumnDef<Project, unknown>[] = [
     },
   },
 ]
-
-function viewProjectDetails(projectId: string) {
-  useRouter().push(`/admin/projects/${projectId}`)
-}
 
 function editProject(project: Project) {
   projectToEdit.value = project

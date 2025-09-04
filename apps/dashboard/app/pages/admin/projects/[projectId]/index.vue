@@ -554,6 +554,7 @@ const budgetColumns: ColumnDef<BudgetInjection, unknown>[] = [
           color: "warning",
           variant: "outline",
           ariaLabel: "Edit",
+          class: "cursor-pointer",
           onClick: () => openEditInjectionModal(injection),
         }),
         h(UButton, {
@@ -562,6 +563,7 @@ const budgetColumns: ColumnDef<BudgetInjection, unknown>[] = [
           color: "error",
           variant: "outline",
           ariaLabel: "Delete",
+          class: "cursor-pointer",
           onClick: () => openDeleteConfirmationModal(injection),
         }),
       ])

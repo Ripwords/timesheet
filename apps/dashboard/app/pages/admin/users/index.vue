@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ColumnDef, CellContext } from "@tanstack/vue-table"
-import { UButton, UBadge } from "#components"
+import { UButton, UBadge, ULink } from "#components"
 
 definePageMeta({
   middleware: "admin",
@@ -168,20 +168,27 @@ const columns: ColumnDef<User, unknown>[] = [
     cell: (context: CellContext<User, unknown>) => {
       const user = context.row.original
       return h("div", { class: "space-x-2" }, [
-        h(UButton, {
-          icon: "i-heroicons-eye",
-          size: "xl",
-          variant: "outline",
-          color: "primary",
-          ariaLabel: "View Details",
-          onClick: () => viewUserDetails(String(user.id)),
-        }),
+        h(
+          ULink,
+          {
+            to: `/admin/users/${user.id}`,
+          },
+          h(UButton, {
+            icon: "i-heroicons-eye",
+            size: "xl",
+            variant: "outline",
+            color: "primary",
+            ariaLabel: "View Details",
+            class: "cursor-pointer",
+          })
+        ),
         h(UButton, {
           icon: "i-heroicons-pencil-square",
           size: "xl",
           variant: "outline",
           color: "warning",
           ariaLabel: "Edit",
+          class: "cursor-pointer",
           onClick: () => editUser(user),
         }),
         h(UButton, {
@@ -198,10 +205,6 @@ const columns: ColumnDef<User, unknown>[] = [
     },
   },
 ]
-
-function viewUserDetails(userId: string) {
-  useRouter().push(`/admin/users/${userId}`)
-}
 
 function editUser(user: User) {
   editingUser.value = JSON.parse(JSON.stringify(user))
