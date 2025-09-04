@@ -9,6 +9,7 @@ import {
   uuid,
   type AnyPgColumn,
   date,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"])
@@ -146,6 +147,34 @@ export const projectRecurringBudgetInjections = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
   }
+)
+
+export const projectDepartmentBudgetSplits = pgTable(
+  "project_department_budget_splits",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    departmentId: uuid("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "restrict" }),
+    budgetAmount: numeric("budget_amount", {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    uniqueProjectDepartment: uniqueIndex("unique_project_department_budget").on(
+      table.projectId,
+      table.departmentId
+    ),
+  })
 )
 
 export const timerStatusEnum = pgEnum("timer_status", ["running", "paused"])

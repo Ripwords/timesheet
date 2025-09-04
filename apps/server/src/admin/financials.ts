@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js" // For precise calculations with numeric types
 import { asc, eq, and, gte, lt, lte } from "drizzle-orm"
-import { t } from "elysia"
+import { t, status } from "elysia"
 import { baseApp } from "../../utils/baseApp"
 import {
   projectBudgetInjections,
@@ -9,6 +9,7 @@ import {
   users,
   departments as departmentsTable,
   projectRecurringBudgetInjections,
+  projectDepartmentBudgetSplits,
 } from "../db/schema"
 import { authGuard } from "../middleware/authGuard"
 import { UUID } from "../../utils/validators"
@@ -628,7 +629,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
               },
             })
 
-          let retainerFee = 0
+          let totalRetainerFee = 0
           if (recurringBudgetInjection) {
             const { amount, frequency, startDate, endDate } =
               recurringBudgetInjection
@@ -646,13 +647,30 @@ export const adminFinancials = baseApp("adminFinancials").group(
               const monthlyAmount = new Decimal(amount)
 
               if (frequency === "monthly") {
-                retainerFee = monthlyAmount.toNumber()
+                totalRetainerFee = monthlyAmount.toNumber()
               } else if (frequency === "quarterly") {
-                retainerFee = monthlyAmount.div(3).toNumber()
+                totalRetainerFee = monthlyAmount.div(3).toNumber()
               } else if (frequency === "yearly") {
-                retainerFee = monthlyAmount.div(12).toNumber()
+                totalRetainerFee = monthlyAmount.div(12).toNumber()
               }
             }
+          }
+
+          // 2.5. Get Department Budget Splits
+          const departmentSplits = await db
+            .select({
+              departmentId: projectDepartmentBudgetSplits.departmentId,
+              budgetAmount: projectDepartmentBudgetSplits.budgetAmount,
+            })
+            .from(projectDepartmentBudgetSplits)
+            .where(eq(projectDepartmentBudgetSplits.projectId, projectId))
+
+          // Calculate department-specific retainer fees
+          const departmentRetainerFees = new Map<string, number>()
+
+          for (const split of departmentSplits) {
+            const amount = new Decimal(split.budgetAmount).toNumber()
+            departmentRetainerFees.set(split.departmentId, amount)
           }
 
           // 3. Fetch Time Entries for the Month with User and Department Info
@@ -763,36 +781,77 @@ export const adminFinancials = baseApp("adminFinancials").group(
             department.totalSpend += cost.toNumber()
           }
 
-          // 6. Convert maps to arrays and calculate percentages
-          const departments = Array.from(departmentMap.values()).map(
-            (dept) => ({
+          // 6. Convert maps to arrays and calculate department-specific percentages
+          const departments = Array.from(departmentMap.values()).map((dept) => {
+            // Get department-specific retainer fee - only if they have a defined split
+            const deptRetainerFee = departmentRetainerFees.get(dept.id) || 0
+
+            const deptLeftover = deptRetainerFee - dept.totalSpend
+            const deptUsedPercentage =
+              deptRetainerFee > 0
+                ? Math.round((dept.totalSpend / deptRetainerFee) * 100)
+                : 0
+            const deptRemainingPercentage =
+              deptRetainerFee > 0
+                ? Math.round((deptLeftover / deptRetainerFee) * 100)
+                : 0
+
+            return {
               ...dept,
               users: Array.from(dept.users.values()),
-            })
-          )
+              retainerFee: deptRetainerFee,
+              leftover: deptLeftover,
+              usedPercentage: deptUsedPercentage,
+              remainingPercentage: deptRemainingPercentage,
+            }
+          })
 
-          const leftover = retainerFee - totalSpend
+          // Overall project calculations (unchanged for backward compatibility)
+          const leftover = totalRetainerFee - totalSpend
           const usedPercentage =
-            retainerFee > 0 ? Math.round((totalSpend / retainerFee) * 100) : 0
+            totalRetainerFee > 0
+              ? Math.round((totalSpend / totalRetainerFee) * 100)
+              : 0
           const remainingPercentage =
-            retainerFee > 0 ? Math.round((leftover / retainerFee) * 100) : 0
+            totalRetainerFee > 0
+              ? Math.round((leftover / totalRetainerFee) * 100)
+              : 0
 
-          // 7. Structure Response
+          // 7. Structure Response - Create separate breakdowns for each department
+          const departmentBreakdowns = departments.map((dept) => ({
+            department: {
+              id: dept.id,
+              name: dept.name,
+              color: dept.color,
+            },
+            monthData: {
+              year: yearNum,
+              month: monthNum,
+              retainerFee: dept.retainerFee,
+              totalSpend: dept.totalSpend,
+              leftover: dept.leftover,
+              usedPercentage: dept.usedPercentage,
+              remainingPercentage: dept.remainingPercentage,
+            },
+            users: dept.users,
+          }))
+
+          // Also include overall project data for reference
           return {
             project: {
               id: projectDetails.id,
               name: projectDetails.name,
             },
-            monthData: {
+            overallMonthData: {
               year: yearNum,
               month: monthNum,
-              retainerFee,
+              retainerFee: totalRetainerFee,
               totalSpend,
               leftover,
               usedPercentage,
               remainingPercentage,
             },
-            departments,
+            departmentBreakdowns,
           }
         },
         {
@@ -806,6 +865,220 @@ export const adminFinancials = baseApp("adminFinancials").group(
           detail: {
             summary: "Get monthly breakdown for a project (Admin)",
             tags: ["Admin", "Financials", "Monthly Breakdown"],
+          },
+        }
+      )
+      // Department Budget Splits endpoints
+      .get(
+        "/:projectId/department-splits",
+        async ({ params, db }) => {
+          const { projectId } = params
+
+          try {
+            const splits = await db
+              .select({
+                id: projectDepartmentBudgetSplits.id,
+                departmentId: projectDepartmentBudgetSplits.departmentId,
+                budgetAmount: projectDepartmentBudgetSplits.budgetAmount,
+                createdAt: projectDepartmentBudgetSplits.createdAt,
+                updatedAt: projectDepartmentBudgetSplits.updatedAt,
+                departmentName: departmentsTable.name,
+                departmentColor: departmentsTable.color,
+              })
+              .from(projectDepartmentBudgetSplits)
+              .innerJoin(
+                departmentsTable,
+                eq(
+                  projectDepartmentBudgetSplits.departmentId,
+                  departmentsTable.id
+                )
+              )
+              .where(eq(projectDepartmentBudgetSplits.projectId, projectId))
+
+            return splits
+          } catch (error) {
+            console.error("Error fetching department splits:", error)
+            throw new Error("Failed to fetch department budget splits")
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+          }),
+          detail: {
+            summary: "Get department budget splits for a project (Admin)",
+            tags: ["Admin", "Financials", "Department Splits"],
+          },
+        }
+      )
+      .post(
+        "/:projectId/department-splits",
+        async ({ params, body, db }) => {
+          const { projectId } = params
+          const { departmentId, budgetAmount } = body
+
+          try {
+            // 1. Check if there's a recurring budget for this project
+            const recurringBudget =
+              await db.query.projectRecurringBudgetInjections.findFirst({
+                where: and(
+                  eq(projectRecurringBudgetInjections.projectId, projectId),
+                  eq(projectRecurringBudgetInjections.isActive, true)
+                ),
+                columns: {
+                  amount: true,
+                  frequency: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              })
+
+            if (!recurringBudget) {
+              return status(
+                400,
+                "No active recurring budget found for this project. Please set up a recurring budget before creating department splits."
+              )
+            }
+
+            // 2. Calculate monthly budget amount
+            const { amount, frequency, startDate, endDate } = recurringBudget
+            const currentDate = new Date()
+            const startDateObj = new Date(startDate)
+            const endDateObj = endDate ? new Date(endDate) : null
+
+            // Check if the recurring budget is currently active
+            if (
+              startDateObj > currentDate ||
+              (endDateObj && endDateObj < currentDate)
+            ) {
+              return status(
+                400,
+                "The recurring budget is not currently active for this project."
+              )
+            }
+
+            // Calculate monthly amount based on frequency
+            const monthlyAmount = new Decimal(amount)
+            let monthlyBudget = 0
+
+            if (frequency === "monthly") {
+              monthlyBudget = monthlyAmount.toNumber()
+            } else if (frequency === "quarterly") {
+              monthlyBudget = monthlyAmount.div(3).toNumber()
+            } else if (frequency === "yearly") {
+              monthlyBudget = monthlyAmount.div(12).toNumber()
+            }
+
+            // 3. Get existing splits for this project
+            const existingSplits = await db
+              .select({
+                departmentId: projectDepartmentBudgetSplits.departmentId,
+                budgetAmount: projectDepartmentBudgetSplits.budgetAmount,
+              })
+              .from(projectDepartmentBudgetSplits)
+              .where(eq(projectDepartmentBudgetSplits.projectId, projectId))
+
+            // 4. Calculate total allocated budget
+            let totalAllocated = 0
+            let isUpdate = false
+
+            for (const split of existingSplits) {
+              if (split.departmentId === departmentId) {
+                isUpdate = true
+                // Skip the current split being updated - we'll add the new amount
+                continue
+              }
+              totalAllocated += new Decimal(split.budgetAmount).toNumber()
+            }
+
+            // Add the new/updated amount
+            totalAllocated += budgetAmount
+
+            // 5. Check if total exceeds monthly budget
+            if (totalAllocated > monthlyBudget) {
+              return status(
+                400,
+                `Total department budget splits ($${totalAllocated.toFixed(
+                  2
+                )}) cannot exceed the monthly recurring budget ($${monthlyBudget.toFixed(
+                  2
+                )}). Please reduce the budget amount or remove other department splits.`
+              )
+            }
+
+            // 6. Proceed with create/update
+            if (isUpdate) {
+              // Update existing split
+              await db
+                .update(projectDepartmentBudgetSplits)
+                .set({
+                  budgetAmount: budgetAmount.toString(),
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(projectDepartmentBudgetSplits.projectId, projectId),
+                    eq(projectDepartmentBudgetSplits.departmentId, departmentId)
+                  )
+                )
+            } else {
+              // Create new split
+              await db.insert(projectDepartmentBudgetSplits).values({
+                projectId,
+                departmentId,
+                budgetAmount: budgetAmount.toString(),
+              })
+            }
+
+            return { success: true }
+          } catch (error) {
+            console.error("Error managing department split:", error)
+            throw new Error("Failed to manage department budget split")
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+          }),
+          body: t.Object({
+            departmentId: UUID,
+            budgetAmount: t.Number({ min: 0.01 }),
+          }),
+          detail: {
+            summary: "Create or update department budget split (Admin)",
+            tags: ["Admin", "Financials", "Department Splits"],
+          },
+        }
+      )
+      .delete(
+        "/:projectId/department-splits/:departmentId",
+        async ({ params, db }) => {
+          const { projectId, departmentId } = params
+
+          try {
+            await db
+              .delete(projectDepartmentBudgetSplits)
+              .where(
+                and(
+                  eq(projectDepartmentBudgetSplits.projectId, projectId),
+                  eq(projectDepartmentBudgetSplits.departmentId, departmentId)
+                )
+              )
+
+            return { success: true }
+          } catch (error) {
+            console.error("Error deleting department split:", error)
+            throw new Error("Failed to delete department budget split")
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+            departmentId: UUID,
+          }),
+          detail: {
+            summary: "Delete department budget split (Admin)",
+            tags: ["Admin", "Financials", "Department Splits"],
           },
         }
       )
