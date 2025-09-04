@@ -518,19 +518,19 @@ function exportToCSV() {
             user.name,
             ratePerDay.toFixed(2),
             ratePerHour.toFixed(2),
-            user.weeklyHours[0] ?? 0 > 0
+            (user.weeklyHours[0] ?? 0) > 0
               ? formatHours(user.weeklyHours[0] ?? 0)
               : "-",
-            user.weeklyHours[1] ?? 0 > 0
+            (user.weeklyHours[1] ?? 0) > 0
               ? formatHours(user.weeklyHours[1] ?? 0)
               : "-",
-            user.weeklyHours[2] ?? 0 > 0
+            (user.weeklyHours[2] ?? 0) > 0
               ? formatHours(user.weeklyHours[2] ?? 0)
               : "-",
-            user.weeklyHours[3] ?? 0 > 0
+            (user.weeklyHours[3] ?? 0) > 0
               ? formatHours(user.weeklyHours[3] ?? 0)
               : "-",
-            user.weeklyHours[4] ?? 0 > 0
+            (user.weeklyHours[4] ?? 0) > 0
               ? formatHours(user.weeklyHours[4] ?? 0)
               : "-",
             formatHours(user.totalHours),
