@@ -708,6 +708,55 @@ export const adminFinancials = baseApp("adminFinancials").group(
               )
             )
 
+          // Compute next month start for to-date aggregations
+          const nextMonthStartIso = `${yearNum}-${(monthNum + 1)
+            .toString()
+            .padStart(2, "0")}-01`
+
+          // 3.5. Compute Overall Project metrics up to the selected month
+          // Sum all budget injections for the project with date before the next month start
+          const allBudgetInjectionsForProject = await db
+            .select({
+              budget: projectBudgetInjections.budget,
+              date: projectBudgetInjections.date,
+            })
+            .from(projectBudgetInjections)
+            .where(
+              and(
+                eq(projectBudgetInjections.projectId, projectId),
+                lt(projectBudgetInjections.date, new Date(nextMonthStartIso))
+              )
+            )
+
+          const totalBudgetToDateDecimal = allBudgetInjectionsForProject.reduce(
+            (sum, b) => sum.add(new Decimal(b.budget)),
+            new Decimal(0)
+          )
+
+          // Sum all time entry costs for this project up to and including the selected month
+          const entriesUpToSelectedMonth = await db
+            .select({
+              durationSeconds: timeEntries.durationSeconds,
+              ratePerHour: timeEntries.ratePerHour,
+              date: timeEntries.date,
+            })
+            .from(timeEntries)
+            .where(
+              and(
+                eq(timeEntries.projectId, projectId),
+                lt(timeEntries.date, nextMonthStartIso)
+              )
+            )
+
+          let totalSpendToDateDecimal = new Decimal(0)
+          for (const entry of entriesUpToSelectedMonth) {
+            const rate = new Decimal(entry.ratePerHour)
+            const hours = new Decimal(entry.durationSeconds).div(3600)
+            totalSpendToDateDecimal = totalSpendToDateDecimal.add(
+              rate.mul(hours)
+            )
+          }
+
           // 4. Helper function to get week number
           const getWeekNumber = (dateString: string): number => {
             const date = new Date(dateString)
@@ -850,6 +899,31 @@ export const adminFinancials = baseApp("adminFinancials").group(
               leftover,
               usedPercentage,
               remainingPercentage,
+            },
+            overallProjectData: {
+              // Lifetime project budget and usage up to the selected month
+              totalBudget: totalBudgetToDateDecimal
+                .toDecimalPlaces(2)
+                .toNumber(),
+              totalSpendToDate: totalSpendToDateDecimal
+                .toDecimalPlaces(2)
+                .toNumber(),
+              leftoverToDate: totalBudgetToDateDecimal
+                .minus(totalSpendToDateDecimal)
+                .toDecimalPlaces(2)
+                .toNumber(),
+              usedPercentageToDate: totalBudgetToDateDecimal.gt(0)
+                ? Math.round(
+                    totalSpendToDateDecimal
+                      .div(totalBudgetToDateDecimal)
+                      .mul(100)
+                      .toNumber()
+                  )
+                : 0,
+              // Also surface this month's spend for convenience
+              totalSpendThisMonth: new Decimal(totalSpend)
+                .toDecimalPlaces(2)
+                .toNumber(),
             },
             departmentBreakdowns,
           }

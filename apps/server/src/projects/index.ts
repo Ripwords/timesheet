@@ -1,7 +1,8 @@
 import { baseApp } from "../../utils/baseApp"
 import * as schema from "../db/schema"
 import { t } from "elysia"
-import { and, count, eq, ilike } from "drizzle-orm"
+import { and, count, eq, ilike, gte, lte } from "drizzle-orm"
+import dayjs from "dayjs"
 import { authGuard } from "../middleware/authGuard"
 const querySchema = t.Object({
   page: t.Optional(t.Number({ default: 1 })),
@@ -412,6 +413,79 @@ export const projects = baseApp("projects").group("/projects", (app) =>
 
           if (!newRecurringBudget || newRecurringBudget.length === 0) {
             return status(500, "Failed to create recurring budget injection")
+          }
+
+          // Backfill missing injections from startDate up to today (respecting endDate)
+          try {
+            const freq = body.frequency
+            const stepMonths =
+              freq === "monthly" ? 1 : freq === "quarterly" ? 3 : 12
+            let cursor = dayjs(body.startDate).startOf("day")
+            const today = dayjs().startOf("day")
+            let until = today
+            if (body.endDate) {
+              const end = dayjs(body.endDate).endOf("day")
+              until = end.isBefore(today) ? end : today
+            }
+
+            while (cursor.isSame(until) || cursor.isBefore(until)) {
+              // Define a period window for duplicate detection
+              let windowStart: dayjs.Dayjs
+              let windowEnd: dayjs.Dayjs
+              if (freq === "monthly") {
+                windowStart = cursor.startOf("month")
+                windowEnd = cursor.endOf("month")
+              } else if (freq === "quarterly") {
+                const quarterStartMonth = cursor.month() - (cursor.month() % 3)
+                windowStart = cursor.month(quarterStartMonth).startOf("month")
+                windowEnd = windowStart
+                  .add(3, "month")
+                  .subtract(1, "day")
+                  .endOf("day")
+              } else {
+                windowStart = cursor.startOf("year")
+                windowEnd = cursor.endOf("year")
+              }
+
+              const existing = await db.query.projectBudgetInjections.findFirst(
+                {
+                  where: and(
+                    eq(schema.projectBudgetInjections.projectId, projectId),
+                    gte(
+                      schema.projectBudgetInjections.date,
+                      windowStart.toDate()
+                    ),
+                    lte(
+                      schema.projectBudgetInjections.date,
+                      windowEnd.toDate()
+                    ),
+                    // Only consider existing recurring injections as duplicates.
+                    ilike(
+                      schema.projectBudgetInjections.description,
+                      "%Recurring%injection%"
+                    )
+                  ),
+                }
+              )
+
+              if (!existing) {
+                await db.insert(schema.projectBudgetInjections).values({
+                  projectId,
+                  date: cursor.toDate(),
+                  budget: body.amount.toString(),
+                  description: `Recurring ${freq} injection: ${
+                    body.description || "Auto-generated"
+                  }`,
+                })
+              }
+
+              cursor = cursor.add(stepMonths, "month")
+            }
+          } catch (backfillError) {
+            console.error(
+              "Failed to backfill recurring budget injections:",
+              backfillError
+            )
           }
 
           return newRecurringBudget[0]

@@ -1092,6 +1092,74 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
     </div>
 
     <!-- Summary Cards -->
+    <!-- Overall Project Summary Cards (lifetime, shown always) -->
+    <div
+      v-if="monthlyData && monthlyData.overallProjectData"
+      class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8"
+    >
+      <UCard
+        class="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border-blue-500/20"
+      >
+        <template #header>
+          <div class="text-sm font-medium text-blue-300">Total Budget</div>
+        </template>
+        <div class="text-3xl font-bold text-blue-400">
+          ${{ monthlyData.overallProjectData.totalBudget.toFixed(2) }}
+        </div>
+      </UCard>
+
+      <UCard
+        class="bg-gradient-to-br from-orange-900/20 to-orange-800/10 border-orange-500/20"
+      >
+        <template #header>
+          <div class="text-sm font-medium text-orange-300">Spend To Date</div>
+        </template>
+        <div class="text-3xl font-bold text-orange-400">
+          ${{ monthlyData.overallProjectData.totalSpendToDate.toFixed(2) }}
+        </div>
+      </UCard>
+
+      <UCard
+        class="bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-500/20"
+      >
+        <template #header>
+          <div class="text-sm font-medium text-green-300">Leftover To Date</div>
+        </template>
+        <div
+          class="text-3xl font-bold"
+          :class="
+            monthlyData.overallProjectData.leftoverToDate >= 0
+              ? 'text-green-400'
+              : 'text-red-400'
+          "
+        >
+          ${{ monthlyData.overallProjectData.leftoverToDate.toFixed(2) }}
+        </div>
+      </UCard>
+
+      <UCard
+        class="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20"
+      >
+        <template #header>
+          <div class="text-sm font-medium text-purple-300">Used To Date</div>
+        </template>
+        <div class="text-3xl font-bold text-purple-400">
+          {{ monthlyData.overallProjectData.usedPercentageToDate }}%
+        </div>
+      </UCard>
+
+      <UCard
+        class="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border-cyan-500/20"
+      >
+        <template #header>
+          <div class="text-sm font-medium text-cyan-300">This Month Spend</div>
+        </template>
+        <div class="text-3xl font-bold text-cyan-400">
+          ${{ monthlyData.overallProjectData.totalSpendThisMonth.toFixed(2) }}
+        </div>
+      </UCard>
+    </div>
+
     <div
       v-if="monthlyData"
       class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"

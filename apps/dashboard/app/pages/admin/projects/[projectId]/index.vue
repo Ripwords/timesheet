@@ -22,7 +22,7 @@ const { $eden, $dayjs } = useNuxtApp()
 const {
   data: projectDetails,
   status,
-  refresh,
+  refresh: refreshProjectDetails,
 } = await useLazyAsyncData(
   projectId ? `project-financials-${projectId}` : "project-financials-invalid",
   async () => {
@@ -239,7 +239,7 @@ async function handleAddInjection(event: FormSubmitEvent<InjectionSchema>) {
         color: "success",
       })
       isAddInjectionModalOpen.value = false
-      await refresh() // Refresh project details
+      await refreshProjectDetails() // Refresh project details
     }
   } catch (error) {
     console.error("Failed to add injection:", error)
@@ -281,7 +281,7 @@ async function handleUpdateInjection(event: FormSubmitEvent<InjectionSchema>) {
       isEditInjectionModalOpen.value = false
       selectedInjection.value = null
     }
-    await refresh()
+    await refreshProjectDetails()
   } catch (error) {
     console.error("Failed to update injection:", error)
     toast.add({
@@ -316,7 +316,7 @@ async function handleDeleteInjection() {
       })
       isDeleteConfirmationModalOpen.value = false
       selectedInjection.value = null
-      await refresh()
+      await refreshProjectDetails()
     }
   } catch (error) {
     console.error("Failed to delete injection:", error)
@@ -426,6 +426,8 @@ async function handleAddRecurringBudget(
       })
       isAddRecurringBudgetModalOpen.value = false
       await refreshRecurringBudget()
+      // Ensure the budget injection table reflects backfilled injections immediately
+      await refreshProjectDetails()
     }
   } catch (error) {
     console.error("Failed to add recurring budget:", error)
@@ -481,6 +483,7 @@ async function handleUpdateRecurringBudget(
     })
   } finally {
     isSaving.value = false
+    await refreshProjectDetails()
   }
 }
 
@@ -571,9 +574,15 @@ const budgetColumns: ColumnDef<BudgetInjection, unknown>[] = [
   },
 ]
 
-const budgetInjections = computed<BudgetInjection[]>(
-  () => projectDetails.value?.budgetInjections ?? []
-)
+const budgetInjections = computed<BudgetInjection[]>(() => {
+  const list = projectDetails.value?.budgetInjections ?? []
+  // Sort by date descending (most recent first)
+  return [...list].sort((a, b) => {
+    const aTs = $dayjs(a.date).valueOf()
+    const bTs = $dayjs(b.date).valueOf()
+    return bTs - aTs
+  })
+})
 const costOverTime = computed(() => projectDetails.value?.costOverTime ?? [])
 
 const totalBudget = computed(() => {
@@ -895,14 +904,6 @@ const frequencyOptions = [
       <div class="mt-8">
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-semibold">Recurring Budget</h3>
-          <UButton
-            v-if="!recurringBudget"
-            icon="i-heroicons-plus-circle"
-            size="sm"
-            variant="solid"
-            label="Add Recurring Budget"
-            @click="openAddRecurringBudgetModal"
-          />
         </div>
 
         <!-- Active Recurring Budget Display -->
@@ -1248,11 +1249,8 @@ const frequencyOptions = [
         </UModal>
       </div>
 
-      <!-- Monthly Breakdown Section -->
-      <div
-        v-if="recurringBudget"
-        class="mt-8"
-      >
+      <!-- Monthly Breakdown Section (always shown) -->
+      <div class="mt-8">
         <AdminMonthlyBreakdownTable :project-id="projectId" />
       </div>
     </UCard>
