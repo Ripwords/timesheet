@@ -115,17 +115,30 @@ export const adminFinancials = baseApp("adminFinancials").group(
             .where(whereCondition)
             .orderBy(asc(timeEntries.date))
 
+          // Fetch target projects (active), optionally filtered by projectId
+          const targetProjects = await db.query.projects.findMany({
+            where: projectId
+              ? and(eq(projects.id, projectId), eq(projects.isActive, true))
+              : eq(projects.isActive, true),
+            columns: { id: true, name: true },
+          })
+
           // Fetch budget injections for all projects
           const budgetInjections =
             await db.query.projectBudgetInjections.findMany({
               columns: {
                 projectId: true,
                 budget: true,
+                date: true,
               },
             })
 
           // Create a map of project budgets
-          const projectBudgets = new Map<string, Decimal>()
+          const projectBudgets = new Map<string, Decimal>() // lifetime budgets (for revenue)
+          const projectBudgetsToDate = new Map<string, Decimal>() // budgets up to endDate (overall budget to date)
+          const cutoffBudgetDate = endDate
+            ? new Date(`${endDate}T23:59:59.999Z`)
+            : null
           for (const injection of budgetInjections) {
             const currentBudget =
               projectBudgets.get(injection.projectId) || new Decimal(0)
@@ -133,6 +146,46 @@ export const adminFinancials = baseApp("adminFinancials").group(
               injection.projectId,
               currentBudget.add(new Decimal(injection.budget))
             )
+            // Also aggregate budgets up to endDate when provided
+            if (!cutoffBudgetDate || injection.date <= cutoffBudgetDate) {
+              const currentToDate =
+                projectBudgetsToDate.get(injection.projectId) || new Decimal(0)
+              projectBudgetsToDate.set(
+                injection.projectId,
+                currentToDate.add(new Decimal(injection.budget))
+              )
+            }
+          }
+
+          // Build spend-to-date map (sum of entry costs up to endDate)
+          const spendToDateFilters = [] as unknown[]
+          if (endDate) {
+            spendToDateFilters.push(lte(timeEntries.date, endDate as string))
+          }
+
+          const entriesUpToCutoff = await db
+            .select({
+              projectId: timeEntries.projectId,
+              date: timeEntries.date,
+              durationSeconds: timeEntries.durationSeconds,
+              ratePerHour: timeEntries.ratePerHour,
+            })
+            .from(timeEntries)
+            .$dynamic()
+            .where(
+              spendToDateFilters.length > 0
+                ? and(...(spendToDateFilters as [any, ...any[]]))
+                : undefined
+            )
+
+          const spendToDateByProjectId = new Map<string, Decimal>()
+          for (const entry of entriesUpToCutoff) {
+            const rate = new Decimal(entry.ratePerHour)
+            const hours = new Decimal(entry.durationSeconds).div(3600)
+            const cost = rate.mul(hours)
+            const current =
+              spendToDateByProjectId.get(entry.projectId) || new Decimal(0)
+            spendToDateByProjectId.set(entry.projectId, current.add(cost))
           }
 
           // Helper function to get week number
@@ -148,6 +201,21 @@ export const adminFinancials = baseApp("adminFinancials").group(
 
           // Process data into the required format - group by project, then by user
           const projectMap = new Map<string, ProjectData>()
+
+          // Seed all target projects so projects without time entries still appear
+          for (const p of targetProjects) {
+            const seededBudget = projectBudgets.get(p.id) || new Decimal(0)
+            if (!projectMap.has(p.name)) {
+              projectMap.set(p.name, {
+                projectName: p.name,
+                projectId: p.id,
+                users: new Map<string, ProjectUserRecord>(),
+                totalHours: 0,
+                totalCost: 0,
+                revenue: seededBudget.toNumber(),
+              })
+            }
+          }
 
           for (const entry of timeEntriesWithUsers) {
             const cost = new Decimal(entry.ratePerHour)
@@ -255,6 +323,17 @@ export const adminFinancials = baseApp("adminFinancials").group(
               const marginsPercentage =
                 revenue > 0 ? Math.round((profit / revenue) * 100) : 0
 
+              const totalBudgetToDate =
+                projectBudgetsToDate.get(project.projectId) || new Decimal(0)
+              const totalSpendToDate =
+                spendToDateByProjectId.get(project.projectId) || new Decimal(0)
+              const leftoverToDate = totalBudgetToDate.sub(totalSpendToDate)
+              const usedToDatePct = totalBudgetToDate.gt(0)
+                ? Math.round(
+                    totalSpendToDate.div(totalBudgetToDate).mul(100).toNumber()
+                  )
+                : 0
+
               return {
                 projectName: project.projectName,
                 projectId: project.projectId,
@@ -267,6 +346,15 @@ export const adminFinancials = baseApp("adminFinancials").group(
                 profit: profit.toFixed(2),
                 usedPercentage: `${usedPercentage}%`,
                 marginsPercentage: `${marginsPercentage}%`,
+                overallProjectData: {
+                  totalBudget: totalBudgetToDate.toDecimalPlaces(2).toNumber(),
+                  totalSpendToDate: totalSpendToDate
+                    .toDecimalPlaces(2)
+                    .toNumber(),
+                  leftoverToDate: leftoverToDate.toDecimalPlaces(2).toNumber(),
+                  usedPercentageToDate: usedToDatePct,
+                  periodSpend: project.totalCost.toFixed(2),
+                },
               }
             }
           )

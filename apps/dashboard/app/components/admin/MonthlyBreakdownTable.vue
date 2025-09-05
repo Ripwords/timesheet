@@ -409,6 +409,34 @@ function exportToCSV() {
     csvRows.push([`Period: ${currentMonthYear.value}`])
     csvRows.push([])
 
+    // Overall Project Summary (lifetime up to selected month)
+    if (monthlyData.value.overallProjectData) {
+      const overall = monthlyData.value.overallProjectData
+      csvRows.push(["OVERALL PROJECT SUMMARY"])
+      csvRows.push([])
+      csvRows.push([
+        "Total Budget To Date",
+        (overall.totalBudget ?? 0).toFixed(2),
+      ])
+      csvRows.push([
+        "Total Spend To Date",
+        (overall.totalSpendToDate ?? 0).toFixed(2),
+      ])
+      csvRows.push([
+        "Leftover To Date",
+        (overall.leftoverToDate ?? 0).toFixed(2),
+      ])
+      csvRows.push([
+        "Used To Date",
+        `${(overall.usedPercentageToDate ?? 0).toFixed(0)}%`,
+      ])
+      csvRows.push([
+        "This Month Spend",
+        (overall.totalSpendThisMonth ?? 0).toFixed(2),
+      ])
+      csvRows.push([])
+    }
+
     // Financial Summary Section
     csvRows.push(["FINANCIAL SUMMARY"])
     csvRows.push([])

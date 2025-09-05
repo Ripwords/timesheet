@@ -103,6 +103,12 @@ const columns: ColumnDef<Record<string, unknown>, unknown>[] = [
 // Computed properties
 const projects = computed(() => financialData.value?.projects ?? [])
 
+// Helper for overall project cards per project
+function formatCurrency(value: number | string | undefined) {
+  const num = typeof value === "number" ? value : parseFloat(value || "0")
+  return `$${num.toFixed(2)}`
+}
+
 // Project options for filter
 const projectOptions = computed(() => {
   if (!projectsResponse.value?.projects) return []
@@ -152,7 +158,40 @@ function exportToCSV() {
     csvRows.push(`"${project.projectName}" Project`)
     csvRows.push("") // Empty row for spacing
 
-    // Add project summary
+    // Add overall project summary (to-date) if available
+    csvRows.push("OVERALL PROJECT SUMMARY")
+    csvRows.push("Metric,Value")
+    if (project.overallProjectData) {
+      csvRows.push(
+        `"Total Budget To Date","$${Number(
+          project.overallProjectData.totalBudget || 0
+        ).toFixed(2)}"`
+      )
+      csvRows.push(
+        `"Total Spend To Date","$${Number(
+          project.overallProjectData.totalSpendToDate || 0
+        ).toFixed(2)}"`
+      )
+      csvRows.push(
+        `"Leftover To Date","$${Number(
+          project.overallProjectData.leftoverToDate || 0
+        ).toFixed(2)}"`
+      )
+      csvRows.push(
+        `"Used To Date","${Number(
+          project.overallProjectData.usedPercentageToDate || 0
+        ).toFixed(0)}%"`
+      )
+      csvRows.push(
+        `"This Period Spend","$${Number(
+          project.overallProjectData.periodSpend || 0
+        ).toFixed(2)}"`
+      )
+    }
+    csvRows.push("") // Empty row for spacing
+
+    // Add filtered period project summary (existing widgets)
+    csvRows.push("PERIOD SUMMARY")
     csvRows.push("Metric,Value")
     csvRows.push(`"Revenue","$${project.revenue}"`)
     csvRows.push(`"Profit","$${project.profit}"`)
@@ -319,6 +358,74 @@ function formatHours(decimalHours: number): string {
                 </div>
               </div>
             </template>
+
+            <!-- Overall Project Cards per project -->
+            <div
+              v-if="project.overallProjectData"
+              class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4"
+            >
+              <UCard>
+                <template #header>
+                  <div class="text-xs font-medium text-blue-700">
+                    Total Budget
+                  </div>
+                </template>
+                <div class="text-xl font-bold">
+                  {{ formatCurrency(project.overallProjectData.totalBudget) }}
+                </div>
+              </UCard>
+              <UCard>
+                <template #header>
+                  <div class="text-xs font-medium text-orange-700">
+                    Spend To Date
+                  </div>
+                </template>
+                <div class="text-xl font-bold">
+                  {{
+                    formatCurrency(project.overallProjectData.totalSpendToDate)
+                  }}
+                </div>
+              </UCard>
+              <UCard>
+                <template #header>
+                  <div class="text-xs font-medium text-green-700">
+                    Leftover To Date
+                  </div>
+                </template>
+                <div
+                  class="text-xl font-bold"
+                  :class="
+                    (project.overallProjectData.leftoverToDate ?? 0) >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  "
+                >
+                  {{
+                    formatCurrency(project.overallProjectData.leftoverToDate)
+                  }}
+                </div>
+              </UCard>
+              <UCard>
+                <template #header>
+                  <div class="text-xs font-medium text-purple-700">
+                    Used To Date
+                  </div>
+                </template>
+                <div class="text-xl font-bold">
+                  {{ project.overallProjectData.usedPercentageToDate }}%
+                </div>
+              </UCard>
+              <UCard>
+                <template #header>
+                  <div class="text-xs font-medium text-cyan-700">
+                    This Period Spend
+                  </div>
+                </template>
+                <div class="text-xl font-bold">
+                  {{ formatCurrency(project.overallProjectData.periodSpend) }}
+                </div>
+              </UCard>
+            </div>
 
             <UTable
               :data="project.users"
