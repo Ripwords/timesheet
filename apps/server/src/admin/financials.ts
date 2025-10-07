@@ -1244,4 +1244,106 @@ export const adminFinancials = baseApp("adminFinancials").group(
           },
         }
       )
+      // GET Lifetime Project Data (not affected by date filters)
+      .get(
+        "/:projectId/lifetime",
+        async ({ params, db, status }) => {
+          const { projectId } = params
+
+          try {
+            // 1. Fetch Project Details
+            const projectDetails = await db.query.projects.findFirst({
+              where: eq(projects.id, projectId),
+              columns: {
+                id: true,
+                name: true,
+              },
+            })
+
+            if (!projectDetails) {
+              return status(404, "Project not found")
+            }
+
+            // 2. Fetch ALL Budget Injections (no date filtering)
+            const allBudgetInjections =
+              await db.query.projectBudgetInjections.findMany({
+                where: eq(projectBudgetInjections.projectId, projectId),
+                columns: {
+                  id: true,
+                  budget: true,
+                  date: true,
+                  description: true,
+                },
+                orderBy: [asc(projectBudgetInjections.date)],
+              })
+
+            // 3. Fetch ALL Time Entries (no date filtering)
+            const allTimeEntries = await db
+              .select({
+                id: timeEntries.id,
+                date: timeEntries.date,
+                durationSeconds: timeEntries.durationSeconds,
+                ratePerHour: timeEntries.ratePerHour,
+                userId: timeEntries.userId,
+                userName: users.email,
+              })
+              .from(timeEntries)
+              .innerJoin(users, eq(timeEntries.userId, users.id))
+              .where(eq(timeEntries.projectId, projectId))
+              .orderBy(asc(timeEntries.date))
+
+            // 4. Calculate lifetime totals
+            const totalBudgetLifetime = allBudgetInjections.reduce(
+              (sum, b) => sum.add(new Decimal(b.budget)),
+              new Decimal(0)
+            )
+
+            let totalSpendLifetime = new Decimal(0)
+            for (const entry of allTimeEntries) {
+              const rate = new Decimal(entry.ratePerHour)
+              const hours = new Decimal(entry.durationSeconds).div(3600)
+              totalSpendLifetime = totalSpendLifetime.add(rate.mul(hours))
+            }
+
+            const leftoverLifetime =
+              totalBudgetLifetime.minus(totalSpendLifetime)
+            const usedPercentageLifetime = totalBudgetLifetime.gt(0)
+              ? Math.round(
+                  totalSpendLifetime
+                    .div(totalBudgetLifetime)
+                    .mul(100)
+                    .toNumber()
+                )
+              : 0
+
+            return {
+              project: {
+                id: projectDetails.id,
+                name: projectDetails.name,
+              },
+              lifetimeData: {
+                totalBudget: totalBudgetLifetime.toDecimalPlaces(2).toNumber(),
+                totalSpend: totalSpendLifetime.toDecimalPlaces(2).toNumber(),
+                leftover: leftoverLifetime.toDecimalPlaces(2).toNumber(),
+                usedPercentage: usedPercentageLifetime,
+                totalEntries: allTimeEntries.length,
+                totalBudgetInjections: allBudgetInjections.length,
+              },
+            }
+          } catch (error) {
+            console.error("Error fetching lifetime project data:", error)
+            return status(500, "Failed to fetch lifetime project data")
+          }
+        },
+        {
+          params: t.Object({
+            projectId: UUID,
+          }),
+          detail: {
+            summary:
+              "Get lifetime project data (not affected by date filters) (Admin)",
+            tags: ["Admin", "Financials", "Lifetime Data"],
+          },
+        }
+      )
 )

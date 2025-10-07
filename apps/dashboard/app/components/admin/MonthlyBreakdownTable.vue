@@ -108,6 +108,36 @@ const {
   }
 )
 
+// Fetch lifetime project data (not affected by month filter)
+const {
+  data: lifetimeData,
+  status: _lifetimeStatus,
+  refresh: _refreshLifetimeData,
+} = await useLazyAsyncData(
+  `lifetime-data-${props.projectId}`,
+  async () => {
+    try {
+      const { data, error } = await $eden.api.admin
+        .financials({
+          projectId: props.projectId,
+        })
+        ["lifetime"].get()
+
+      if (error) {
+        console.error("Error fetching lifetime data:", error.value)
+        return null
+      }
+      return data
+    } catch (e) {
+      console.error("Exception during lifetime data fetch:", e)
+      return null
+    }
+  },
+  {
+    watch: [() => props.projectId],
+  }
+)
+
 // Fetch department budget splits
 const { data: splitsData, refresh: refreshSplits } = await useLazyAsyncData(
   `department-splits-${props.projectId}`,
@@ -409,31 +439,15 @@ function exportToCSV() {
     csvRows.push([`Period: ${currentMonthYear.value}`])
     csvRows.push([])
 
-    // Overall Project Summary (lifetime up to selected month)
-    if (monthlyData.value.overallProjectData) {
-      const overall = monthlyData.value.overallProjectData
-      csvRows.push(["OVERALL PROJECT SUMMARY"])
+    // Overall Project Summary (lifetime data)
+    if (lifetimeData.value?.lifetimeData) {
+      const lifetime = lifetimeData.value.lifetimeData
+      csvRows.push(["OVERALL PROJECT SUMMARY (LIFETIME)"])
       csvRows.push([])
-      csvRows.push([
-        "Total Budget To Date",
-        (overall.totalBudget ?? 0).toFixed(2),
-      ])
-      csvRows.push([
-        "Total Spend To Date",
-        (overall.totalSpendToDate ?? 0).toFixed(2),
-      ])
-      csvRows.push([
-        "Leftover To Date",
-        (overall.leftoverToDate ?? 0).toFixed(2),
-      ])
-      csvRows.push([
-        "Used To Date",
-        `${(overall.usedPercentageToDate ?? 0).toFixed(0)}%`,
-      ])
-      csvRows.push([
-        "This Month Spend",
-        (overall.totalSpendThisMonth ?? 0).toFixed(2),
-      ])
+      csvRows.push(["Total Budget", (lifetime.totalBudget ?? 0).toFixed(2)])
+      csvRows.push(["Total Spend", (lifetime.totalSpend ?? 0).toFixed(2)])
+      csvRows.push(["Leftover", (lifetime.leftover ?? 0).toFixed(2)])
+      csvRows.push(["Used", `${(lifetime.usedPercentage ?? 0).toFixed(0)}%`])
       csvRows.push([])
     }
 
@@ -1089,374 +1103,378 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
 
 <template>
   <div class="monthly-breakdown">
-    <!-- Month Selector -->
-    <div class="flex justify-between items-center mb-8">
-      <h3 class="text-xl font-bold text-gray-100">Monthly Breakdown</h3>
-      <div class="flex items-center gap-4">
-        <UButton
-          icon="i-heroicons-chevron-left"
-          size="sm"
-          variant="outline"
-          @click="previousMonth"
-        />
-        <span class="font-semibold text-lg text-gray-200">{{
-          currentMonthYear
-        }}</span>
-        <UButton
-          icon="i-heroicons-chevron-right"
-          size="sm"
-          variant="outline"
-          @click="nextMonth"
-        />
-        <UButton
-          v-if="monthlyData && tableData.length > 0"
-          icon="i-heroicons-arrow-down-tray"
-          size="sm"
-          variant="outline"
-          label="Export CSV"
-          @click="exportToCSV"
-        />
+    <!-- Overall Project Summary Section -->
+    <div class="mb-12">
+      <h2 class="text-2xl font-bold text-gray-100 mb-6">
+        Overall Project Summary
+      </h2>
+      <!-- Overall Project Summary Cards (lifetime, shown always) -->
+      <div
+        v-if="lifetimeData && lifetimeData.lifetimeData"
+        class="grid grid-cols-1 md:grid-cols-4 gap-6"
+      >
+        <UCard
+          class="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border-blue-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-blue-300">Total Budget</div>
+          </template>
+          <div class="text-3xl font-bold text-blue-400">
+            ${{ lifetimeData.lifetimeData.totalBudget.toFixed(2) }}
+          </div>
+        </UCard>
+
+        <UCard
+          class="bg-gradient-to-br from-orange-900/20 to-orange-800/10 border-orange-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-orange-300">Total Spend</div>
+          </template>
+          <div class="text-3xl font-bold text-orange-400">
+            ${{ lifetimeData.lifetimeData.totalSpend.toFixed(2) }}
+          </div>
+        </UCard>
+
+        <UCard
+          class="bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-green-300">Leftover</div>
+          </template>
+          <div
+            class="text-3xl font-bold"
+            :class="
+              lifetimeData.lifetimeData.leftover >= 0
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            ${{ lifetimeData.lifetimeData.leftover.toFixed(2) }}
+          </div>
+        </UCard>
+
+        <UCard
+          class="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-purple-300">Used</div>
+          </template>
+          <div class="text-3xl font-bold text-purple-400">
+            {{ lifetimeData.lifetimeData.usedPercentage }}%
+          </div>
+        </UCard>
       </div>
     </div>
 
-    <!-- Summary Cards -->
-    <!-- Overall Project Summary Cards (lifetime, shown always) -->
-    <div
-      v-if="monthlyData && monthlyData.overallProjectData"
-      class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8"
-    >
-      <UCard
-        class="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border-blue-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-blue-300">Total Budget</div>
-        </template>
-        <div class="text-3xl font-bold text-blue-400">
-          ${{ monthlyData.overallProjectData.totalBudget.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-orange-900/20 to-orange-800/10 border-orange-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-orange-300">Spend To Date</div>
-        </template>
-        <div class="text-3xl font-bold text-orange-400">
-          ${{ monthlyData.overallProjectData.totalSpendToDate.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-green-300">Leftover To Date</div>
-        </template>
-        <div
-          class="text-3xl font-bold"
-          :class="
-            monthlyData.overallProjectData.leftoverToDate >= 0
-              ? 'text-green-400'
-              : 'text-red-400'
-          "
-        >
-          ${{ monthlyData.overallProjectData.leftoverToDate.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-purple-300">Used To Date</div>
-        </template>
-        <div class="text-3xl font-bold text-purple-400">
-          {{ monthlyData.overallProjectData.usedPercentageToDate }}%
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border-cyan-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-cyan-300">This Month Spend</div>
-        </template>
-        <div class="text-3xl font-bold text-cyan-400">
-          ${{ monthlyData.overallProjectData.totalSpendThisMonth.toFixed(2) }}
-        </div>
-      </UCard>
-    </div>
-
-    <div
-      v-if="monthlyData"
-      class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
-    >
-      <UCard
-        class="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border-blue-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-blue-300">Retainer Fee</div>
-        </template>
-        <div class="text-3xl font-bold text-blue-400">
-          ${{ monthlyData.overallMonthData.retainerFee.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-red-900/20 to-red-800/10 border-red-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-red-300">Actual Spend</div>
-        </template>
-        <div class="text-3xl font-bold text-red-400">
-          ${{ monthlyData.overallMonthData.totalSpend.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-green-300">Leftover</div>
-        </template>
-        <div
-          class="text-3xl font-bold"
-          :class="leftoverClass"
-        >
-          ${{ monthlyData.overallMonthData.leftover.toFixed(2) }}
-        </div>
-      </UCard>
-
-      <UCard
-        class="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20"
-      >
-        <template #header>
-          <div class="text-sm font-medium text-purple-300">Usage</div>
-        </template>
-        <div class="text-3xl font-bold text-purple-400">
-          {{ monthlyData.overallMonthData.usedPercentage }}%
-        </div>
-      </UCard>
-    </div>
-
-    <!-- Department Tables -->
-    <div
-      v-if="monthlyData && departmentCards.length > 0"
-      class="space-y-8"
-    >
-      <div
-        v-for="cardData in departmentCards"
-        :key="cardData.department.id"
-        class="space-y-4"
-      >
-        <!-- Department Header with Summary Cards -->
-        <div class="bg-gray-800/20 rounded-lg p-6 border border-gray-600/20">
-          <h4 class="text-xl font-bold text-gray-100 mb-6">
-            {{ cardData.department.name }}
-          </h4>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <!-- Department Fee Card -->
-            <div
-              class="bg-gray-900/50 border border-gray-600/30 rounded-lg p-2"
-            >
-              <div class="text-xs font-medium text-gray-300 mb-1">
-                Department Fee
-              </div>
-              <div class="text-sm font-bold text-gray-100">
-                ${{ cardData.monthData.retainerFee.toFixed(2) }}
-              </div>
-            </div>
-
-            <!-- Actual Spend Card -->
-            <div class="bg-gray-900/50 border border-red-500/30 rounded-lg p-2">
-              <div class="text-xs font-medium text-red-300 mb-1">
-                Actual Spend
-              </div>
-              <div class="text-sm font-bold text-red-400">
-                ${{ cardData.monthData.totalSpend.toFixed(2) }}
-              </div>
-            </div>
-
-            <!-- Leftover Card -->
-            <div
-              class="bg-gray-900/50 border border-green-500/30 rounded-lg p-2"
-            >
-              <div class="text-xs font-medium text-green-300 mb-1">
-                Leftover
-              </div>
-              <div
-                class="text-sm font-bold"
-                :class="
-                  cardData.monthData.leftover >= 0
-                    ? 'text-green-400'
-                    : 'text-red-400'
-                "
-              >
-                ${{ cardData.monthData.leftover.toFixed(2) }}
-              </div>
-            </div>
-
-            <!-- Usage Card -->
-            <div
-              class="bg-gray-900/50 border border-purple-500/30 rounded-lg p-2"
-            >
-              <div class="text-xs font-medium text-purple-300 mb-1">Usage</div>
-              <div class="text-sm font-bold text-purple-400">
-                {{ cardData.monthData.usedPercentage }}%
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Department Table -->
-        <div
-          v-if="getDepartmentTableData(cardData.department.id).length > 0"
-          class="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden"
-        >
-          <UTable
-            :data="getDepartmentTableData(cardData.department.id)"
-            :columns="tableColumns"
-            :loading="status === 'pending'"
-            :ui="{
-              thead: 'bg-gray-800/50',
-              tbody: 'divide-y divide-gray-700/50',
-              tr: 'hover:bg-gray-800/30 transition-colors',
-              th: 'px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider',
-              td: 'px-4 py-3 text-sm text-gray-200',
-            }"
+    <!-- Monthly Breakdown Section -->
+    <div class="mb-8">
+      <!-- Month Selector -->
+      <div class="flex justify-between items-center mb-8">
+        <h3 class="text-xl font-bold text-gray-100">Monthly Breakdown</h3>
+        <div class="flex items-center gap-4">
+          <UButton
+            icon="i-heroicons-chevron-left"
+            size="sm"
+            variant="outline"
+            @click="previousMonth"
+          />
+          <span class="font-semibold text-lg text-gray-200">{{
+            currentMonthYear
+          }}</span>
+          <UButton
+            icon="i-heroicons-chevron-right"
+            size="sm"
+            variant="outline"
+            @click="nextMonth"
+          />
+          <UButton
+            v-if="monthlyData && tableData.length > 0"
+            icon="i-heroicons-arrow-down-tray"
+            size="sm"
+            variant="outline"
+            label="Export CSV"
+            @click="exportToCSV"
           />
         </div>
       </div>
-    </div>
 
-    <!-- Empty State -->
-    <div
-      v-else-if="monthlyData && departmentCards.length === 0"
-      class="text-center py-12"
-    >
-      <Icon
-        name="i-heroicons-calendar-days"
-        class="w-16 h-16 mx-auto mb-6 text-gray-400"
-      />
-      <p class="text-xl font-semibold mb-2 text-gray-200">No Data Available</p>
-      <p class="text-sm text-gray-400">
-        No time entries found for {{ currentMonthYear }}
-      </p>
-    </div>
+      <!-- Monthly Summary Cards -->
+      <div
+        v-if="monthlyData"
+        class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+      >
+        <UCard
+          class="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border-blue-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-blue-300">Retainer Fee</div>
+          </template>
+          <div class="text-3xl font-bold text-blue-400">
+            ${{ monthlyData.overallMonthData.retainerFee.toFixed(2) }}
+          </div>
+        </UCard>
 
-    <!-- Loading State -->
-    <div
-      v-else-if="status === 'pending'"
-      class="text-center py-12"
-    >
-      <Icon
-        name="i-heroicons-arrow-path"
-        class="w-12 h-12 mx-auto mb-4 text-gray-400 animate-spin"
-      />
-      <p class="text-sm text-gray-400">Loading monthly breakdown...</p>
-    </div>
+        <UCard
+          class="bg-gradient-to-br from-red-900/20 to-red-800/10 border-red-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-red-300">Actual Spend</div>
+          </template>
+          <div class="text-3xl font-bold text-red-400">
+            ${{ monthlyData.overallMonthData.totalSpend.toFixed(2) }}
+          </div>
+        </UCard>
 
-    <!-- Department Budget Splits Section -->
-    <div class="mt-8">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold text-gray-200">
-          Department Budget Splits
-        </h3>
-        <UButton
-          icon="i-heroicons-plus-circle"
-          size="sm"
-          variant="solid"
-          label="Add Split"
-          @click="openAddSplitModal"
-        />
+        <UCard
+          class="bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-green-300">Leftover</div>
+          </template>
+          <div
+            class="text-3xl font-bold"
+            :class="leftoverClass"
+          >
+            ${{ monthlyData.overallMonthData.leftover.toFixed(2) }}
+          </div>
+        </UCard>
+
+        <UCard
+          class="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20"
+        >
+          <template #header>
+            <div class="text-sm font-medium text-purple-300">Usage</div>
+          </template>
+          <div class="text-3xl font-bold text-purple-400">
+            {{ monthlyData.overallMonthData.usedPercentage }}%
+          </div>
+        </UCard>
       </div>
 
-      <!-- Department Splits Table -->
+      <!-- Department Tables -->
       <div
-        v-if="departmentSplits.length > 0"
-        class="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden"
+        v-if="monthlyData && departmentCards.length > 0"
+        class="space-y-8"
       >
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="bg-gray-800/50">
-              <tr>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-                >
-                  Department
-                </th>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-                >
-                  Budget Amount
-                </th>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-700/50">
-              <tr
-                v-for="split in departmentSplits"
-                :key="split.id"
-                class="hover:bg-gray-800/30 transition-colors"
+        <div
+          v-for="cardData in departmentCards"
+          :key="cardData.department.id"
+          class="space-y-4"
+        >
+          <!-- Department Header with Summary Cards -->
+          <div class="bg-gray-800/20 rounded-lg p-6 border border-gray-600/20">
+            <h4 class="text-xl font-bold text-gray-100 mb-6">
+              {{ cardData.department.name }}
+            </h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <!-- Department Fee Card -->
+              <div
+                class="bg-gray-900/50 border border-gray-600/30 rounded-lg p-2"
               >
-                <td class="px-4 py-3 text-sm text-gray-200">
-                  {{ split.departmentName }}
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-200 font-mono">
-                  ${{ parseFloat(split.budgetAmount).toFixed(2) }}
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-200">
-                  <div class="flex items-center space-x-2">
-                    <UButton
-                      icon="i-heroicons-pencil-square"
-                      size="sm"
-                      color="warning"
-                      variant="outline"
-                      @click="openEditSplitModal(split)"
-                    />
-                    <UButton
-                      icon="i-heroicons-trash"
-                      size="sm"
-                      color="error"
-                      variant="outline"
-                      @click="openDeleteSplitModal(split)"
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                <div class="text-xs font-medium text-gray-300 mb-1">
+                  Department Fee
+                </div>
+                <div class="text-sm font-bold text-gray-100">
+                  ${{ cardData.monthData.retainerFee.toFixed(2) }}
+                </div>
+              </div>
+
+              <!-- Actual Spend Card -->
+              <div
+                class="bg-gray-900/50 border border-red-500/30 rounded-lg p-2"
+              >
+                <div class="text-xs font-medium text-red-300 mb-1">
+                  Actual Spend
+                </div>
+                <div class="text-sm font-bold text-red-400">
+                  ${{ cardData.monthData.totalSpend.toFixed(2) }}
+                </div>
+              </div>
+
+              <!-- Leftover Card -->
+              <div
+                class="bg-gray-900/50 border border-green-500/30 rounded-lg p-2"
+              >
+                <div class="text-xs font-medium text-green-300 mb-1">
+                  Leftover
+                </div>
+                <div
+                  class="text-sm font-bold"
+                  :class="
+                    cardData.monthData.leftover >= 0
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                  "
+                >
+                  ${{ cardData.monthData.leftover.toFixed(2) }}
+                </div>
+              </div>
+
+              <!-- Usage Card -->
+              <div
+                class="bg-gray-900/50 border border-purple-500/30 rounded-lg p-2"
+              >
+                <div class="text-xs font-medium text-purple-300 mb-1">
+                  Usage
+                </div>
+                <div class="text-sm font-bold text-purple-400">
+                  {{ cardData.monthData.usedPercentage }}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Department Table -->
+          <div
+            v-if="getDepartmentTableData(cardData.department.id).length > 0"
+            class="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden"
+          >
+            <UTable
+              :data="getDepartmentTableData(cardData.department.id)"
+              :columns="tableColumns"
+              :loading="status === 'pending'"
+              :ui="{
+                thead: 'bg-gray-800/50',
+                tbody: 'divide-y divide-gray-700/50',
+                tr: 'hover:bg-gray-800/30 transition-colors',
+                th: 'px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider',
+                td: 'px-4 py-3 text-sm text-gray-200',
+              }"
+            />
+          </div>
         </div>
       </div>
 
-      <!-- Empty State for Department Splits -->
+      <!-- Empty State -->
       <div
-        v-else
-        class="text-center py-8"
+        v-else-if="monthlyData && departmentCards.length === 0"
+        class="text-center py-12"
       >
         <Icon
-          name="i-heroicons-building-office-2"
-          class="w-12 h-12 mx-auto mb-4 text-gray-400"
+          name="i-heroicons-calendar-days"
+          class="w-16 h-16 mx-auto mb-6 text-gray-400"
         />
-        <p class="text-lg font-medium mb-2 text-gray-200">
-          No Department Budget Splits
+        <p class="text-xl font-semibold mb-2 text-gray-200">
+          No Data Available
         </p>
-        <p class="text-sm text-gray-400 mb-4">
-          Add department budget splits to allocate project budget across
-          different departments.
+        <p class="text-sm text-gray-400">
+          No time entries found for {{ currentMonthYear }}
         </p>
-        <UButton
-          icon="i-heroicons-plus-circle"
-          size="sm"
-          variant="solid"
-          label="Add First Split"
-          @click="openAddSplitModal"
+      </div>
+
+      <!-- Loading State -->
+      <div
+        v-else-if="status === 'pending'"
+        class="text-center py-12"
+      >
+        <Icon
+          name="i-heroicons-arrow-path"
+          class="w-12 h-12 mx-auto mb-4 text-gray-400 animate-spin"
         />
+        <p class="text-sm text-gray-400">Loading monthly breakdown...</p>
+      </div>
+
+      <!-- Department Budget Splits Section -->
+      <div class="mt-8">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-200">
+            Department Budget Splits
+          </h3>
+          <UButton
+            icon="i-heroicons-plus-circle"
+            size="sm"
+            variant="solid"
+            label="Add Split"
+            @click="openAddSplitModal"
+          />
+        </div>
+
+        <!-- Department Splits Table -->
+        <div
+          v-if="departmentSplits.length > 0"
+          class="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden"
+        >
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-800/50">
+                <tr>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  >
+                    Department
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  >
+                    Budget Amount
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700/50">
+                <tr
+                  v-for="split in departmentSplits"
+                  :key="split.id"
+                  class="hover:bg-gray-800/30 transition-colors"
+                >
+                  <td class="px-4 py-3 text-sm text-gray-200">
+                    {{ split.departmentName }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-200 font-mono">
+                    ${{ parseFloat(split.budgetAmount).toFixed(2) }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-200">
+                    <div class="flex items-center space-x-2">
+                      <UButton
+                        icon="i-heroicons-pencil-square"
+                        size="sm"
+                        color="warning"
+                        variant="outline"
+                        @click="openEditSplitModal(split)"
+                      />
+                      <UButton
+                        icon="i-heroicons-trash"
+                        size="sm"
+                        color="error"
+                        variant="outline"
+                        @click="openDeleteSplitModal(split)"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Empty State for Department Splits -->
+        <div
+          v-else
+          class="text-center py-8"
+        >
+          <Icon
+            name="i-heroicons-building-office-2"
+            class="w-12 h-12 mx-auto mb-4 text-gray-400"
+          />
+          <p class="text-lg font-medium mb-2 text-gray-200">
+            No Department Budget Splits
+          </p>
+          <p class="text-sm text-gray-400 mb-4">
+            Add department budget splits to allocate project budget across
+            different departments.
+          </p>
+          <UButton
+            icon="i-heroicons-plus-circle"
+            size="sm"
+            variant="solid"
+            label="Add First Split"
+            @click="openAddSplitModal"
+          />
+        </div>
       </div>
     </div>
 
