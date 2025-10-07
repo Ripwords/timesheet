@@ -12,12 +12,38 @@ useSeoMeta({
 
 const { $eden, $dayjs } = useNuxtApp()
 
+// Type definitions
+interface LifetimeData {
+  totalBudget: number
+  totalSpend: number
+  leftover: number
+  usedPercentage: number
+  totalEntries: number
+  totalBudgetInjections: number
+}
+
+interface LifetimeResponse {
+  project: { id: string; name: string }
+  lifetimeData: LifetimeData
+}
+
+interface LifetimeDataMap {
+  [projectId: string]: LifetimeResponse | null | undefined
+}
+
 // Filter state
-const startDate = ref($dayjs().startOf("month").format("YYYY-MM-DD"))
-const endDate = ref($dayjs().endOf("month").format("YYYY-MM-DD"))
+const selectedMonth = ref($dayjs().format("YYYY-MM"))
 const selectedProject = ref<
   { label: string; value: string | undefined } | undefined
 >(undefined)
+
+// Computed dates based on selected month
+const startDate = computed(() =>
+  $dayjs(selectedMonth.value).startOf("month").format("YYYY-MM-DD")
+)
+const endDate = computed(() =>
+  $dayjs(selectedMonth.value).endOf("month").format("YYYY-MM-DD")
+)
 
 // Projects for filter dropdown
 const { data: projectsResponse } = await useLazyAsyncData(
@@ -34,7 +60,7 @@ const { data: projectsResponse } = await useLazyAsyncData(
   }
 )
 
-// Financial data
+// Financial data (period-specific)
 const {
   data: financialData,
   status,
@@ -52,7 +78,43 @@ const {
     return data
   },
   {
-    watch: [startDate, endDate, selectedProject],
+    watch: [selectedMonth, selectedProject],
+  }
+)
+
+// Lifetime data for each project
+const { data: lifetimeData } = await useLazyAsyncData<LifetimeDataMap>(
+  "lifetime-data-all-projects",
+  async () => {
+    if (!projectsResponse.value?.projects) return {}
+
+    const lifetimePromises = projectsResponse.value.projects.map(
+      async (project: { id: string }) => {
+        try {
+          const { data } = await $eden.api.admin
+            .financials({
+              projectId: project.id,
+            })
+            .lifetime.get()
+          return { projectId: project.id, data }
+        } catch (error) {
+          console.error(
+            `Error fetching lifetime data for project ${project.id}:`,
+            error
+          )
+          return { projectId: project.id, data: undefined }
+        }
+      }
+    )
+
+    const results = await Promise.all(lifetimePromises)
+    return results.reduce((acc, { projectId, data }) => {
+      acc[projectId] = data
+      return acc
+    }, {} as LifetimeDataMap)
+  },
+  {
+    watch: [projectsResponse],
   }
 )
 
@@ -158,45 +220,31 @@ function exportToCSV() {
     csvRows.push(`"${project.projectName}" Project`)
     csvRows.push("") // Empty row for spacing
 
-    // Add overall project summary (to-date) if available
-    csvRows.push("OVERALL PROJECT SUMMARY")
+    // Add overall project summary (lifetime data)
+    csvRows.push("OVERALL PROJECT SUMMARY (LIFETIME)")
     csvRows.push("Metric,Value")
-    if (project.overallProjectData) {
+    const lifetimeProjectData =
+      lifetimeData.value?.[project.projectId]?.lifetimeData
+    if (lifetimeProjectData) {
       csvRows.push(
-        `"Total Budget To Date","$${Number(
-          project.overallProjectData.totalBudget || 0
+        `"Total Budget","$${Number(
+          lifetimeProjectData.totalBudget || 0
         ).toFixed(2)}"`
       )
       csvRows.push(
-        `"Total Spend To Date","$${Number(
-          project.overallProjectData.totalSpendToDate || 0
-        ).toFixed(2)}"`
+        `"Total Spend","$${Number(lifetimeProjectData.totalSpend || 0).toFixed(
+          2
+        )}"`
       )
       csvRows.push(
-        `"Leftover To Date","$${Number(
-          project.overallProjectData.leftoverToDate || 0
-        ).toFixed(2)}"`
+        `"Leftover","$${Number(lifetimeProjectData.leftover || 0).toFixed(2)}"`
       )
       csvRows.push(
-        `"Used To Date","${Number(
-          project.overallProjectData.usedPercentageToDate || 0
-        ).toFixed(0)}%"`
-      )
-      csvRows.push(
-        `"This Period Spend","$${Number(
-          project.overallProjectData.periodSpend || 0
-        ).toFixed(2)}"`
+        `"Used","${Number(lifetimeProjectData.usedPercentage || 0).toFixed(
+          0
+        )}%"`
       )
     }
-    csvRows.push("") // Empty row for spacing
-
-    // Add filtered period project summary (existing widgets)
-    csvRows.push("PERIOD SUMMARY")
-    csvRows.push("Metric,Value")
-    csvRows.push(`"Revenue","$${project.revenue}"`)
-    csvRows.push(`"Profit","$${project.profit}"`)
-    csvRows.push(`"Used","${project.usedPercentage}"`)
-    csvRows.push(`"Margins","${project.marginsPercentage}"`)
     csvRows.push("") // Empty row for spacing
 
     // Add user data headers
@@ -248,10 +296,7 @@ function exportToCSV() {
   const link = document.createElement("a")
   const url = URL.createObjectURL(blob)
   link.setAttribute("href", url)
-  link.setAttribute(
-    "download",
-    `financial-report-${startDate.value}-to-${endDate.value}.csv`
-  )
+  link.setAttribute("download", `financial-report-${selectedMonth.value}.csv`)
   link.style.visibility = "hidden"
   document.body.appendChild(link)
   link.click()
@@ -284,19 +329,11 @@ function formatHours(decimalHours: number): string {
 
       <!-- Filters -->
       <div class="mb-6 p-4 rounded-lg">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <UFormField label="Start Date">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <UFormField label="Month">
             <UInput
-              v-model="startDate"
-              type="date"
-              @change="handleFilterChange"
-            />
-          </UFormField>
-
-          <UFormField label="End Date">
-            <UInput
-              v-model="endDate"
-              type="date"
+              v-model="selectedMonth"
+              type="month"
               @change="handleFilterChange"
             />
           </UFormField>
@@ -310,7 +347,7 @@ function formatHours(decimalHours: number): string {
             />
           </UFormField>
 
-          <div class="flex items-end gap-2">
+          <div class="flex items-end gap-2 md:col-start-4 justify-end">
             <UButton
               icon="i-heroicons-arrow-path"
               label="Refresh"
@@ -342,89 +379,88 @@ function formatHours(decimalHours: number): string {
             <template #header>
               <div class="flex justify-between items-center">
                 <h3 class="text-lg font-semibold">{{ project.projectName }}</h3>
-                <div class="flex flex-wrap gap-2 text-sm">
-                  <div class="rounded px-2 py-1 bg-blue-100 text-blue-800">
-                    Revenue: ${{ project.revenue }}
-                  </div>
-                  <div class="rounded px-2 py-1 bg-green-100 text-green-800">
-                    Profit: ${{ project.profit }}
-                  </div>
-                  <div class="rounded px-2 py-1 bg-orange-100 text-orange-800">
-                    Used: {{ project.usedPercentage }}
-                  </div>
-                  <div class="rounded px-2 py-1 bg-purple-100 text-purple-800">
-                    Margins: {{ project.marginsPercentage }}
-                  </div>
-                </div>
               </div>
             </template>
 
-            <!-- Overall Project Cards per project -->
-            <div
-              v-if="project.overallProjectData"
-              class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4"
-            >
-              <UCard>
-                <template #header>
-                  <div class="text-xs font-medium text-blue-700">
-                    Total Budget
-                  </div>
-                </template>
-                <div class="text-xl font-bold">
-                  {{ formatCurrency(project.overallProjectData.totalBudget) }}
-                </div>
-              </UCard>
-              <UCard>
-                <template #header>
-                  <div class="text-xs font-medium text-orange-700">
-                    Spend To Date
-                  </div>
-                </template>
-                <div class="text-xl font-bold">
-                  {{
-                    formatCurrency(project.overallProjectData.totalSpendToDate)
-                  }}
-                </div>
-              </UCard>
-              <UCard>
-                <template #header>
-                  <div class="text-xs font-medium text-green-700">
-                    Leftover To Date
-                  </div>
-                </template>
-                <div
-                  class="text-xl font-bold"
-                  :class="
-                    (project.overallProjectData.leftoverToDate ?? 0) >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  "
+            <!-- Overall Project Summary (Lifetime) -->
+            <div class="mb-8">
+              <h4 class="text-md font-semibold mb-4 text-gray-700">
+                Overall Project Summary (Lifetime)
+              </h4>
+              <div
+                v-if="lifetimeData?.[project.projectId]?.lifetimeData"
+                class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+              >
+                <UCard
+                  class="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
                 >
-                  {{
-                    formatCurrency(project.overallProjectData.leftoverToDate)
-                  }}
-                </div>
-              </UCard>
-              <UCard>
-                <template #header>
-                  <div class="text-xs font-medium text-purple-700">
-                    Used To Date
+                  <template #header>
+                    <div class="text-xs font-medium text-blue-700">
+                      Total Budget
+                    </div>
+                  </template>
+                  <div class="text-xl font-bold text-blue-800">
+                    {{
+                      formatCurrency(
+                        lifetimeData[project.projectId]!.lifetimeData
+                          .totalBudget
+                      )
+                    }}
                   </div>
-                </template>
-                <div class="text-xl font-bold">
-                  {{ project.overallProjectData.usedPercentageToDate }}%
-                </div>
-              </UCard>
-              <UCard>
-                <template #header>
-                  <div class="text-xs font-medium text-cyan-700">
-                    This Period Spend
+                </UCard>
+                <UCard
+                  class="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+                >
+                  <template #header>
+                    <div class="text-xs font-medium text-orange-700">
+                      Total Spend
+                    </div>
+                  </template>
+                  <div class="text-xl font-bold text-orange-800">
+                    {{
+                      formatCurrency(
+                        lifetimeData[project.projectId]!.lifetimeData.totalSpend
+                      )
+                    }}
                   </div>
-                </template>
-                <div class="text-xl font-bold">
-                  {{ formatCurrency(project.overallProjectData.periodSpend) }}
-                </div>
-              </UCard>
+                </UCard>
+                <UCard
+                  class="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+                >
+                  <template #header>
+                    <div class="text-xs font-medium text-green-700">
+                      Leftover
+                    </div>
+                  </template>
+                  <div
+                    class="text-xl font-bold"
+                    :class="
+                       (lifetimeData[project.projectId]!.lifetimeData.leftover ?? 0) >= 0
+                        ? 'text-green-800'
+                        : 'text-red-800'
+                    "
+                  >
+                    {{
+                      formatCurrency(
+                        lifetimeData[project.projectId]!.lifetimeData.leftover
+                      )
+                    }}
+                  </div>
+                </UCard>
+                <UCard
+                  class="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+                >
+                  <template #header>
+                    <div class="text-xs font-medium text-purple-700">Used</div>
+                  </template>
+                  <div class="text-xl font-bold text-purple-800">
+                    {{
+                      lifetimeData[project.projectId]!.lifetimeData
+                        .usedPercentage
+                    }}%
+                  </div>
+                </UCard>
+              </div>
             </div>
 
             <UTable

@@ -136,8 +136,12 @@ export const adminFinancials = baseApp("adminFinancials").group(
           // Create a map of project budgets
           const projectBudgets = new Map<string, Decimal>() // lifetime budgets (for revenue)
           const projectBudgetsToDate = new Map<string, Decimal>() // budgets up to endDate (overall budget to date)
+          const projectBudgetsInPeriod = new Map<string, Decimal>() // budgets within the selected period
           const cutoffBudgetDate = endDate
             ? new Date(`${endDate}T23:59:59.999Z`)
+            : null
+          const startBudgetDate = startDate
+            ? new Date(`${startDate}T00:00:00.000Z`)
             : null
           for (const injection of budgetInjections) {
             const currentBudget =
@@ -153,6 +157,19 @@ export const adminFinancials = baseApp("adminFinancials").group(
               projectBudgetsToDate.set(
                 injection.projectId,
                 currentToDate.add(new Decimal(injection.budget))
+              )
+            }
+            // Aggregate budgets within the selected period
+            const isInPeriod =
+              (!startBudgetDate || injection.date >= startBudgetDate) &&
+              (!cutoffBudgetDate || injection.date <= cutoffBudgetDate)
+            if (isInPeriod) {
+              const currentInPeriod =
+                projectBudgetsInPeriod.get(injection.projectId) ||
+                new Decimal(0)
+              projectBudgetsInPeriod.set(
+                injection.projectId,
+                currentInPeriod.add(new Decimal(injection.budget))
               )
             }
           }
@@ -204,7 +221,9 @@ export const adminFinancials = baseApp("adminFinancials").group(
 
           // Seed all target projects so projects without time entries still appear
           for (const p of targetProjects) {
-            const seededBudget = projectBudgets.get(p.id) || new Decimal(0)
+            const _seededBudget = projectBudgets.get(p.id) || new Decimal(0)
+            const periodBudget =
+              projectBudgetsInPeriod.get(p.id) || new Decimal(0)
             if (!projectMap.has(p.name)) {
               projectMap.set(p.name, {
                 projectName: p.name,
@@ -212,7 +231,7 @@ export const adminFinancials = baseApp("adminFinancials").group(
                 users: new Map<string, ProjectUserRecord>(),
                 totalHours: 0,
                 totalCost: 0,
-                revenue: seededBudget.toNumber(),
+                revenue: periodBudget.toNumber(), // Use period-specific budget
               })
             }
           }
@@ -226,15 +245,17 @@ export const adminFinancials = baseApp("adminFinancials").group(
 
             // Group by project first
             if (!projectMap.has(entry.projectName)) {
-              const projectBudget =
+              const _projectBudget =
                 projectBudgets.get(entry.projectId) || new Decimal(0)
+              const periodBudget =
+                projectBudgetsInPeriod.get(entry.projectId) || new Decimal(0)
               projectMap.set(entry.projectName, {
                 projectName: entry.projectName,
                 projectId: entry.projectId,
                 users: new Map<string, ProjectUserRecord>(),
                 totalHours: 0,
                 totalCost: 0,
-                revenue: projectBudget.toNumber(),
+                revenue: periodBudget.toNumber(), // Use period-specific budget
               })
             }
 
@@ -315,7 +336,10 @@ export const adminFinancials = baseApp("adminFinancials").group(
               )
 
               // Calculate per-project financial metrics
-              const revenue = project.revenue
+              // Use period-specific budget for revenue calculation
+              const periodBudget =
+                projectBudgetsInPeriod.get(project.projectId) || new Decimal(0)
+              const revenue = periodBudget.toNumber()
               const cost = project.totalCost
               const profit = revenue - cost
               const usedPercentage =
