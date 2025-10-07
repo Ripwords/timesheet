@@ -77,7 +77,6 @@ const selectedInjection = ref<BudgetInjection | null>(null)
 
 // State for recurring budget modals
 const isAddRecurringBudgetModalOpen = ref(false)
-const isEditRecurringBudgetModalOpen = ref(false)
 const isDeactivateRecurringBudgetModalOpen = ref(false)
 const selectedRecurringBudget = ref<RecurringBudgetInjection | null>(null)
 
@@ -119,13 +118,6 @@ const newRecurringBudgetData = reactive<Partial<RecurringBudgetSchema>>({
   endDate: undefined,
   description: "",
 })
-const editRecurringBudgetData = reactive<Partial<RecurringBudgetSchema>>({
-  amount: undefined,
-  frequency: "monthly" as Frequency,
-  startDate: "",
-  endDate: undefined,
-  description: "",
-})
 
 // Computed properties for USelectMenu binding
 const newRecurringBudgetFrequency = computed({
@@ -135,16 +127,6 @@ const newRecurringBudgetFrequency = computed({
   },
   set(value: (typeof frequencyOptions)[0] | undefined) {
     newRecurringBudgetData.frequency = value?.value as Frequency
-  },
-})
-
-const editRecurringBudgetFrequency = computed({
-  get() {
-    const freq = editRecurringBudgetData.frequency
-    return freq ? frequencyOptions.find((opt) => opt.value === freq) : undefined
-  },
-  set(value: (typeof frequencyOptions)[0] | undefined) {
-    editRecurringBudgetData.frequency = value?.value as Frequency
   },
 })
 
@@ -331,36 +313,37 @@ async function handleDeleteInjection() {
 }
 
 // Add recurring budget data fetching
-const { data: recurringBudgetData, refresh: refreshRecurringBudget } =
-  await useLazyAsyncData(
-    projectId
-      ? `project-recurring-budget-${projectId}`
-      : "project-recurring-budget-invalid",
-    async () => {
-      if (!projectId) {
-        console.error(
-          "Cannot fetch recurring budget without a valid project ID"
-        )
-        return null
-      }
-      try {
-        const { data, error } = await $eden.api.projects
-          .id({
-            id: projectId,
-          })
-          ["recurring-budget"].get()
-
-        if (error) {
-          console.error("Error fetching recurring budget:", error.value)
-          return null
-        }
-        return data
-      } catch (e) {
-        console.error("Exception during recurring budget fetch:", e)
-        return null
-      }
+const {
+  data: recurringBudgetData,
+  refresh: refreshRecurringBudget,
+  status: recurringBudgetStatus,
+} = await useLazyAsyncData(
+  projectId
+    ? `project-recurring-budget-${projectId}`
+    : "project-recurring-budget-invalid",
+  async () => {
+    if (!projectId) {
+      console.error("Cannot fetch recurring budget without a valid project ID")
+      return null
     }
-  )
+    try {
+      const { data, error } = await $eden.api.projects
+        .id({
+          id: projectId,
+        })
+        ["recurring-budget"].get()
+
+      if (error) {
+        console.error("Error fetching recurring budget:", error.value)
+        return null
+      }
+      return data
+    } catch (e) {
+      console.error("Exception during recurring budget fetch:", e)
+      return null
+    }
+  }
+)
 
 // Modal control functions for recurring budget
 function openAddRecurringBudgetModal() {
@@ -370,21 +353,6 @@ function openAddRecurringBudgetModal() {
   newRecurringBudgetData.endDate = undefined
   newRecurringBudgetData.description = ""
   isAddRecurringBudgetModalOpen.value = true
-}
-
-function openEditRecurringBudgetModal(
-  recurringBudget: RecurringBudgetInjection
-) {
-  selectedRecurringBudget.value = recurringBudget
-  editRecurringBudgetData.amount = parseFloat(recurringBudget.amount)
-  editRecurringBudgetData.frequency = recurringBudget.frequency as
-    | "monthly"
-    | "quarterly"
-    | "yearly"
-  editRecurringBudgetData.startDate = recurringBudget.startDate
-  editRecurringBudgetData.endDate = recurringBudget.endDate || undefined
-  editRecurringBudgetData.description = recurringBudget.description || ""
-  isEditRecurringBudgetModalOpen.value = true
 }
 
 function openDeactivateRecurringBudgetModal(
@@ -438,52 +406,6 @@ async function handleAddRecurringBudget(
     })
   } finally {
     isSaving.value = false
-  }
-}
-
-async function handleUpdateRecurringBudget(
-  event: FormSubmitEvent<RecurringBudgetSchema>
-) {
-  if (!selectedRecurringBudget.value?.id) return
-  const injectionId = selectedRecurringBudget.value.id
-  isSaving.value = true
-  try {
-    const { error } = await $eden.api.projects["recurring-budget"]({
-      injectionId,
-    }).put({
-      amount: event.data.amount,
-      frequency: event.data.frequency,
-      startDate: event.data.startDate,
-      endDate: event.data.endDate,
-      description: event.data.description,
-    })
-
-    if (error) {
-      toast.add({
-        title: "Error",
-        description: String(error.value),
-        color: "error",
-      })
-    } else {
-      toast.add({
-        title: "Success",
-        description: "Recurring budget injection updated.",
-        color: "success",
-      })
-      isEditRecurringBudgetModalOpen.value = false
-      selectedRecurringBudget.value = null
-    }
-    await refreshRecurringBudget()
-  } catch (error) {
-    console.error("Failed to update recurring budget:", error)
-    toast.add({
-      title: "Error",
-      description: "Could not update recurring budget.",
-      color: "error",
-    })
-  } finally {
-    isSaving.value = false
-    await refreshProjectDetails()
   }
 }
 
@@ -610,6 +532,10 @@ const frequencyOptions = [
   { label: "Quarterly", value: "quarterly" },
   { label: "Yearly", value: "yearly" },
 ]
+
+const isRefreshing = computed(
+  () => status.value === "pending" || recurringBudgetStatus.value === "pending"
+)
 </script>
 
 <template>
@@ -917,19 +843,14 @@ const frequencyOptions = [
                 <span>Active Recurring Budget</span>
                 <div class="flex gap-2">
                   <UButton
-                    icon="i-heroicons-pencil-square"
-                    size="sm"
-                    color="warning"
-                    variant="outline"
-                    @click="openEditRecurringBudgetModal(recurringBudget)"
-                  />
-                  <UButton
                     icon="i-heroicons-x-circle"
                     size="sm"
                     color="error"
                     variant="outline"
                     @click="openDeactivateRecurringBudgetModal(recurringBudget)"
-                  />
+                  >
+                    Stop & Create New
+                  </UButton>
                 </div>
               </div>
             </template>
@@ -966,6 +887,17 @@ const frequencyOptions = [
                 <span class="font-medium">Description:</span>
                 <span>{{ recurringBudget.description }}</span>
               </div>
+            </div>
+            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p class="text-sm text-blue-800">
+                <Icon
+                  name="i-heroicons-information-circle"
+                  class="w-4 h-4 inline mr-1"
+                />
+                To modify the recurring budget amount or settings, stop this
+                recurring budget and create a new one. All existing budget
+                injections will remain unchanged.
+              </p>
             </div>
           </UCard>
         </div>
@@ -1105,128 +1037,22 @@ const frequencyOptions = [
         </UModal>
 
         <UModal
-          v-model:open="isEditRecurringBudgetModalOpen"
-          :prevent-close="isSaving"
-        >
-          <template #content>
-            <UCard v-if="selectedRecurringBudget">
-              <template #header>Edit Recurring Budget</template>
-              <UForm
-                class="space-y-4"
-                :schema="recurringBudgetSchema"
-                :state="editRecurringBudgetData"
-                @submit="handleUpdateRecurringBudget"
-              >
-                <UFormField
-                  label="Amount"
-                  name="amount"
-                  class="w-full"
-                  required
-                >
-                  <UInput
-                    v-model.number="editRecurringBudgetData.amount"
-                    class="w-full"
-                    type="number"
-                    step="0.01"
-                    :disabled="isSaving"
-                  >
-                    <template #leading>
-                      <Icon
-                        name="i-heroicons-currency-dollar"
-                        class="w-4 h-4"
-                      />
-                    </template>
-                  </UInput>
-                </UFormField>
-
-                <UFormField
-                  label="Frequency"
-                  name="frequency"
-                  class="w-full"
-                  required
-                >
-                  <USelectMenu
-                    v-model="editRecurringBudgetFrequency"
-                    :items="frequencyOptions"
-                    placeholder="Select frequency"
-                    :disabled="isSaving"
-                  />
-                </UFormField>
-
-                <UFormField
-                  label="Start Date"
-                  name="startDate"
-                  class="w-full"
-                  required
-                >
-                  <UInput
-                    v-model="editRecurringBudgetData.startDate"
-                    class="w-full"
-                    type="date"
-                    :disabled="isSaving"
-                  />
-                </UFormField>
-
-                <UFormField
-                  label="End Date (Optional)"
-                  name="endDate"
-                  class="w-full"
-                >
-                  <UInput
-                    v-model="editRecurringBudgetData.endDate"
-                    class="w-full"
-                    type="date"
-                    :disabled="isSaving"
-                  />
-                </UFormField>
-
-                <UFormField
-                  label="Description"
-                  name="description"
-                  class="w-full"
-                >
-                  <UInput
-                    v-model="editRecurringBudgetData.description"
-                    class="w-full"
-                    :disabled="isSaving"
-                  />
-                </UFormField>
-
-                <div class="flex justify-end gap-2 mt-4">
-                  <UButton
-                    label="Cancel"
-                    variant="ghost"
-                    :disabled="isSaving"
-                    @click="isEditRecurringBudgetModalOpen = false"
-                  />
-                  <UButton
-                    type="submit"
-                    label="Save Changes"
-                    :loading="isSaving"
-                  />
-                </div>
-              </UForm>
-            </UCard>
-          </template>
-        </UModal>
-
-        <UModal
           v-model:open="isDeactivateRecurringBudgetModalOpen"
           :prevent-close="isDeleting"
         >
           <template #content>
             <UCard v-if="selectedRecurringBudget">
-              <template #header>Confirm Deactivation</template>
+              <template #header>Stop Recurring Budget</template>
               <p>
-                Are you sure you want to deactivate the recurring budget
-                injection for ${{
-                  parseFloat(selectedRecurringBudget.amount).toFixed(2)
-                }}
-                ({{ selectedRecurringBudget.frequency }})?
+                Are you sure you want to stop the recurring budget injection for
+                ${{ parseFloat(selectedRecurringBudget.amount).toFixed(2) }} ({{
+                  selectedRecurringBudget.frequency
+                }})?
               </p>
               <p class="text-sm text-gray-500 mt-2">
-                This will stop future automatic budget injections but won't
-                affect existing ones.
+                This will deactivate the recurring budget. All existing budget
+                injections will remain unchanged. You can create a new recurring
+                budget with different settings after stopping this one.
               </p>
               <template #footer>
                 <div class="flex justify-end gap-2">
@@ -1237,7 +1063,7 @@ const frequencyOptions = [
                     @click="isDeactivateRecurringBudgetModalOpen = false"
                   />
                   <UButton
-                    label="Deactivate"
+                    label="Stop Recurring Budget"
                     color="error"
                     :loading="isDeleting"
                     @click="handleDeactivateRecurringBudget"
@@ -1251,7 +1077,10 @@ const frequencyOptions = [
 
       <!-- Monthly Breakdown Section (always shown) -->
       <div class="mt-8">
-        <AdminMonthlyBreakdownTable :project-id="projectId" />
+        <AdminMonthlyBreakdownTable
+          :key="`${isRefreshing}`"
+          :project-id="projectId"
+        />
       </div>
     </UCard>
   </div>

@@ -1,6 +1,11 @@
+// This cron job is used for recurring budgets without end dates.
+// Recurring budgets with end dates create all injections upfront.
+// Recurring budgets without end dates only create injections up to the current period,
+// and this cron job continues creating them as time progresses.
+
 import { cron } from "@elysiajs/cron"
 import dayjs from "dayjs"
-import { and, eq, gte, lte } from "drizzle-orm"
+import { and, eq, gte, lte, isNull } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
 import * as schema from "../db/schema"
@@ -32,7 +37,7 @@ export const recurringBudgetCron = cron({
     console.log("🔄 Processing recurring budget injections...")
 
     try {
-      // Get all active recurring budget injections
+      // Get all active recurring budget injections that don't have an end date
       const activeRecurringBudgets = await db
         .select({
           id: schema.projectRecurringBudgetInjections.id,
@@ -47,10 +52,15 @@ export const recurringBudgetCron = cron({
           updatedAt: schema.projectRecurringBudgetInjections.updatedAt,
         })
         .from(schema.projectRecurringBudgetInjections)
-        .where(eq(schema.projectRecurringBudgetInjections.isActive, true))
+        .where(
+          and(
+            eq(schema.projectRecurringBudgetInjections.isActive, true),
+            isNull(schema.projectRecurringBudgetInjections.endDate)
+          )
+        )
 
       console.log(
-        `Found ${activeRecurringBudgets.length} active recurring budget injections`
+        `Found ${activeRecurringBudgets.length} active recurring budget injections without end dates`
       )
 
       for (const recurringBudget of activeRecurringBudgets) {
@@ -69,9 +79,6 @@ async function processRecurringBudget(
 ) {
   const today = dayjs()
   const startDate = dayjs(recurringBudget.startDate)
-  const endDate = recurringBudget.endDate
-    ? dayjs(recurringBudget.endDate)
-    : null
 
   // Check if we're within the valid date range
   if (today.isBefore(startDate)) {
@@ -81,10 +88,7 @@ async function processRecurringBudget(
     return
   }
 
-  if (endDate && today.isAfter(endDate)) {
-    console.log(`Skipping ${recurringBudget.projectId} - end date passed`)
-    return
-  }
+  // No need to check end date since we only process recurring budgets without end dates
 
   // Calculate the next injection date based on frequency
   const nextInjectionDate = calculateNextInjectionDate(

@@ -12,7 +12,7 @@ alwaysApply: true
 **Technology Stack & Configuration:**
 
 - **Framework:** Nuxt 3 (using `defineNuxtConfig`, `nuxi` commands).
-- **UI Library:** `@nuxt/ui` v3. Components used: `<UApp>`, `<UCard>`, `<UButton>`, `<UTable>`, `<UModal>`, `<USelectMenu>`, `<UFormGroup>`.
+- **UI Library:** `@nuxt/ui` v4. Components used: `<UApp>`, `<UCard>`, `<UButton>`, `<UTable>`, `<UModal>`, `<USelectMenu>`, `<UFormField>`.
 - **Date/Time Library:** `dayjs-nuxt`.
   - Requires adding `"dayjs-nuxt"` to `modules` in `nuxt.config.ts`.
   - Requires configuring necessary plugins (e.g., `duration`, `relativeTime`, `localizedFormat`, `utc`) via the `dayjs` key in `nuxt.config.ts`.

@@ -725,12 +725,16 @@ export const adminFinancials = baseApp("adminFinancials").group(
             const endDateObj = endDate ? new Date(endDate) : null
             const currentMonthStart = new Date(yearNum, monthNum - 1, 1)
             const currentMonthEnd = new Date(yearNum, monthNum, 1)
+            const today = new Date()
 
-            // Check if the recurring budget is active for this month
-            if (
+            // Check if the recurring budget is active for this month AND hasn't ended
+            const isActiveForMonth =
               startDateObj <= currentMonthEnd &&
               (!endDateObj || endDateObj >= currentMonthStart)
-            ) {
+
+            const hasNotEnded = !endDateObj || endDateObj >= today
+
+            if (isActiveForMonth && hasNotEnded) {
               // Calculate the amount for this specific month based on frequency
               const monthlyAmount = new Decimal(amount)
 

@@ -15,7 +15,7 @@ import { timerNotificationCron } from "./services/timerNotificationCron"
 
 const app = new Elysia()
   .use(baseApp("main"))
-  .use(recurringBudgetCron)
+  .use(recurringBudgetCron) // Re-enabled for recurring budgets without end dates
   .use(timerNotificationCron)
   .group("/api", (app) =>
     app

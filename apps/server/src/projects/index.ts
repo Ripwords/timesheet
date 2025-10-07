@@ -378,7 +378,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         }
 
         try {
-          // Check if there's already an active recurring budget injection
+          // Check if there's already an active recurring budget injection that hasn't ended
           const existingActive =
             await db.query.projectRecurringBudgetInjections.findFirst({
               where: and(
@@ -391,10 +391,24 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             })
 
           if (existingActive) {
-            return status(
-              400,
-              "Project already has an active recurring budget injection"
-            )
+            // Check if the existing recurring budget has ended
+            const today = dayjs().startOf("day")
+            const existingEndDate = existingActive.endDate
+              ? dayjs(existingActive.endDate).endOf("day")
+              : null
+
+            // If there's no end date, or if the end date hasn't passed yet, prevent creation
+            if (
+              !existingEndDate ||
+              today.isBefore(existingEndDate) ||
+              today.isSame(existingEndDate)
+            ) {
+              return status(
+                400,
+                "Project already has an active recurring budget injection that hasn't ended yet"
+              )
+            }
+            // If the existing recurring budget has ended, we can create a new one
           }
 
           // Create new recurring budget injection
@@ -415,18 +429,38 @@ export const projects = baseApp("projects").group("/projects", (app) =>
             return status(500, "Failed to create recurring budget injection")
           }
 
-          // Backfill missing injections from startDate up to today (respecting endDate)
+          // Create budget injections upfront
+          // If endDate is provided: create all injections for the entire date range
+          // If no endDate: only create injections up to current period, let cron handle future ones
           try {
             const freq = body.frequency
             const stepMonths =
               freq === "monthly" ? 1 : freq === "quarterly" ? 3 : 12
             let cursor = dayjs(body.startDate).startOf("day")
-            const today = dayjs().startOf("day")
-            let until = today
+
+            // Determine the end point for injection creation
+            let until: dayjs.Dayjs
             if (body.endDate) {
-              const end = dayjs(body.endDate).endOf("day")
-              until = end.isBefore(today) ? end : today
+              // If end date is provided, create all injections for the entire range
+              until = dayjs(body.endDate).endOf("day")
+            } else {
+              // If no end date, only create injections up to the current period
+              const today = dayjs().startOf("day")
+              if (freq === "monthly") {
+                until = today.endOf("month")
+              } else if (freq === "quarterly") {
+                const currentQuarter = Math.floor(today.month() / 3)
+                until = today
+                  .month(currentQuarter * 3)
+                  .endOf("month")
+                  .add(2, "month")
+              } else {
+                // yearly
+                until = today.endOf("year")
+              }
             }
+
+            const injectionsToCreate = []
 
             while (cursor.isSame(until) || cursor.isBefore(until)) {
               // Define a period window for duplicate detection
@@ -469,7 +503,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
               )
 
               if (!existing) {
-                await db.insert(schema.projectBudgetInjections).values({
+                injectionsToCreate.push({
                   projectId,
                   date: cursor.toDate(),
                   budget: body.amount.toString(),
@@ -481,11 +515,28 @@ export const projects = baseApp("projects").group("/projects", (app) =>
 
               cursor = cursor.add(stepMonths, "month")
             }
+
+            // Batch insert all injections at once
+            if (injectionsToCreate.length > 0) {
+              await db
+                .insert(schema.projectBudgetInjections)
+                .values(injectionsToCreate)
+              console.log(
+                `✅ Created ${
+                  injectionsToCreate.length
+                } budget injections for project ${projectId}${
+                  !body.endDate
+                    ? " (up to current period, cron will handle future ones)"
+                    : ""
+                }`
+              )
+            }
           } catch (backfillError) {
             console.error(
-              "Failed to backfill recurring budget injections:",
+              "Failed to create recurring budget injections:",
               backfillError
             )
+            // Don't throw the error, just log it since the recurring budget record was already created
           }
 
           return newRecurringBudget[0]
@@ -512,7 +563,10 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         adminOnly: true,
       }
     )
-    // UPDATE recurring budget injection
+    // DISABLED: UPDATE recurring budget injection
+    // This endpoint is disabled because recurring budgets now create all injections upfront.
+    // To modify a recurring budget, users should stop the current one and create a new one.
+    /*
     .put(
       "/recurring-budget/:injectionId",
       async ({ db, params, body, status, isAdmin }) => {
@@ -574,6 +628,7 @@ export const projects = baseApp("projects").group("/projects", (app) =>
         adminOnly: true,
       }
     )
+    */
     // DEACTIVATE recurring budget injection
     .patch(
       "/recurring-budget/:injectionId/deactivate",

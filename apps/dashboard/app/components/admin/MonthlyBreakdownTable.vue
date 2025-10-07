@@ -451,22 +451,24 @@ function exportToCSV() {
       csvRows.push([])
     }
 
-    // Financial Summary Section
-    csvRows.push(["FINANCIAL SUMMARY"])
+    // Monthly Breakdown Section
+    csvRows.push(["MONTHLY BREAKDOWN"])
     csvRows.push([])
 
+    // Monthly Summary Cards
+    csvRows.push(["Monthly Summary"])
+    csvRows.push([])
     const retainerFee = monthlyData.value.overallMonthData.retainerFee
     const totalSpend = monthlyData.value.overallMonthData.totalSpend
     const leftover = monthlyData.value.overallMonthData.leftover
     const usedPercentage = monthlyData.value.overallMonthData.usedPercentage
-    const remainingPercentage =
+    const _remainingPercentage =
       monthlyData.value.overallMonthData.remainingPercentage
 
-    csvRows.push(["Retainer Fee (Recurring Budget)", retainerFee.toFixed(2)])
-    csvRows.push(["Total Team Cost", totalSpend.toFixed(2)])
-    csvRows.push(["Profit (Retainer - Cost)", leftover.toFixed(2)])
-    csvRows.push(["Budget Used", `${usedPercentage.toFixed(2)}%`])
-    csvRows.push(["Budget Remaining", `${remainingPercentage.toFixed(2)}%`])
+    csvRows.push(["Retainer Fee", retainerFee.toFixed(2)])
+    csvRows.push(["Actual Spend", totalSpend.toFixed(2)])
+    csvRows.push(["Leftover", leftover.toFixed(2)])
+    csvRows.push(["Usage", `${usedPercentage.toFixed(0)}%`])
     csvRows.push([])
 
     // Department Breakdown Section
@@ -1487,7 +1489,7 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
             <h3 class="text-lg font-semibold">Add Department Budget Split</h3>
           </template>
           <div class="space-y-4">
-            <UFormGroup
+            <UFormField
               label="Department"
               required
             >
@@ -1499,8 +1501,8 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
                 placeholder="Select a department"
                 searchable
               />
-            </UFormGroup>
-            <UFormGroup
+            </UFormField>
+            <UFormField
               label="Budget Amount"
               required
             >
@@ -1517,7 +1519,7 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
                   />
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
             <div class="flex justify-end gap-2 mt-6">
               <UButton
                 label="Cancel"
@@ -1542,7 +1544,7 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
             <h3 class="text-lg font-semibold">Edit Department Budget Split</h3>
           </template>
           <div class="space-y-4">
-            <UFormGroup
+            <UFormField
               label="Department"
               required
             >
@@ -1554,8 +1556,8 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
                 placeholder="Select a department"
                 searchable
               />
-            </UFormGroup>
-            <UFormGroup
+            </UFormField>
+            <UFormField
               label="Budget Amount"
               required
             >
@@ -1572,7 +1574,7 @@ const tableColumns: ColumnDef<TableRow, unknown>[] = [
                   />
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
             <div class="flex justify-end gap-2 mt-6">
               <UButton
                 label="Cancel"
